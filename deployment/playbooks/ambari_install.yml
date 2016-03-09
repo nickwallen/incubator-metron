@@ -15,8 +15,14 @@
 #  limitations under the License.
 #
 ---
+- hosts: ec2
+  become: true
+  tasks:
+  - debug: msg="Detected EC2 - including defaults"
+  - include_vars: ../amazon-ec2/conf/defaults.yml
+
 - hosts: ambari_*
-  sudo: yes
+  become: yes
   roles:
     - role: ambari_common
   tags:
@@ -24,7 +30,7 @@
     - hdp-install
 
 - hosts: ambari_master
-  sudo: yes
+  become: yes
   roles:
     - role:  ambari_master
   tags:
@@ -32,7 +38,7 @@
     - hdp-install
 
 - hosts: ambari_slave
-  sudo: yes
+  become: yes
   roles:
     - role: ambari_slave
   tags:

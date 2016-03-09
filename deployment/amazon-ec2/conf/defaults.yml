@@ -21,7 +21,7 @@ instance_type: m4.xlarge
 image: ami-05cf2265
 volume_type: standard
 key_name: metron-test #Change this
-ec2_host_tag: metron-test
+ec2_host_tag: metron-include-test
 
 # ambari
 ambari_host: "{{ groups.ambari_master[0] }}"
@@ -52,8 +52,21 @@ elasticsearch_web_port: 9200
 metron_version: 0.1BETA
 java_home: /usr/jdk64/jdk1.8.0_40
 pcapservice_port: 8081
-sniff_interface: lo
-pcap_replay_interface: lo
+sniff_interface: tap0
+bro_version: "2.4.1"
+fixbuf_version: "1.7.1"
+yaf_version: "2.8.0"
+daq_version: "2.0.6-1"
+iface: "eth0"
+pycapa_repo: "https://github.com/OpenSOC/pycapa.git"
+pycapa_home: "/opt/pycapa"
+snort_version: "2.9.8.0-1"
+snort_alert_csv_path: "/var/log/snort/alert.csv"
+yaf_args: "--idle-timeout 0"
+#PCAP Replay
+pcap_replay: True
+pcap_replay_interface: tap0
+install_tap: True
 
 #data directories - only required to override defaults
 zookeeper_data_dir: "/data1/hadoop/zookeeper"

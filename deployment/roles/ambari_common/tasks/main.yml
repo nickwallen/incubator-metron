@@ -62,5 +62,3 @@
 - name: Download Ambari repo
   get_url: url="{{ rhel_ambari_install_url }}" dest=/etc/yum.repos.d/ambari.repo
 
-- name: Clean yum
-  shell: yum clean all
