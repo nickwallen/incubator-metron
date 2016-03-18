@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/nickwallen/incubator-metron.svg?branch=travis-ci)](https://travis-ci.org/nickwallen/incubator-metron)
+
 # Metron
 
 Metron integrates a variety of open source big data technologies in order
