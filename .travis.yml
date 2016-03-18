@@ -1,2 +1,2 @@
 language: java
-script: mvn apache-rat:check && cd metron-streaming && mvn integration-test package -Dorg.slf4j.simpleLogger.log.org.codehaus.plexus.archiver.jar.JarArchiver=error -Dorg.slf4j.simpleLogger.log.org=warn
+script: mvn apache-rat:check && cd metron-streaming && mvn -q integration-test package | grep -v "DEBUG\|INFO\|WARN"
