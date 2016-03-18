@@ -1,3 +1,2 @@
 language: java
-script: cd metron-streaming && mvn integration-test
-script: mvn apache-rat:check
+script: mvn apache-rat:check && cd metron-streaming && mvn integration-test package
