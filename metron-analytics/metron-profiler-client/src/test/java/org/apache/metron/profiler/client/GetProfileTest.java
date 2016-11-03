@@ -55,7 +55,7 @@ import static org.apache.metron.profiler.client.stellar.GetProfile.PROFILER_PERI
 import static org.apache.metron.profiler.client.stellar.GetProfile.PROFILER_SALT_DIVISOR;
 
 /**
- * Tests the GetProfile class.
+ * Tests the GetProfile and GetProfileConf classes.
  */
 public class GetProfileTest {
 
@@ -66,7 +66,11 @@ public class GetProfileTest {
   private static final String columnFamily = "P";
   private StellarExecutor executor;
   private Map<String, Object> state;
+  private Context context;
   private ProfileWriter profileWriter;
+  private static final long periodDuration2 = 1;
+  private static final TimeUnit periodUnits2 = TimeUnit.HOURS;
+  private static final int saltDivisor2 = 2050;
 
   /**
    * A TableProvider that allows us to mock HBase.
@@ -106,7 +110,33 @@ public class GetProfileTest {
     }};
 
     // create the necessary context
-    Context context = new Context.Builder()
+    context = new Context.Builder()
+            .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
+            .build();
+
+    // initialize the executor with that context
+    executor = new DefaultStellarExecutor();
+    executor.setContext(context);
+
+    // force re-initialization before each test
+    FunctionResolverSingleton.getInstance().reset();
+  }
+
+  public void setup2() {
+    state = new HashMap<>();
+
+    // global properties
+    Map<String, Object> global = new HashMap<String, Object>() {{
+      put(PROFILER_HBASE_TABLE, tableName);
+      put(PROFILER_COLUMN_FAMILY, columnFamily);
+      put(PROFILER_HBASE_TABLE_PROVIDER, MockTableProvider.class.getName());
+      put(PROFILER_PERIOD, Long.toString(periodDuration2));
+      put(PROFILER_PERIOD_UNITS, periodUnits2.toString());
+      put(PROFILER_SALT_DIVISOR, Integer.toString(saltDivisor2));
+    }};
+
+    // create the necessary context
+    context = new Context.Builder()
             .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
             .build();
 
@@ -239,4 +269,40 @@ public class GetProfileTest {
     // validate - there should be no values from only 4 seconds ago
     Assert.assertEquals(0, result.size());
   }
+
+  /**
+   * Values should be retrievable that were written with configuration different than current global config.
+   */
+  @Test
+  public void testWithConfigOverride() {
+    final int periodsPerHour = 4;
+    final int expectedValue = 2302;
+    final int hours = 2;
+    final long startTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(hours);
+    final List<Object> group = Collections.emptyList();
+
+    // setup - write some measurements to be read later
+    final int count = hours * periodsPerHour;
+    ProfileMeasurement m = new ProfileMeasurement("profile1", "entity1", startTime, periodDuration, periodUnits);
+    profileWriter.write(m, count, group, val -> expectedValue);
+
+    // now change the executor configuration
+    setup2();
+    // prove it
+    Map<String, Object> global = (Map<String, Object>) context.getCapability(Context.Capabilities.GLOBAL_CONFIG).get();
+    Assert.assertEquals(global.get(PROFILER_PERIOD), Long.toString(periodDuration2));
+    Assert.assertNotEquals(periodDuration, periodDuration2);
+
+    // execute - read the profile values - with config_override.
+    // first two override values are strings, third is deliberately a number.
+    String expr = "PROFILE_GET_CONF('profile1', 'entity1', 4, 'HOURS', {"
+            + "'profiler.client.period.duration' : '" + periodDuration + "', "
+            + "'profiler.client.period.duration.units' : '" + periodUnits.toString() + "', "
+            + "'profiler.client.salt.divisor' : " + saltDivisor + " })";
+    List<Integer> result = run(expr, List.class);
+
+    // validate - expect to read all values from the past 4 hours
+    Assert.assertEquals(count, result.size());
+  }
+
 }

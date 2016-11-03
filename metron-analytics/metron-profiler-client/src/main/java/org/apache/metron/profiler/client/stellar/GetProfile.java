@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -51,9 +52,9 @@ import static java.lang.String.format;
 import static org.apache.metron.common.dsl.Context.Capabilities.GLOBAL_CONFIG;
 
 /**
- * A Stellar function that can retrieve data contained within a Profile.
+ * Stellar functions that can retrieve data contained within a Profile.
  *
- *  PROFILE_GET
+ *  PROFILE_GET and PROFILE_GET_CONF
  *
  * Retrieve all values for 'entity1' from 'profile1' over the past 4 hours.
  *
@@ -66,6 +67,16 @@ import static org.apache.metron.common.dsl.Context.Capabilities.GLOBAL_CONFIG;
  * Retrieve all values for 'entity1' from 'profile1' that occurred on 'weekdays' over the past month.
  *
  *   <code>PROFILE_GET('profile1', 'entity1', 1, 'MONTHS', 'weekdays')</code>
+ *
+ * Retrieve all values for 'entity1' from 'profile1' over the past 2 days,
+ * overriding the usual global client configuration parameters for window duration.
+ *
+ *   <code>PROFILE_GET_CONF('profile1', 'entity1', 2, 'DAYS', {'profiler.client.period.duration' : 2, 'profiler.client.period.duration.units' : 'MINUTES'})</code>
+ *
+ * Retrieve all values for 'entity1' from 'profile1' that occurred on 'weekdays' over the past month,
+ * overriding the usual global client configuration parameters for window duration.
+ *
+ *   <code>PROFILE_GET_CONF('profile1', 'entity1', 1, 'MONTHS', {'profiler.client.period.duration' : 2, 'profiler.client.period.duration.units' : 'MINUTES'}, 'weekdays')</code>
  *
  */
 @Stellar(
@@ -132,27 +143,25 @@ public class GetProfile implements StellarFunction {
 
   private static final Logger LOG = LoggerFactory.getLogger(GetProfile.class);
 
-  /**
-   * A client that can retrieve profile values.
-   */
+
+  // Global configuration from client context, used to help create profiler client.
+  private Map<String, Object> global;
+
+  // Cached client that can retrieve profile values.
   private ProfilerClient client;
+
+  // Cached value of config override map used to construct the previously cached client.
+  private Map cachedConfigOverrideMap;
 
   /**
    * Initialization.
    */
   @Override
   public void initialize(Context context) {
-
     // ensure the required capabilities are defined
     Context.Capabilities[] required = { GLOBAL_CONFIG };
     validateCapabilities(context, required);
-    Map<String, Object> global = (Map<String, Object>) context.getCapability(GLOBAL_CONFIG).get();
-
-    // create the profiler client
-    RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(global);
-    ColumnBuilder columnBuilder = getColumnBuilder(global);
-    HTableInterface table = getTable(global);
-    client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder);
+    global = (Map<String, Object>) context.getCapability(GLOBAL_CONFIG).get();
   }
 
   /**
@@ -160,7 +169,7 @@ public class GetProfile implements StellarFunction {
    */
   @Override
   public boolean isInitialized() {
-    return client != null;
+    return global != null;
   }
 
   /**
@@ -171,6 +180,17 @@ public class GetProfile implements StellarFunction {
   @Override
   public Object apply(List<Object> args, Context context) throws ParseException {
 
+    return applyWithConf(args, null, context);
+  }
+
+  /**
+   * Apply the function with override_config (see PROFILE_GET_CONF).
+   * @param args The function arguments other than the config override map.
+   * @param configOverrideMap - the config override map - may be null.
+   * @param context
+   */
+  protected Object applyWithConf(List<Object> args, Map configOverrideMap, Context context) throws ParseException {
+
     String profile = getArg(0, String.class, args);
     String entity = getArg(1, String.class, args);
     long durationAgo = getArg(2, Long.class, args);
@@ -178,7 +198,81 @@ public class GetProfile implements StellarFunction {
     TimeUnit units = TimeUnit.valueOf(unitsName);
     List<Object> groups = getGroupsArg(4, args);
 
+    //create new profiler client if needed
+    if (client == null || !cachedConfigOverrideMap.equals(configOverrideMap)) {
+      Map<String, Object> configWithOverrides = processOverrides(global, configOverrideMap);
+      RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(configWithOverrides);
+      ColumnBuilder columnBuilder = getColumnBuilder(configWithOverrides);
+      HTableInterface table = getTable(configWithOverrides);
+      client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder);
+      cachedConfigOverrideMap = configOverrideMap;
+    }
+
     return client.fetch(Object.class, profile, entity, groups, durationAgo, units);
+  }
+
+  /**
+   * Combine the configuration parameter override list with the config from global context,
+   * and return the result.
+   *
+   * Only the six recognized profiler client config parameters may be overridden,
+   * all other key-value pairs in the Map will be ignored.
+   *
+   * Type violations cause a Stellar ParseException.
+   *
+   * @param global - a context global config map.
+   * @param configOverrideMap - Map as described above.
+   * @return config map with overrides applied.
+   * @throws ParseException - if any override values are of wrong type.
+   */
+  private Map<String, Object> processOverrides(
+              Map<String, Object> global
+              , Map configOverrideMap
+  ) throws ParseException {
+
+    if (configOverrideMap == null || configOverrideMap.isEmpty())
+      return global;
+
+    Map<String, Object> result = new HashMap<String, Object>(global);
+    Object v;
+    try {
+      for (Object key : configOverrideMap.keySet()) {
+        if (key.getClass() != String.class) {
+          // Probably unintended user error, so throw an exception rather than ignore
+          throw new ParseException("Non-string key in config_override map is not allowed: " + key.toString());
+        }
+        switch ((String) key) {
+          case PROFILER_HBASE_TABLE:
+          case PROFILER_COLUMN_FAMILY:
+          case PROFILER_HBASE_TABLE_PROVIDER:
+          case PROFILER_PERIOD_UNITS:
+            v = configOverrideMap.get(key);
+            if (v != null) result.put((String) key, (String) v);
+            break;
+          case PROFILER_PERIOD:
+          case PROFILER_SALT_DIVISOR:
+            v = configOverrideMap.get(key);
+            if (v != null) {
+              // be tolerant if the user put a number instead of a string
+              // but validate that it is an integer value
+              if (v instanceof String) {
+                long vlong = Long.parseLong((String) v);
+                result.put((String) key, String.valueOf(vlong));
+              }
+              else {
+                result.put((String) key, String.valueOf(((Number) v).longValue()));
+              }
+            }
+            break;
+          default:
+            LOG.warn("Ignoring unallowed key {} in config_override map.", key);
+            break;
+        }
+      }
+    } catch (ClassCastException | NumberFormatException cce) {
+      throw new ParseException("Type violation in config_override map values: ", cce);
+    }
+    return result;
   }
 
   /**
@@ -230,7 +324,7 @@ public class GetProfile implements StellarFunction {
    * @param args All of the arguments.
    * @param <T> The type of the argument expected.
    */
-  private <T> T getArg(int index, Class<T> clazz, List<Object> args) {
+  protected <T> T getArg(int index, Class<T> clazz, List<Object> args) {
     if(index >= args.size()) {
       throw new IllegalArgumentException(format("expected at least %d argument(s), found %d", index+1, args.size()));
     }
