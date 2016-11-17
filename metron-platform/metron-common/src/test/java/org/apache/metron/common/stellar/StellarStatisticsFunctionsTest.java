@@ -31,6 +31,7 @@ import org.apache.metron.common.dsl.ParseException;
 import org.apache.metron.common.dsl.StellarFunctions;
 import org.apache.metron.common.math.stats.OnlineStatisticsProviderTest;
 import org.apache.metron.common.math.stats.StatisticsProvider;
+import org.apache.metron.common.utils.ConversionUtils;
 import org.apache.metron.common.utils.SerDeUtils;
 import org.junit.Assert;
 import org.junit.Before;
@@ -193,8 +194,9 @@ public class StellarStatisticsFunctionsTest {
     Update the reference stats from commons math to ensure we are
      */
     GaussianRandomGenerator gaussian = new GaussianRandomGenerator(new MersenneTwister(1L));
-    SummaryStatistics sStatistics= new SummaryStatistics();
+    SummaryStatistics sStatistics = new SummaryStatistics();
     DescriptiveStatistics dStatistics = new DescriptiveStatistics();
+
     for(int i = 0;i < 10;++i) {
       List<Double> sample = new ArrayList<>();
       for(int j = 0;j < 100;++j) {
@@ -203,9 +205,9 @@ public class StellarStatisticsFunctionsTest {
         sStatistics.addValue(s);
         dStatistics.addValue(s);
       }
-      StatisticsProvider provider = (StatisticsProvider)run("STATS_ADD(STATS_INIT(), " + Joiner.on(",").join(sample) + ")"
-                                                           , new HashMap<>()
-                                                           );
+
+      String expression = "STATS_ADD(STATS_INIT(), " + Joiner.on(",").join(sample) + ")";
+      StatisticsProvider provider = (StatisticsProvider)run(expression, new HashMap<>());
       providers.add(provider);
     }
 
@@ -216,43 +218,39 @@ public class StellarStatisticsFunctionsTest {
     for(int i = 0;i < providers.size();++i) {
       providerVariables.put("provider_" + i, providers.get(i));
     }
-    StatisticsProvider mergedProvider =
-            (StatisticsProvider)run("STATS_MERGE([" + Joiner.on(",").join(providerVariables.keySet()) + "])"
-                                   , providerVariables
-                                   );
-    OnlineStatisticsProviderTest.validateStatisticsProvider(mergedProvider, sStatistics , dStatistics);
 
+    String expression = "STATS_MERGE([" + Joiner.on(",").join(providerVariables.keySet()) + "])";
+    StatisticsProvider mergedProvider = (StatisticsProvider)run(expression, providerVariables);
+    OnlineStatisticsProviderTest.validateStatisticsProvider(mergedProvider, sStatistics , dStatistics);
   }
 
   @Test
   public void testAddManyIntegers() throws Exception {
     statsInit(windowSize);
-    Object result = run("STATS_COUNT(stats)", variables);
-    double countAtStart = (double) result;
+    double countAtStart = (double) run("STATS_COUNT(stats)", variables);
 
     run("STATS_ADD(stats, 10, 20, 30, 40, 50)", variables);
 
     Object actual = run("STATS_COUNT(stats)", variables);
-    assertEquals(countAtStart + 5.0, (double) actual, 0.1);
+    assertEquals(countAtStart + 5, actual);
   }
 
   @Test
   public void testAddManyFloats() throws Exception {
     statsInit(windowSize);
-    Object result = run("STATS_COUNT(stats)", variables);
-    double countAtStart = (double) result;
+    double countAtStart = (double) run("STATS_COUNT(stats)", variables);
 
     run("STATS_ADD(stats, 10.0, 20.0, 30.0, 40.0, 50.0)", variables);
 
     Object actual = run("STATS_COUNT(stats)", variables);
-    assertEquals(countAtStart + 5.0, (double) actual, 0.1);
+    assertEquals(countAtStart + 5, actual);
   }
 
   @Test
   public void testCount() throws Exception {
     statsInit(windowSize);
     Object actual = run("STATS_COUNT(stats)", variables);
-    assertEquals(stats.getN(), (double) actual, 0.1);
+    assertEquals((long)stats.getN(), (long)ConversionUtils.convert(actual,Long.class));
   }
 
   @Test
@@ -358,7 +356,6 @@ public class StellarStatisticsFunctionsTest {
     assertEquals(stats.getSkewness(), (Double) actual, 0.1);
   }
 
-
   @Test
   public void testPercentileNoWindow() throws Exception {
     statsInit(0);
@@ -377,13 +374,17 @@ public class StellarStatisticsFunctionsTest {
 
   @Test
   public void testWithNull() throws Exception {
-    Object actual = run("STATS_MEAN(null)", variables);
-    assertTrue(((Double)actual).isNaN());
-
-    actual = run("STATS_COUNT(null)", variables);
-    assertTrue(((Double)actual).isNaN());
-
-    actual = run("STATS_VARIANCE(null)", variables);
-    assertTrue(((Double)actual).isNaN());
+    {
+      Object actual = run("STATS_MEAN(null)", variables);
+      assertTrue(((Double) actual).isNaN());
+    }
+    {
+      double actual = (double) run("STATS_COUNT(null)", variables);
+      assertTrue(((Double)actual).isNaN());
+    }
+    {
+      Object actual = run("STATS_VARIANCE(null)", variables);
+      assertTrue(((Double) actual).isNaN());
+    }
   }
 }

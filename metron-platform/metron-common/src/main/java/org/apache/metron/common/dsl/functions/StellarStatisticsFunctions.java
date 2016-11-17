@@ -161,11 +161,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The mean of the values in the window or NaN if the statistics object is null."
           )
   public static class Mean extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getMean() : Double.NaN;
     }
@@ -180,11 +182,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The geometric mean of the values in the window or NaN if the statistics object is null."
           )
   public static class GeometricMean extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getGeometricMean() : Double.NaN;
     }
@@ -199,11 +203,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The sum of the values in the window or NaN if the statistics object is null."
           )
   public static class Sum extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getSum() : Double.NaN;
     }
@@ -217,11 +223,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The maximum of the accumulated values in the window or NaN if the statistics object is null."
           )
   public static class Max extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getMax() : Double.NaN;
     }
@@ -235,11 +243,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The minimum of the accumulated values in the window or NaN if the statistics object is null."
           )
   public static class Min extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getMin() : Double.NaN;
     }
@@ -253,10 +263,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The count of the values in the window or NaN if the statistics object is null.")
   public static class Count extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? convert(stats.getCount(), Double.class) : Double.NaN;
     }
@@ -270,10 +282,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The population variance of the values in the window or NaN if the statistics object is null.")
   public static class PopulationVariance extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getPopulationVariance() : Double.NaN;
     }
@@ -287,10 +301,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The variance of the values in the window or NaN if the statistics object is null.")
   public static class Variance extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getVariance() : Double.NaN;
     }
@@ -304,10 +320,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The quadratic mean of the values in the window or NaN if the statistics object is null.")
   public static class QuadraticMean extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getQuadraticMean() : Double.NaN;
     }
@@ -321,10 +339,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The standard deviation of the values in the window or NaN if the statistics object is null.")
   public static class StandardDeviation extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getStandardDeviation() : Double.NaN;
     }
@@ -338,10 +358,12 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The sum of the (natural) log of the values in the window or NaN if the statistics object is null.")
   public static class SumLogs extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getSumLogs() : Double.NaN;
     }
@@ -355,11 +377,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The sum of the squares of the values in the window or NaN if the statistics object is null.")
   public static class SumSquares extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
-      StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
+        validate(args);
+        StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getSumSquares() : Double.NaN;
     }
   }
@@ -372,11 +396,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The kurtosis of the values in the window or NaN if the statistics object is null.")
   public static class Kurtosis extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
-      StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
+        validate(args);
+        StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getKurtosis() : Double.NaN;
     }
   }
@@ -389,11 +415,13 @@ public class StellarStatisticsFunctions {
           , params = {
             "stats - The Stellar statistics object"
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The skewness of the values in the window or NaN if the statistics object is null.")
   public static class Skewness extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
-      StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
+        validate(args);
+        StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       return (stats != null) ? stats.getSkewness() : Double.NaN;
     }
   }
@@ -410,11 +438,13 @@ public class StellarStatisticsFunctions {
           ,"p - a double where 0 <= p < 1 representing the percentile"
 
                      }
+          , requiredParams = { StatisticsProvider.class }
           , returns = "The p'th percentile of the data or NaN if the statistics object is null"
           )
   public static class Percentile extends BaseStellarFunction {
     @Override
     public Object apply(List<Object> args) {
+      validate(args);
       StatisticsProvider stats = convert(args.get(0), StatisticsProvider.class);
       Double p = convert(args.get(1), Double.class);
 
