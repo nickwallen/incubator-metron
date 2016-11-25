@@ -24,7 +24,9 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.log4j.Level;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.utils.JSONUtils;
+import org.apache.metron.profiler.ProfileBuilder;
 import org.apache.metron.profiler.ProfileMeasurement;
+import org.apache.metron.profiler.stellar.StellarExecutor;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.metron.test.utils.UnitTestHelper;
 import org.apache.storm.Constants;
@@ -41,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.any;
@@ -66,6 +70,15 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
   private JSONObject message;
 
+
+  // TODO test initializes a ProfileBuilder
+
+  // TODO test that different profiles have different builders
+
+  // TODO test that different entities with same profile have different builders
+
+
+
   public static Tuple mockTickTuple() {
     return mockTuple(Constants.SYSTEM_COMPONENT_ID, Constants.SYSTEM_TICK_STREAM_ID);
   }
@@ -87,7 +100,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     when(tuple.getValueByField(eq("message"))).thenReturn(message);
 
     // the tuple will contain the 'fully resolved' name of the entity
-    when(tuple.getStringByField(eq("entity"))).thenReturn("10.0.0.1");
+    when(tuple.getValueByField(eq("entity"))).thenReturn("10.0.0.1");
 
     // the tuple will contain the profile definition
     ProfileConfig profileConfig = JSONUtils.INSTANCE.load(profile, ProfileConfig.class);
@@ -140,9 +153,9 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     bolt.execute(tuple);
 
     // validate that x=10+10+10 y=20+20+20
-    ProfileState state = bolt.getProfileState(tuple);
-    assertEquals(10+10+10.0, state.getExecutor().getState().get("x"));
-    assertEquals(20+20+20.0, state.getExecutor().getState().get("y"));
+    ProfileBuilder builder = bolt.getBuilder(tuple);
+    assertEquals(10+10+10.0, builder.valueOf("x"));
+    assertEquals(20+20+20.0, builder.valueOf("y"));
   }
 
   /**
@@ -169,8 +182,8 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     bolt.execute(tuple);
 
     // validate
-    ProfileState state = bolt.getProfileState(tuple);
-    assertEquals(2, state.getExecutor().getState().get("x"));
+    ProfileBuilder builder = bolt.getBuilder(tuple);
+    assertEquals(2, builder.valueOf("x"));
   }
 
   /**
@@ -198,8 +211,8 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     bolt.execute(tuple);
 
     // validate
-    ProfileState state = bolt.getProfileState(tuple);
-    assertEquals(2, state.getExecutor().getState().get("x"));
+    ProfileBuilder builder = bolt.getBuilder(tuple);
+    assertEquals(2, builder.valueOf("x"));
   }
 
   /**
@@ -265,11 +278,17 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     bolt.execute(tuple);
     bolt.execute(tuple);
 
+    // before the flush - the profile contains some state
+    ProfileBuilder builder = bolt.getBuilder(tuple);
+    assertNotNull(builder.valueOf("x"));
+    assertNotNull(builder.valueOf("y"));
+
     // execute - should clear state from previous tuples
     bolt.execute(mockTickTuple());
 
-    ProfileState state = bolt.getProfileState(tuple);
-    assertThat(state.getExecutor().getState().size(), equalTo(0));
+    // after the flush - the profile should not have any state
+    assertNull(builder.valueOf("x"));
+    assertNull(builder.valueOf("y"));
   }
 
   /**
