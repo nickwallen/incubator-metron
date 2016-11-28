@@ -61,7 +61,9 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
   private transient JSONParser parser;
 
   /**
-   * Executes Stellar code.
+   * Executes Stellar code.  The code that is executed in the splitter is stateless.  None
+   * of the expressions result in state that is shared across telemetry messages.  This is
+   * why we can reuse the same executor.
    */
   private StellarExecutor executor;
 
@@ -151,7 +153,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    */
   @Override
   public void declareOutputFields(OutputFieldsDeclarer declarer) {
-    declarer.declare(new Fields("entity", "profile", "message"));
+    declarer.declare(new Fields("entity", "profile"));
   }
 
   public StellarExecutor getExecutor() {
