@@ -47,12 +47,12 @@ import java.util.concurrent.TimeUnit;
 import static java.lang.String.format;
 
 /**
- * A bolt that is responsible for building a Profile.
+ * A bolt that is responsible for building the portion of a Profile that
+ * pertains to a single entity.
  *
- * This bolt maintains the state required to build a Profile.  When the window
- * period expires, the data is summarized as a ProfileMeasurement, all state is
- * flushed, and the ProfileMeasurement is emitted.
- *
+ * One instance will be maintained for each unique [profile, entity] pair. When
+ * the window period expires, the data is summarized as a ProfileMeasurement,
+ * all state is flushed, and the ProfileMeasurement is emitted.
  */
 public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
 
@@ -61,17 +61,17 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
   private OutputCollector collector;
 
   /**
-   * The duration of each profile period in milliseconds.
-   */
-  private long periodDurationMillis;
-
-  /**
    * If a message has not been applied to a Profile in this number of milliseconds,
    * the Profile will be forgotten and its resources will be cleaned up.
    *
    * The TTL must be at least greater than the period duration.
    */
   private long timeToLiveMillis;
+
+  /**
+   * The duration of each profile period in milliseconds.
+   */
+  private long periodDurationMillis;
 
   /**
    * Maintains the state of a profile which is unique to a profile/entity pair.
@@ -87,19 +87,13 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
    * @param zookeeperUrl The Zookeeper URL that contains the configuration data.
    */
   public ProfileBuilderBolt(String zookeeperUrl) {
+    // TODO can we use this and the client to fetch the global configuration for the executor periodically?
     super(zookeeperUrl);
   }
 
-  /**
-   * Defines the frequency at which the bolt will receive tick tuples.  Tick tuples are
-   * used to control how often a profile is flushed.
-   */
   @Override
-  public Map<String, Object> getComponentConfiguration() {
-    // how frequently should the bolt receive tick tuples?
-    Config conf = new Config();
-    conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, TimeUnit.MILLISECONDS.toSeconds(periodDurationMillis));
-    return conf;
+  public void declareOutputFields(OutputFieldsDeclarer declarer) {
+    declarer.declare(new Fields("measurement", "profile"));
   }
 
   @Override
@@ -112,6 +106,7 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
               timeToLiveMillis,
               periodDurationMillis));
     }
+
     this.collector = collector;
     this.parser = new JSONParser();
     this.profileCache = CacheBuilder
@@ -120,23 +115,13 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
             .build();
   }
 
-  /**
-   * The builder emits a single field, 'measurement', which contains a ProfileMeasurement. A
-   * ProfileMeasurement is emitted when a time window expires and a flush occurs.
-   */
-  @Override
-  public void declareOutputFields(OutputFieldsDeclarer declarer) {
-    // once the time window expires, a complete ProfileMeasurement is emitted
-    declarer.declare(new Fields("measurement", "profile"));
-  }
-
   @Override
   public void execute(Tuple input) {
     try {
       doExecute(input);
 
     } catch (Throwable e) {
-      LOG.error(format("Unexpected failure: message='%s', tuple='%s'", e.getMessage(), input), e);
+      LOG.error(format("Unexpected failure: '%s' tuple='%s'", e.getMessage(), input), e);
       collector.reportError(e);
 
     } finally {

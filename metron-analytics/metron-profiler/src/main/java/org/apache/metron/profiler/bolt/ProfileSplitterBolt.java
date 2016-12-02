@@ -75,6 +75,11 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
   }
 
   @Override
+  public void declareOutputFields(OutputFieldsDeclarer declarer) {
+    declarer.declare(new Fields("entity", "profile", "message"));
+  }
+
+  @Override
   public void prepare(Map stormConf, TopologyContext context, OutputCollector collector) {
     super.prepare(stormConf, context, collector);
     this.collector = collector;
@@ -141,19 +146,6 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
       // emit a message for the bolt responsible for building this profile
       collector.emit(input, new Values(entity, profile, message));
     }
-  }
-
-  /**
-   * Each emitted tuple contains the following fields.
-   * <p><ol>
-   * <li> entity - The name of the entity.  The actual result of executing the Stellar expression.
-   * <li> profile - The profile definition that the message needs applied to.
-   * <li> message - The message containing JSON-formatted data that needs applied to a profile.
-   * </ol></p>
-   */
-  @Override
-  public void declareOutputFields(OutputFieldsDeclarer declarer) {
-    declarer.declare(new Fields("entity", "profile"));
   }
 
   public StellarExecutor getExecutor() {
