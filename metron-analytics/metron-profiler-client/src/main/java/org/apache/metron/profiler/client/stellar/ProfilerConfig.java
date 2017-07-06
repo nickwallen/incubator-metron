@@ -26,6 +26,7 @@ import org.apache.metron.hbase.HTableProvider;
 import java.util.Map;
 
 public enum ProfilerConfig {
+
   /**
    * A global property that defines the name of the HBase table used to store profile data.
    */
@@ -56,11 +57,17 @@ public enum ProfilerConfig {
   /**
    * A global property that defines the salt divisor used to store profile data.
    */
-  PROFILER_SALT_DIVISOR("profiler.client.salt.divisor", 1000L, Long.class);
+  PROFILER_SALT_DIVISOR("profiler.client.salt.divisor", 1000L, Long.class),
+
+  /**
+   * A global property that defines which ColumnBuilder to use.
+   */
+  PROFILER_COLUMN_BUILDER("profiler.client.column.builder", "org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder", String.class);
 
   String key;
   Object defaultValue;
   Class<?> valueType;
+
   ProfilerConfig(String key, Object defaultValue, Class<?> valueType) {
     this.key = key;
     this.defaultValue = defaultValue;

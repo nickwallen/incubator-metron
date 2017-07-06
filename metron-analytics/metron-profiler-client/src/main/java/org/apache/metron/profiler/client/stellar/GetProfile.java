@@ -22,6 +22,8 @@ package org.apache.metron.profiler.client.stellar;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.metron.profiler.client.ColumnBuilderFactory;
+import org.apache.metron.profiler.hbase.CompleteColumnBuilder;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -93,7 +95,7 @@ import static org.apache.metron.profiler.client.stellar.Util.getEffectiveConfig;
 )
 public class GetProfile implements StellarFunction {
 
-
+  private static final Logger LOG = LoggerFactory.getLogger(GetProfile.class);
 
   /**
    * Cached client that can retrieve profile values.
@@ -104,8 +106,6 @@ public class GetProfile implements StellarFunction {
    * Cached value of config map actually used to construct the previously cached client.
    */
   private Map<String, Object> cachedConfigMap = new HashMap<String, Object>(6);
-
-  private static final Logger LOG = LoggerFactory.getLogger(GetProfile.class);
 
   /**
    * Initialization.  No longer need to do anything in initialization,
@@ -194,21 +194,14 @@ public class GetProfile implements StellarFunction {
     return groups;
   }
 
-
-
-
-
   /**
    * Creates the ColumnBuilder to use in accessing the profile data.
    * @param global The global configuration.
    */
   private ColumnBuilder getColumnBuilder(Map<String, Object> global) {
-    ColumnBuilder columnBuilder;
 
-    String columnFamily = PROFILER_COLUMN_FAMILY.get(global, String.class);
-    columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-
-    return columnBuilder;
+    String className = PROFILER_COLUMN_BUILDER.get(global, String.class);
+    return ColumnBuilderFactory.create(className, global);
   }
 
   /**
