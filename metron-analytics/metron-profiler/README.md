@@ -281,8 +281,8 @@ The values can be changed on disk and then the Profiler topology must be restart
 | profiler.executors                    | The number of executors to spawn per component.
 | profiler.input.topic                  | The name of the Kafka topic from which to consume data.
 | profiler.output.topic                 | The name of the Kafka topic to which profile data is written.  Only used with profiles that use the [`triage` result field](#result).
-| profiler.period.duration              | The duration of each profile period.  This value should be defined along with `profiler.period.duration.units`.
-| profiler.period.duration.units        | The units used to specify the `profiler.period.duration`.
+| profiler.period.duration              | The duration of each profile period.  This value should be defined along with `profiler.period.duration.units`. To read a profile using the Profiler Client, this value must match the Profiler Client's `profiler.client.period.duration` property.
+| profiler.period.duration.units        | The units used to specify the `profiler.period.duration`.  This value should be defined along with `profiler.period.duration`. To read a profile using the Profiler Client, this value must match the Profiler Client's `profiler.client.period.duration.units` property.
 | profiler.ttl                          | If a message has not been applied to a Profile in this period of time, the Profile will be forgotten and its resources will be cleaned up. This value should be defined along with `profiler.ttl.units`.
 | profiler.ttl.units                    | The units used to specify the `profiler.ttl`.
 | profiler.hbase.salt.divisor           | A salt is prepended to the row key to help prevent hotspotting.  This constant is used to generate the salt.  Ideally, this constant should be roughly equal to the number of nodes in the Hbase cluster.
@@ -291,11 +291,17 @@ The values can be changed on disk and then the Profiler topology must be restart
 | profiler.hbase.batch                  | The number of puts that are written in a single batch.
 | profiler.hbase.flush.interval.seconds | The maximum number of seconds between batch writes to HBase.
 
+If the Profiler's period duration or the salt divisor is altered, these values must also be altered for the Profiler Client.  Otherwise, the [Profiler Client](metron-analytics/metron-profiler-client) will not be able to read the profile data.  
+* If the Profiler's `profiler.period.duration` is changed, also change the Profiler Client's `profiler.client.period.duration`.
+* If the Profiler's `profiler.period.duration.units` is changed, also change the Profiler Client's `profiler.client.period.duration.units`.
+* If the Profiler's `profiler.hbase.salt.divisor` is changed, also change the Profiler Client's `profiler.client.salt.divisor`.
+
 After altering the configuration, start the Profiler.
 
-```
-$ $METRON_HOME/start_profiler_topology.sh
-```
+    ```
+    $ cd $METRON_HOME
+    $ bin/start_profiler_topology.sh
+    ```
 
 ## Examples
 
