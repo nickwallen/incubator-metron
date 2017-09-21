@@ -109,7 +109,7 @@ class ProfilerCommands:
                   self.__params.hbase_keytab_path,
                   self.__params.hbase_principal_name,
                   execute_user=self.__params.hbase_user)
-        cmd = "echo \"grant '{0}', 'RW', '{1}'\" | hbase shell -n"
+        cmd = "echo \"grant '{0}', 'RWC', '{1}'\" | hbase shell -n"
         add_table_acl_cmd = cmd.format(self.__params.metron_user, self.__params.profiler_hbase_table)
         Execute(add_table_acl_cmd,
                 tries=3,
