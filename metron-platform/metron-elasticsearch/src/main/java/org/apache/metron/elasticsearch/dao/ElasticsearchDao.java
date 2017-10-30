@@ -300,21 +300,28 @@ public class ElasticsearchDao implements IndexDao {
 
   @Override
   public Document getLatest(final String guid, final String sensorType) throws IOException {
-    Optional<Document> ret = searchByGuid(
-            guid
-            , sensorType
-            , hit -> {
-              Long ts = 0L;
-              String doc = hit.getSourceAsString();
-              String sourceType = Iterables.getFirst(Splitter.on("_doc").split(hit.getType()), null);
-              try {
-                return Optional.of(new Document(doc, guid, sourceType, ts));
-              } catch (IOException e) {
-                throw new IllegalStateException("Unable to retrieve latest: " + e.getMessage(), e);
-              }
-            }
-            );
-    return ret.orElse(null);
+    Optional<Document> doc = searchByGuid(guid, sensorType, hit -> toDocument(guid, hit));
+    return doc.orElse(null);
+  }
+
+  private Optional<Document> toDocument(final String guid, SearchHit hit) {
+    Long ts = 0L;
+    String doc = hit.getSourceAsString();
+    String sourceType = toSourceType(hit.getType());
+    try {
+      return Optional.of(new Document(doc, guid, sourceType, ts));
+    } catch (IOException e) {
+      throw new IllegalStateException("Unable to retrieve latest: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Returns the source type based on a given doc type.
+   * @param docType The document type.
+   * @return The source type.
+   */
+  private String toSourceType(String docType) {
+    return Iterables.getFirst(Splitter.on("_doc").split(docType), null);
   }
 
   /**
