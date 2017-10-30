@@ -93,7 +93,6 @@ public class ElasticsearchSearchIntegrationTest extends SearchIntegrationTest {
   @Multiline
   private static String snortTypeMappings;
 
-
   @Override
   protected IndexDao createDao() throws Exception {
     IndexDao elasticsearchDao = new ElasticsearchDao();
