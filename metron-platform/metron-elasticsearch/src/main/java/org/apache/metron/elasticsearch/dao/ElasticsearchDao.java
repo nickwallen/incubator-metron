@@ -17,23 +17,8 @@
  */
 package org.apache.metron.elasticsearch.dao;
 
-import static org.apache.metron.elasticsearch.utils.ElasticsearchUtils.INDEX_NAME_DELIMITER;
-
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -48,6 +33,7 @@ import org.apache.metron.indexing.dao.search.InvalidSearchException;
 import org.apache.metron.indexing.dao.search.SearchRequest;
 import org.apache.metron.indexing.dao.search.SearchResponse;
 import org.apache.metron.indexing.dao.search.SearchResult;
+import org.apache.metron.indexing.dao.search.SortField;
 import org.apache.metron.indexing.dao.search.SortOrder;
 import org.apache.metron.indexing.dao.update.Document;
 import org.elasticsearch.action.ActionWriteResponse.ShardInfo;
@@ -80,6 +66,21 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static org.apache.metron.elasticsearch.utils.ElasticsearchUtils.INDEX_NAME_DELIMITER;
 
 public class ElasticsearchDao implements IndexDao {
 
@@ -126,49 +127,109 @@ public class ElasticsearchDao implements IndexDao {
    * @throws InvalidSearchException When the query is malformed or the current state doesn't allow search
    */
   protected SearchResponse search(SearchRequest searchRequest, QueryBuilder queryBuilder) throws InvalidSearchException {
+    org.elasticsearch.action.search.SearchRequest esRequest;
+    org.elasticsearch.action.search.SearchResponse esResponse;
+
     if(client == null) {
       throw new InvalidSearchException("Uninitialized Dao!  You must call init() prior to use.");
     }
     if (searchRequest.getSize() > accessConfig.getMaxSearchResults()) {
       throw new InvalidSearchException("Search result size must be less than " + accessConfig.getMaxSearchResults());
     }
+
+    // build the search request
+    esRequest = buildSearchRequest(searchRequest, queryBuilder);
+
+    // execute the search
+    try {
+      esResponse = client
+              .search(esRequest)
+              .actionGet();
+
+    } catch (SearchPhaseExecutionException e) {
+      LOG.error("Could not execute search", e);
+      throw new InvalidSearchException("Could not execute search", e);
+    }
+
+    // build the search response
+    return buildSearchResponse(searchRequest, esResponse);
+  }
+
+  /**
+   * Builds an Elasticsearch search request.
+   * @param searchRequest The Metron search request.
+   * @param queryBuilder
+   * @return An Elasticsearch search request.
+   */
+  private org.elasticsearch.action.search.SearchRequest buildSearchRequest(SearchRequest searchRequest, QueryBuilder queryBuilder) {
     SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
             .size(searchRequest.getSize())
             .from(searchRequest.getFrom())
             .query(queryBuilder)
             .trackScores(true);
-    searchRequest.getSort().forEach(sortField -> searchSourceBuilder.sort(sortField.getField(), getElasticsearchSortOrder(sortField.getSortOrder())));
-    Optional<List<String>> fields = searchRequest.getFields();
-    if (fields.isPresent()) {
-      searchSourceBuilder.fields(fields.get());
+
+    // handle sort fields
+    for(SortField sortField : searchRequest.getSort()) {
+      org.elasticsearch.search.sort.SortOrder order = getElasticsearchSortOrder(sortField.getSortOrder());
+      searchSourceBuilder.sort(sortField.getField(), order);
+    }
+
+    // handle search fields
+    if (searchRequest.getFields().isPresent()) {
+      searchSourceBuilder.fields(searchRequest.getFields().get());
     } else {
       searchSourceBuilder.fetchSource(true);
     }
-    Optional<List<String>> facetFields = searchRequest.getFacetFields();
-    if (facetFields.isPresent()) {
-      facetFields.get().forEach(field -> searchSourceBuilder.aggregation(new TermsBuilder(getFacentAggregationName(field)).field(field)));
+
+    // handle facet fields
+    if (searchRequest.getFacetFields().isPresent()) {
+      for(String field : searchRequest.getFacetFields().get()) {
+        String name = getFacentAggregationName(field);
+        TermsBuilder terms = new TermsBuilder(name).field(field);
+        searchSourceBuilder.aggregation(terms);
+      }
     }
-    String[] wildcardIndices = wildcardIndices(searchRequest.getIndices());
-    org.elasticsearch.action.search.SearchResponse elasticsearchResponse;
-    try {
-      elasticsearchResponse = client.search(new org.elasticsearch.action.search.SearchRequest(wildcardIndices)
-              .source(searchSourceBuilder)).actionGet();
-    } catch (SearchPhaseExecutionException e) {
-      LOG.error("Could not execute search", e);
-      throw new InvalidSearchException("Could not execute search", e);
-    }
+
+    // build the search request
+    String[] indices = wildcardIndices(searchRequest.getIndices());
+    return new org.elasticsearch.action.search.SearchRequest()
+            .indices(indices)
+            .source(searchSourceBuilder);
+  }
+
+  /**
+   * Transforms an Elasticsearch search response into a Metron search response.
+   * @param searchRequest The Metron search request.
+   * @param esResponse The Elasticsearch search response.
+   * @return A Metron search response.
+   * @throws InvalidSearchException
+   */
+  private SearchResponse buildSearchResponse(SearchRequest searchRequest, org.elasticsearch.action.search.SearchResponse esResponse) throws InvalidSearchException {
     SearchResponse searchResponse = new SearchResponse();
-    searchResponse.setTotal(elasticsearchResponse.getHits().getTotalHits());
-    searchResponse.setResults(Arrays.stream(elasticsearchResponse.getHits().getHits()).map(searchHit ->
-        getSearchResult(searchHit, fields.isPresent())).collect(Collectors.toList()));
-    if (facetFields.isPresent()) {
+    searchResponse.setTotal(esResponse.getHits().getTotalHits());
+
+    // search hits --> search results
+    final boolean fieldsPresent = searchRequest.getFields().isPresent();
+    List<SearchResult> results = new ArrayList<>();
+    for(SearchHit hit: esResponse.getHits().getHits()) {
+      SearchResult result = getSearchResult(hit, fieldsPresent);
+      results.add(result);
+    }
+    searchResponse.setResults(results);
+
+    // handle facet fields
+    if (searchRequest.getFacetFields().isPresent()) {
+      List<String> facetFields = searchRequest.getFacetFields().get();
       Map<String, FieldType> commonColumnMetadata;
       try {
         commonColumnMetadata = getCommonColumnMetadata(searchRequest.getIndices());
+
       } catch (IOException e) {
-        throw new InvalidSearchException(String.format("Could not get common column metadata for indices %s", Arrays.toString(searchRequest.getIndices().toArray())));
+        throw new InvalidSearchException(String.format(
+                "Could not get common column metadata for indices %s",
+                Arrays.toString(searchRequest.getIndices().toArray())));
       }
-      searchResponse.setFacetCounts(getFacetCounts(facetFields.get(), elasticsearchResponse.getAggregations(), commonColumnMetadata ));
+      searchResponse.setFacetCounts(getFacetCounts(facetFields, esResponse.getAggregations(), commonColumnMetadata ));
     }
     return searchResponse;
   }
