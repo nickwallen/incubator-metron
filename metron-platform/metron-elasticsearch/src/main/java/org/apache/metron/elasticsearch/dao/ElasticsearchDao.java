@@ -19,6 +19,7 @@ package org.apache.metron.elasticsearch.dao;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -36,6 +37,7 @@ import org.apache.metron.indexing.dao.search.SearchResult;
 import org.apache.metron.indexing.dao.search.SortField;
 import org.apache.metron.indexing.dao.search.SortOrder;
 import org.apache.metron.indexing.dao.update.Document;
+import org.codehaus.jackson.map.ObjectMapper;
 import org.elasticsearch.action.ActionWriteResponse.ShardInfo;
 import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -43,15 +45,18 @@ import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchPhaseExecutionException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
+import org.elasticsearch.action.search.ShardSearchFailure;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.common.collect.ImmutableOpenMap;
+import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryStringQueryBuilder;
+import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.Aggregation;
@@ -63,6 +68,10 @@ import org.elasticsearch.search.aggregations.bucket.terms.TermsBuilder;
 import org.elasticsearch.search.aggregations.metrics.sum.Sum;
 import org.elasticsearch.search.aggregations.metrics.sum.SumBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.elasticsearch.search.sort.SortBuilder;
+import org.json.simple.JSONObject;
+import org.omg.CORBA.DynAnyPackage.Invalid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,38 +130,65 @@ public class ElasticsearchDao implements IndexDao {
 
   /**
    * Defers to a provided {@link org.elasticsearch.index.query.QueryBuilder} for the query.
-   * @param searchRequest The request defining the parameters of the search
+   * @param request The request defining the parameters of the search
    * @param queryBuilder The actual query to be run. Intended for if the SearchRequest requires wrapping
    * @return The results of the query
    * @throws InvalidSearchException When the query is malformed or the current state doesn't allow search
    */
-  protected SearchResponse search(SearchRequest searchRequest, QueryBuilder queryBuilder) throws InvalidSearchException {
+  protected SearchResponse search(SearchRequest request, QueryBuilder queryBuilder) throws InvalidSearchException {
     org.elasticsearch.action.search.SearchRequest esRequest;
     org.elasticsearch.action.search.SearchResponse esResponse;
 
     if(client == null) {
       throw new InvalidSearchException("Uninitialized Dao!  You must call init() prior to use.");
     }
-    if (searchRequest.getSize() > accessConfig.getMaxSearchResults()) {
+    if (request.getSize() > accessConfig.getMaxSearchResults()) {
       throw new InvalidSearchException("Search result size must be less than " + accessConfig.getMaxSearchResults());
     }
 
-    // build the search request
-    esRequest = buildSearchRequest(searchRequest, queryBuilder);
+    esRequest = buildSearchRequest(request, queryBuilder);
+    esResponse = executeSearch(esRequest);
+    return buildSearchResponse(request, esResponse);
+  }
 
-    // execute the search
-    try {
-      esResponse = client
-              .search(esRequest)
-              .actionGet();
+  /**
+   * Converts an Elasticsearch SearchRequest to JSON.
+   * @param esRequest The search request.
+   * @return The JSON representation of the SearchRequest.
+   */
+  private String toJSON(org.elasticsearch.action.search.SearchRequest esRequest) {
+    String json = "null";
+    if(esRequest != null) {
+      try {
+        json = XContentHelper.convertToJson(esRequest.source(), true);
 
-    } catch (SearchPhaseExecutionException e) {
-      LOG.error("Could not execute search", e);
-      throw new InvalidSearchException("Could not execute search", e);
+      } catch (IOException io) {
+        json = "JSON conversion failed; request=" + esRequest.toString();
+      }
+    }
+    return json;
+  }
+
+  /**
+   * Convert a SearchRequest to JSON.
+   * @param request The search request.
+   * @return The JSON representation of the SearchRequest.
+   */
+  private String toJSON(Object request) {
+    String json = "null";
+    if(request != null) {
+      try {
+        json = new ObjectMapper()
+                .writer()
+                .withDefaultPrettyPrinter()
+                .writeValueAsString(request);
+
+      } catch (IOException io) {
+        json = "JSON conversion failed; request=" + request.toString();
+      }
     }
 
-    // build the search response
-    return buildSearchResponse(searchRequest, esResponse);
+    return json;
   }
 
   /**
@@ -161,8 +197,12 @@ public class ElasticsearchDao implements IndexDao {
    * @param queryBuilder
    * @return An Elasticsearch search request.
    */
-  private org.elasticsearch.action.search.SearchRequest buildSearchRequest(SearchRequest searchRequest, QueryBuilder queryBuilder) {
-    SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
+  private org.elasticsearch.action.search.SearchRequest buildSearchRequest(
+          SearchRequest searchRequest,
+          QueryBuilder queryBuilder)
+  {
+    LOG.debug("Got search request; request={}", toJSON(searchRequest));
+    SearchSourceBuilder searchBuilder = new SearchSourceBuilder()
             .size(searchRequest.getSize())
             .from(searchRequest.getFrom())
             .query(queryBuilder)
@@ -170,15 +210,17 @@ public class ElasticsearchDao implements IndexDao {
 
     // handle sort fields
     for(SortField sortField : searchRequest.getSort()) {
-      org.elasticsearch.search.sort.SortOrder order = getElasticsearchSortOrder(sortField.getSortOrder());
-      searchSourceBuilder.sort(sortField.getField(), order);
+      FieldSortBuilder sortBy = new FieldSortBuilder(sortField.getField())
+              .order(getElasticsearchSortOrder(sortField.getSortOrder()))
+              .missing("_last");
+      searchBuilder.sort(sortBy);
     }
 
     // handle search fields
     if (searchRequest.getFields().isPresent()) {
-      searchSourceBuilder.fields(searchRequest.getFields().get());
+      searchBuilder.fields(searchRequest.getFields().get());
     } else {
-      searchSourceBuilder.fetchSource(true);
+      searchBuilder.fetchSource(true);
     }
 
     // handle facet fields
@@ -186,15 +228,72 @@ public class ElasticsearchDao implements IndexDao {
       for(String field : searchRequest.getFacetFields().get()) {
         String name = getFacentAggregationName(field);
         TermsBuilder terms = new TermsBuilder(name).field(field);
-        searchSourceBuilder.aggregation(terms);
+        searchBuilder.aggregation(terms);
       }
     }
 
-    // build the search request
+    // return the search request
     String[] indices = wildcardIndices(searchRequest.getIndices());
+    LOG.debug("Built Elasticsearch request; indices={}, request={}", indices, searchBuilder.toString());
     return new org.elasticsearch.action.search.SearchRequest()
             .indices(indices)
-            .source(searchSourceBuilder);
+            .source(searchBuilder);
+  }
+
+  /**
+   * Executes a search against Elasticsearch.
+   * @param request The search request.
+   * @return The search response.
+   * @throws InvalidSearchException If the search execution fails for any reason.
+   */
+  private org.elasticsearch.action.search.SearchResponse executeSearch(
+          org.elasticsearch.action.search.SearchRequest request) throws InvalidSearchException {
+
+    // submit the search request
+    org.elasticsearch.action.search.SearchResponse esResponse;
+    try {
+      esResponse = client
+              .search(request)
+              .actionGet();
+
+    } catch (SearchPhaseExecutionException e) {
+      String msg = String.format(
+              "Failed to execute search; error='%s', search='%s'",
+              ExceptionUtils.getRootCauseMessage(e),
+              toJSON(request));
+      LOG.error(msg, e);
+      throw new InvalidSearchException(msg, e);
+    }
+
+    // validate the response
+    if(RestStatus.OK == esResponse.status()) {
+      return esResponse;
+
+    } else {
+      // the search was not successful
+      String msg;
+      Throwable cause;
+      if(esResponse.getFailedShards() > 0) {
+
+        // fetch details of the first failure only
+        ShardSearchFailure fail = esResponse.getShardFailures()[0];
+        cause = fail.getCause();
+        msg = String.format(
+                "Bad search response; reason=%s, index=%s, shard=%s, nodeId=%s",
+                fail.reason(), fail.index(), fail.shardId(), fail.shard().getNodeId());
+
+      } else {
+
+        // something bad happened, but elasticsearch is not telling us much
+        cause = null;
+        msg = String.format(
+                "Bad search response; status=%s, timeout=%s, terminatedEarly=%s",
+                esResponse.status(), esResponse.isTimedOut(), esResponse.isTerminatedEarly());
+      }
+
+      LOG.error(msg, cause);
+      throw new InvalidSearchException(msg, cause);
+    }
   }
 
   /**
@@ -205,6 +304,8 @@ public class ElasticsearchDao implements IndexDao {
    * @throws InvalidSearchException
    */
   private SearchResponse buildSearchResponse(SearchRequest searchRequest, org.elasticsearch.action.search.SearchResponse esResponse) throws InvalidSearchException {
+    LOG.debug("Got Elasticsearch response; response={}", esResponse.toString());
+
     SearchResponse searchResponse = new SearchResponse();
     searchResponse.setTotal(esResponse.getHits().getTotalHits());
 
@@ -231,6 +332,8 @@ public class ElasticsearchDao implements IndexDao {
       }
       searchResponse.setFacetCounts(getFacetCounts(facetFields, esResponse.getAggregations(), commonColumnMetadata ));
     }
+
+    LOG.debug("Built search response; response={}", toJSON(searchResponse));
     return searchResponse;
   }
 
@@ -248,38 +351,37 @@ public class ElasticsearchDao implements IndexDao {
    */
   protected GroupResponse group(GroupRequest groupRequest, QueryBuilder queryBuilder)
       throws InvalidSearchException {
+    org.elasticsearch.action.search.SearchRequest request;
+    org.elasticsearch.action.search.SearchResponse response;
+
     if (client == null) {
       throw new InvalidSearchException("Uninitialized Dao!  You must call init() prior to use.");
     }
     if (groupRequest.getGroups() == null || groupRequest.getGroups().size() == 0) {
       throw new InvalidSearchException("At least 1 group must be provided.");
     }
-    final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
-    searchSourceBuilder.query(queryBuilder);
-    searchSourceBuilder.aggregation(getGroupsTermBuilder(groupRequest, 0));
-    String[] wildcardIndices = wildcardIndices(groupRequest.getIndices());
-    org.elasticsearch.action.search.SearchRequest request;
-    org.elasticsearch.action.search.SearchResponse response;
 
-    try {
-      request = new org.elasticsearch.action.search.SearchRequest(wildcardIndices)
-          .source(searchSourceBuilder);
-      response = client.search(request).actionGet();
-    } catch (SearchPhaseExecutionException e) {
-      throw new InvalidSearchException("Could not execute search", e);
-    }
+    // build the search request
+    final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
+            .query(queryBuilder)
+            .aggregation(getGroupsTermBuilder(groupRequest, 0));
+    String[] indices = wildcardIndices(groupRequest.getIndices());
+    request = new org.elasticsearch.action.search.SearchRequest(indices)
+            .source(searchSourceBuilder);
+    response = executeSearch(request);
+
+    // build the search response
     Map<String, FieldType> commonColumnMetadata;
     try {
       commonColumnMetadata = getCommonColumnMetadata(groupRequest.getIndices());
     } catch (IOException e) {
-      throw new InvalidSearchException(String
-          .format("Could not get common column metadata for indices %s",
+      throw new InvalidSearchException(String.format("Could not get common column metadata for indices %s",
               Arrays.toString(groupRequest.getIndices().toArray())));
     }
+
     GroupResponse groupResponse = new GroupResponse();
     groupResponse.setGroupedBy(groupRequest.getGroups().get(0).getField());
-    groupResponse.setGroupResults(
-        getGroupResults(groupRequest, 0, response.getAggregations(), commonColumnMetadata));
+    groupResponse.setGroupResults(getGroupResults(groupRequest, 0, response.getAggregations(), commonColumnMetadata));
     return groupResponse;
   }
 
