@@ -19,6 +19,7 @@ package org.apache.metron.elasticsearch.dao;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
@@ -69,9 +70,6 @@ import org.elasticsearch.search.aggregations.metrics.sum.Sum;
 import org.elasticsearch.search.aggregations.metrics.sum.SumBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
-import org.elasticsearch.search.sort.SortBuilder;
-import org.json.simple.JSONObject;
-import org.omg.CORBA.DynAnyPackage.Invalid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,6 +140,7 @@ public class ElasticsearchDao implements IndexDao {
     if(client == null) {
       throw new InvalidSearchException("Uninitialized Dao!  You must call init() prior to use.");
     }
+
     if (request.getSize() > accessConfig.getMaxSearchResults()) {
       throw new InvalidSearchException("Search result size must be less than " + accessConfig.getMaxSearchResults());
     }
@@ -149,46 +148,6 @@ public class ElasticsearchDao implements IndexDao {
     esRequest = buildSearchRequest(request, queryBuilder);
     esResponse = executeSearch(esRequest);
     return buildSearchResponse(request, esResponse);
-  }
-
-  /**
-   * Converts an Elasticsearch SearchRequest to JSON.
-   * @param esRequest The search request.
-   * @return The JSON representation of the SearchRequest.
-   */
-  private String toJSON(org.elasticsearch.action.search.SearchRequest esRequest) {
-    String json = "null";
-    if(esRequest != null) {
-      try {
-        json = XContentHelper.convertToJson(esRequest.source(), true);
-
-      } catch (IOException io) {
-        json = "JSON conversion failed; request=" + esRequest.toString();
-      }
-    }
-    return json;
-  }
-
-  /**
-   * Convert a SearchRequest to JSON.
-   * @param request The search request.
-   * @return The JSON representation of the SearchRequest.
-   */
-  private String toJSON(Object request) {
-    String json = "null";
-    if(request != null) {
-      try {
-        json = new ObjectMapper()
-                .writer()
-                .withDefaultPrettyPrinter()
-                .writeValueAsString(request);
-
-      } catch (IOException io) {
-        json = "JSON conversion failed; request=" + request.toString();
-      }
-    }
-
-    return json;
   }
 
   /**
@@ -368,6 +327,8 @@ public class ElasticsearchDao implements IndexDao {
     String[] indices = wildcardIndices(groupRequest.getIndices());
     request = new org.elasticsearch.action.search.SearchRequest(indices)
             .source(searchSourceBuilder);
+
+    // search
     response = executeSearch(request);
 
     // build the search response
@@ -386,6 +347,9 @@ public class ElasticsearchDao implements IndexDao {
   }
 
   private String[] wildcardIndices(List<String> indices) {
+    if(indices == null)
+      return new String[] {};
+
     return indices
             .stream()
             .map(index -> String.format("%s%s*", index, INDEX_NAME_DELIMITER))
@@ -585,30 +549,65 @@ public class ElasticsearchDao implements IndexDao {
   @SuppressWarnings("unchecked")
   @Override
   public Map<String, FieldType> getCommonColumnMetadata(List<String> indices) throws IOException {
+    LOG.debug("Getting common metadata; indices={}", indices);
     Map<String, FieldType> commonColumnMetadata = null;
-    ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings =
-            client.admin().indices().getMappings(new GetMappingsRequest().indices(getLatestIndices(indices))).actionGet().getMappings();
+
+    // retrieve the mappings for only the latest version of each index
+    String[] latestIndices = getLatestIndices(indices);
+    ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings;
+    mappings = client
+            .admin()
+            .indices()
+            .getMappings(new GetMappingsRequest().indices(latestIndices))
+            .actionGet()
+            .getMappings();
+
+    // did we get all the mappings that we expect?
+    if(mappings.size() < latestIndices.length) {
+      String msg = String.format(
+              "Failed to get required mappings; expected mappings for '%s', but got '%s'",
+              latestIndices, mappings.keys().toArray());
+      throw new IllegalStateException(msg);
+    }
+
+    // for each index...
     for(Object index: mappings.keys().toArray()) {
       ImmutableOpenMap<String, MappingMetaData> mapping = mappings.get(index.toString());
       Iterator<String> mappingIterator = mapping.keysIt();
       while(mappingIterator.hasNext()) {
-        MappingMetaData mappingMetaData = mapping.get(mappingIterator.next());
-        Map<String, Map<String, String>> map = (Map<String, Map<String, String>>) mappingMetaData.getSourceAsMap().get("properties");
-        Map<String, FieldType> mappingsWithTypes = map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey,
-                e-> elasticsearchSearchTypeMap.getOrDefault(e.getValue().get("type"), FieldType.OTHER)));
+        MappingMetaData metadata = mapping.get(mappingIterator.next());
+        Map<String, Map<String, String>> map = (Map<String, Map<String, String>>) metadata.getSourceAsMap().get("properties");
+        Map<String, FieldType> mappingsWithTypes = map
+                .entrySet()
+                .stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e-> elasticsearchSearchTypeMap.getOrDefault(e.getValue().get("type"), FieldType.OTHER)));
+
+        // keep only the properties in common
         if (commonColumnMetadata == null) {
           commonColumnMetadata = mappingsWithTypes;
         } else {
-          commonColumnMetadata.entrySet().retainAll(mappingsWithTypes.entrySet());
+          commonColumnMetadata
+                  .entrySet()
+                  .retainAll(mappingsWithTypes.entrySet());
         }
       }
     }
+
     return commonColumnMetadata;
   }
 
   protected String[] getLatestIndices(List<String> includeIndices) {
+    LOG.debug("Getting latest indices; indices={}", includeIndices);
     Map<String, String> latestIndices = new HashMap<>();
-    String[] indices = client.admin().indices().prepareGetIndex().setFeatures().get().getIndices();
+    String[] indices = client
+            .admin()
+            .indices()
+            .prepareGetIndex()
+            .setFeatures()
+            .get()
+            .getIndices();
     for (String index : indices) {
       if (!ignoredIndices.contains(index)) {
         int prefixEnd = index.indexOf(INDEX_NAME_DELIMITER);
@@ -624,6 +623,46 @@ public class ElasticsearchDao implements IndexDao {
       }
     }
     return latestIndices.values().toArray(new String[latestIndices.size()]);
+  }
+
+  /**
+   * Converts an Elasticsearch SearchRequest to JSON.
+   * @param esRequest The search request.
+   * @return The JSON representation of the SearchRequest.
+   */
+  public static String toJSON(org.elasticsearch.action.search.SearchRequest esRequest) {
+    String json = "null";
+    if(esRequest != null) {
+      try {
+        json = XContentHelper.convertToJson(esRequest.source(), true);
+
+      } catch (IOException io) {
+        json = "JSON conversion failed; request=" + esRequest.toString();
+      }
+    }
+    return json;
+  }
+
+  /**
+   * Convert a SearchRequest to JSON.
+   * @param request The search request.
+   * @return The JSON representation of the SearchRequest.
+   */
+  public static String toJSON(Object request) {
+    String json = "null";
+    if(request != null) {
+      try {
+        json = new ObjectMapper()
+                .writer()
+                .withDefaultPrettyPrinter()
+                .writeValueAsString(request);
+
+      } catch (IOException io) {
+        json = "JSON conversion failed; request=" + request.toString();
+      }
+    }
+
+    return json;
   }
 
   private org.elasticsearch.search.sort.SortOrder getElasticsearchSortOrder(
@@ -738,4 +777,6 @@ public class ElasticsearchDao implements IndexDao {
   private String getSumAggregationName(String field) {
     return String.format("%s_score", field);
   }
+
+
 }

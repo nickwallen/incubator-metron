@@ -181,12 +181,17 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andDo((r) -> System.out.println(r.getResponse().getContentAsString()))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
-            .andExpect(jsonPath("$.total").value(5))
+            .andExpect(jsonPath("$.total").value(10))
             .andExpect(jsonPath("$.results[0].source.threat:triage:score").value(10))
-            .andExpect(jsonPath("$.results[1].source.threat:triage:score").value(20))
-            .andExpect(jsonPath("$.results[2].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[3].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[4].source.threat:triage:score").doesNotExist());
+            .andExpect(jsonPath("$.results[1].source.threat:triage:score").value(10))
+            .andExpect(jsonPath("$.results[2].source.threat:triage:score").value(20))
+            .andExpect(jsonPath("$.results[3].source.threat:triage:score").value(20))
+            .andExpect(jsonPath("$.results[4].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[5].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[6].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[7].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[8].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[9].source.threat:triage:score").doesNotExist());
 
     // pagination
     this.mockMvc

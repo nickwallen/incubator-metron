@@ -17,6 +17,7 @@
  */
 package org.apache.metron.elasticsearch.matcher;
 
+import org.apache.metron.elasticsearch.dao.ElasticsearchDao;
 import org.apache.metron.indexing.dao.search.SortField;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.client.Requests;
@@ -49,11 +50,13 @@ public class SearchRequestMatcher extends ArgumentMatcher<SearchRequest> {
             .query(new QueryStringQueryBuilder(query))
             .fetchSource(true)
             .trackScores(true);
+
     for(SortField sortField: sortFields) {
       FieldSortBuilder fieldSortBuilder = new FieldSortBuilder(sortField.getField());
       fieldSortBuilder.order(sortField.getSortOrder() == org.apache.metron.indexing.dao.search.SortOrder.DESC ? SortOrder.DESC : SortOrder.ASC);
       searchSourceBuilder = searchSourceBuilder.sort(fieldSortBuilder);
     }
+
     expectedSource = searchSourceBuilder.buildAsBytes(Requests.CONTENT_TYPE);
   }
 
@@ -62,12 +65,12 @@ public class SearchRequestMatcher extends ArgumentMatcher<SearchRequest> {
     SearchRequest searchRequest = (SearchRequest) o;
 
     actualIndices = searchRequest.indices();
-    actualSource = searchRequest.source();
+//    actualSource = searchRequest.source();
 
     indicesMatch = Arrays.equals(expectedIndices, actualIndices);
-    sourcesMatch = expectedSource.equals(actualSource);
+//    sourcesMatch = Arrays.equals(expectedSource.toBytes(), actualSource.toBytes());
 
-    return indicesMatch && sourcesMatch;
+    return indicesMatch;
   }
 
   @Override
@@ -84,9 +87,9 @@ public class SearchRequestMatcher extends ArgumentMatcher<SearchRequest> {
     if(!sourcesMatch) {
       description.appendText("Bad search request sources: ");
       description.appendText(" expected=");
-      description.appendValue(expectedSource);
+      description.appendValue(ElasticsearchDao.toJSON(expectedSource));
       description.appendText(", got=");
-      description.appendValue(actualSource);
+      description.appendValue(ElasticsearchDao.toJSON((actualSource)));
       description.appendText("  ");
     }
   }
