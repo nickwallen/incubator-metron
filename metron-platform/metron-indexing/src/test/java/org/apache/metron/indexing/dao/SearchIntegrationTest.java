@@ -138,18 +138,8 @@ public abstract class SearchIntegrationTest {
   /**
    * {
    *  "indices": [
-   *    "websphere",
    *    "snort",
-   *    "asa",
-   *    "bro",
-   *    "yaf"
-   *  ],
-   *  "facetFields": [
-   *    "source:type",
-   *    "ip_src_addr",
-   *    "ip_dst_addr",
-   *    "host",
-   *    "enrichments:geo:ip_dst_addr:country"
+   *    "bro"
    *  ],
    * "query": "*",
    * "from": 0,
@@ -163,7 +153,27 @@ public abstract class SearchIntegrationTest {
    * }
    */
   @Multiline
-  public static String sortWithMissingFieldsQuery;
+  public static String sortWithMissingFieldsFirstQuery;
+
+  /**
+   * {
+   *  "indices": [
+   *    "snort",
+   *    "bro"
+   *  ],
+   * "query": "*",
+   * "from": 0,
+   * "size": 25,
+   * "sort": [
+   *    {
+   *      "field": "threat:triage:score",
+   *      "sortOrder": "desc"
+   *    }
+   *  ]
+   * }
+   */
+  @Multiline
+  public static String sortWithMissingFieldsLastQuery;
 
   /**
    * {
@@ -443,17 +453,17 @@ public abstract class SearchIntegrationTest {
         Assert.assertEquals(i, results.get(i-8001).getSource().get("ip_src_port"));
       }
     }
-    //Sort with missing field test case
+    //Sort with missing fields last; ascending
     {
-      SearchRequest request = JSONUtils.INSTANCE.load(sortWithMissingFieldsQuery, SearchRequest.class);
+      SearchRequest request = JSONUtils.INSTANCE.load(sortWithMissingFieldsLastQuery, SearchRequest.class);
       SearchResponse response = dao.search(request);
       Assert.assertEquals(10, response.getTotal());
       List<SearchResult> results = response.getResults();
       Assert.assertEquals(10, results.size());
 
-      // validate sorted order - there are only 4 with a 'threat:triage:score'
-      Assert.assertEquals("10", results.get(0).getSource().get("threat:triage:score"));
-      Assert.assertEquals("20", results.get(1).getSource().get("threat:triage:score"));
+      // validate sorted order - there are only 2 with a 'threat:triage:score'
+      Assert.assertEquals("20", results.get(0).getSource().get("threat:triage:score"));
+      Assert.assertEquals("10", results.get(1).getSource().get("threat:triage:score"));
 
       // the remaining are missing the 'threat:triage:score' and should be sorted last
       Assert.assertFalse(results.get(2).getSource().containsKey("threat:triage:score"));
@@ -464,6 +474,28 @@ public abstract class SearchIntegrationTest {
       Assert.assertFalse(results.get(7).getSource().containsKey("threat:triage:score"));
       Assert.assertFalse(results.get(8).getSource().containsKey("threat:triage:score"));
       Assert.assertFalse(results.get(9).getSource().containsKey("threat:triage:score"));
+    }
+    //Sort with missing fields first; descending
+    {
+      SearchRequest request = JSONUtils.INSTANCE.load(sortWithMissingFieldsFirstQuery, SearchRequest.class);
+      SearchResponse response = dao.search(request);
+      Assert.assertEquals(10, response.getTotal());
+      List<SearchResult> results = response.getResults();
+      Assert.assertEquals(10, results.size());
+
+      // the remaining are missing the 'threat:triage:score' and should be sorted last
+      Assert.assertFalse(results.get(0).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(1).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(2).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(3).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(4).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(5).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(6).getSource().containsKey("threat:triage:score"));
+      Assert.assertFalse(results.get(7).getSource().containsKey("threat:triage:score"));
+
+      // validate sorted order - there are only 2 with a 'threat:triage:score'
+      Assert.assertEquals("10", results.get(8).getSource().get("threat:triage:score"));
+      Assert.assertEquals("20", results.get(9).getSource().get("threat:triage:score"));
     }
     //pagination test case
     {

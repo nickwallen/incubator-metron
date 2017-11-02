@@ -98,6 +98,16 @@ public class ElasticsearchDao implements IndexDao {
   private AccessConfig accessConfig;
   private List<String> ignoredIndices = new ArrayList<>();
 
+  /**
+   * The value required to ensure that Elasticsearch sorts missing values last.
+   */
+  private String MISSING_SORT_LAST = "_last";
+
+  /**
+   * The value required to ensure that Elasticsearch sorts missing values last.
+   */
+  private String MISSING_SORT_FIRST = "_first";
+
   protected ElasticsearchDao(TransportClient client, AccessConfig config) {
     this.client = client;
     this.accessConfig = config;
@@ -198,10 +208,19 @@ public class ElasticsearchDao implements IndexDao {
               .findFirst()
               .orElse(FieldType.OTHER);
 
+      // sort order - if ASC, then missing values sorted last.  Otherwise, missing values sorted first
+      org.elasticsearch.search.sort.SortOrder sortOrder = getElasticsearchSortOrder(sortField.getSortOrder());
+      String missingSortOrder;
+      if(sortOrder == org.elasticsearch.search.sort.SortOrder.DESC) {
+        missingSortOrder = MISSING_SORT_LAST;
+      } else {
+        missingSortOrder = MISSING_SORT_FIRST;
+      }
+
       // sort by the field - missing fields always last
       FieldSortBuilder sortBy = new FieldSortBuilder(sortField.getField())
-              .order(getElasticsearchSortOrder(sortField.getSortOrder()))
-              .missing("_last")
+              .order(sortOrder)
+              .missing(missingSortOrder)
               .unmappedType(sortFieldType.getFieldType());
       searchBuilder.sort(sortBy);
     }
