@@ -170,9 +170,7 @@ public class ElasticsearchDao implements IndexDao {
     // handle sort fields
     for(SortField sortField : searchRequest.getSort()) {
       FieldSortBuilder sortBy = new FieldSortBuilder(sortField.getField())
-              .order(getElasticsearchSortOrder(sortField.getSortOrder()))
-              .missing("_last")
-              .unmappedType(FieldType.LONG.getFieldType());
+              .order(getElasticsearchSortOrder(sortField.getSortOrder()));
       searchBuilder.sort(sortBy);
     }
 
