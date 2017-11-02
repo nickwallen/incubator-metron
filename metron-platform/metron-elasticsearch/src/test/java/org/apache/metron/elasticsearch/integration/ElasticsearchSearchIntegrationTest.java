@@ -90,9 +90,6 @@ public class ElasticsearchSearchIntegrationTest extends SearchIntegrationTest {
    *     },
    *     "alert": {
    *         "type": "nested"
-   *     },
-   *     "threat:triage:score": {
-   *         "type": "float"
    *     }
    *   }
    *  }
