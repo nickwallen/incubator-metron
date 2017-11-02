@@ -70,6 +70,7 @@ import org.elasticsearch.search.aggregations.metrics.sum.Sum;
 import org.elasticsearch.search.aggregations.metrics.sum.SumBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
+import org.omg.CORBA.DynAnyPackage.Invalid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +87,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.apache.metron.elasticsearch.utils.ElasticsearchUtils.INDEX_NAME_DELIMITER;
 
@@ -106,7 +108,7 @@ public class ElasticsearchDao implements IndexDao {
     //uninitialized.
   }
 
-  private static Map<String, FieldType> elasticsearchSearchTypeMap;
+  private static Map<String, FieldType> elasticsearchTypeMap;
 
   static {
     Map<String, FieldType> fieldTypeMap = new HashMap<>();
@@ -118,7 +120,16 @@ public class ElasticsearchDao implements IndexDao {
     fieldTypeMap.put("float", FieldType.FLOAT);
     fieldTypeMap.put("double", FieldType.DOUBLE);
     fieldTypeMap.put("boolean", FieldType.BOOLEAN);
-    elasticsearchSearchTypeMap = Collections.unmodifiableMap(fieldTypeMap);
+    elasticsearchTypeMap = Collections.unmodifiableMap(fieldTypeMap);
+  }
+
+  /**
+   * Converts a string type to the corresponding FieldType.
+   * @param type The type to convert.
+   * @return The corresponding FieldType or FieldType.OTHER, if no match.
+   */
+  private FieldType toFieldType(String type) {
+    return elasticsearchTypeMap.getOrDefault(type, FieldType.OTHER);
   }
 
   @Override
@@ -158,8 +169,8 @@ public class ElasticsearchDao implements IndexDao {
    */
   private org.elasticsearch.action.search.SearchRequest buildSearchRequest(
           SearchRequest searchRequest,
-          QueryBuilder queryBuilder)
-  {
+          QueryBuilder queryBuilder) throws InvalidSearchException {
+
     LOG.debug("Got search request; request={}", toJSON(searchRequest));
     SearchSourceBuilder searchBuilder = new SearchSourceBuilder()
             .size(searchRequest.getSize())
@@ -167,10 +178,31 @@ public class ElasticsearchDao implements IndexDao {
             .query(queryBuilder)
             .trackScores(true);
 
+    // column metadata needed to understand the type of each sort field
+    Map<String, Map<String, FieldType>> meta;
+    try {
+      meta = getColumnMetadata(searchRequest.getIndices());
+    } catch(IOException e) {
+      throw new InvalidSearchException("Unable to get column metadata", e);
+    }
+
     // handle sort fields
     for(SortField sortField : searchRequest.getSort()) {
+
+      // what type is the sort field?
+      FieldType sortFieldType = meta
+              .values()
+              .stream()
+              .filter(e -> e.containsKey(sortField.getField()))
+              .map(m -> m.get(sortField.getField()))
+              .findFirst()
+              .orElse(FieldType.OTHER);
+
+      // sort by the field - missing fields always last
       FieldSortBuilder sortBy = new FieldSortBuilder(sortField.getField())
-              .order(getElasticsearchSortOrder(sortField.getSortOrder()));
+              .order(getElasticsearchSortOrder(sortField.getSortOrder()))
+              .missing("_last")
+              .unmappedType(sortFieldType.getFieldType());
       searchBuilder.sort(sortBy);
     }
 
@@ -254,16 +286,20 @@ public class ElasticsearchDao implements IndexDao {
           org.elasticsearch.action.search.SearchRequest request,
           org.elasticsearch.action.search.SearchResponse response) {
 
+    int errors = ArrayUtils.getLength(response.getShardFailures());
     LOG.warn("Search resulted in {}/{} shards failing; errors={}, search={}",
             response.getFailedShards(),
             response.getTotalShards(),
-            ArrayUtils.getLength(response.getShardFailures()),
+            errors,
             toJSON(request));
 
     // log each reported failure
+    int failureCount=1;
     for(ShardSearchFailure fail: response.getShardFailures()) {
       String msg = String.format(
-              "Shard search failure; reason=%s, index=%s, shard=%s, status=%s, nodeId=%s",
+              "Shard search failure [%s/%s]; reason=%s, index=%s, shard=%s, status=%s, nodeId=%s",
+              failureCount,
+              errors,
               ExceptionUtils.getRootCauseMessage(fail.getCause()),
               fail.index(),
               fail.shardId(),
@@ -523,8 +559,7 @@ public class ElasticsearchDao implements IndexDao {
     String type = sensorType + "_doc";
     Object ts = update.getTimestamp();
     IndexRequest indexRequest = new IndexRequest(indexName, type, update.getGuid())
-        .source(update.getDocument())
-        ;
+        .source(update.getDocument());
     if(ts != null) {
       indexRequest = indexRequest.timestamp(ts.toString());
     }
@@ -555,7 +590,7 @@ public class ElasticsearchDao implements IndexDao {
         MappingMetaData mappingMetaData = mapping.get(mappingIterator.next());
         Map<String, Map<String, String>> map = (Map<String, Map<String, String>>) mappingMetaData.getSourceAsMap().get("properties");
         for(String field: map.keySet()) {
-          indexColumnMetadata.put(field, elasticsearchSearchTypeMap.getOrDefault(map.get(field).get("type"), FieldType.OTHER));
+          indexColumnMetadata.put(field, toFieldType(map.get(field).get("type")));
         }
       }
 
@@ -601,7 +636,7 @@ public class ElasticsearchDao implements IndexDao {
                 .stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
-                        e-> elasticsearchSearchTypeMap.getOrDefault(e.getValue().get("type"), FieldType.OTHER)));
+                        e-> toFieldType(e.getValue().get("type"))));
 
         // keep only the properties in common
         if (commonColumnMetadata == null) {
