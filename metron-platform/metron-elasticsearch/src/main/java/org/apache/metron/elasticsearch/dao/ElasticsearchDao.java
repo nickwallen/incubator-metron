@@ -171,7 +171,8 @@ public class ElasticsearchDao implements IndexDao {
     for(SortField sortField : searchRequest.getSort()) {
       FieldSortBuilder sortBy = new FieldSortBuilder(sortField.getField())
               .order(getElasticsearchSortOrder(sortField.getSortOrder()))
-              .missing("_last");
+              .missing("_last")
+              .unmappedType(FieldType.LONG.getFieldType());
       searchBuilder.sort(sortBy);
     }
 
@@ -224,34 +225,53 @@ public class ElasticsearchDao implements IndexDao {
       throw new InvalidSearchException(msg, e);
     }
 
-    // validate the response
+    // check for shard failures
+    LOG.debug("Got Elasticsearch response; response={}", esResponse.toString());
+    if(esResponse.getFailedShards() > 0) {
+      logShardFailures(request, esResponse);
+    }
+
+    // validate the response status
     if(RestStatus.OK == esResponse.status()) {
       return esResponse;
 
     } else {
       // the search was not successful
-      String msg;
-      Throwable cause;
-      if(esResponse.getFailedShards() > 0) {
-
-        // fetch details of the first failure only
-        ShardSearchFailure fail = esResponse.getShardFailures()[0];
-        cause = fail.getCause();
-        msg = String.format(
-                "Bad search response; reason=%s, index=%s, shard=%s, nodeId=%s",
-                fail.reason(), fail.index(), fail.shardId(), fail.shard().getNodeId());
-
-      } else {
-
-        // something bad happened, but elasticsearch is not telling us much
-        cause = null;
-        msg = String.format(
+      String msg = String.format(
                 "Bad search response; status=%s, timeout=%s, terminatedEarly=%s",
                 esResponse.status(), esResponse.isTimedOut(), esResponse.isTerminatedEarly());
-      }
+      LOG.error(msg);
+      throw new InvalidSearchException(msg);
+    }
+  }
 
-      LOG.error(msg, cause);
-      throw new InvalidSearchException(msg, cause);
+  /**
+   * Log individual shard failures that can occur even when the response is OK.  These
+   * can indicate misconfiguration and are important to log.
+   *
+   * @param request The search request.
+   * @param response  The search response.
+   */
+  private void logShardFailures(
+          org.elasticsearch.action.search.SearchRequest request,
+          org.elasticsearch.action.search.SearchResponse response) {
+
+    LOG.warn("Search resulted in {}/{} shards failing; errors={}, search={}",
+            response.getFailedShards(),
+            response.getTotalShards(),
+            ArrayUtils.getLength(response.getShardFailures()),
+            toJSON(request));
+
+    // log each reported failure
+    for(ShardSearchFailure fail: response.getShardFailures()) {
+      String msg = String.format(
+              "Shard search failure; reason=%s, index=%s, shard=%s, status=%s, nodeId=%s",
+              ExceptionUtils.getRootCauseMessage(fail.getCause()),
+              fail.index(),
+              fail.shardId(),
+              fail.status(),
+              fail.shard().getNodeId());
+      LOG.warn(msg, fail.getCause());
     }
   }
 
@@ -262,8 +282,9 @@ public class ElasticsearchDao implements IndexDao {
    * @return A Metron search response.
    * @throws InvalidSearchException
    */
-  private SearchResponse buildSearchResponse(SearchRequest searchRequest, org.elasticsearch.action.search.SearchResponse esResponse) throws InvalidSearchException {
-    LOG.debug("Got Elasticsearch response; response={}", esResponse.toString());
+  private SearchResponse buildSearchResponse(
+          SearchRequest searchRequest,
+          org.elasticsearch.action.search.SearchResponse esResponse) throws InvalidSearchException {
 
     SearchResponse searchResponse = new SearchResponse();
     searchResponse.setTotal(esResponse.getHits().getTotalHits());
