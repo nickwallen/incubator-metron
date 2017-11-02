@@ -18,10 +18,11 @@
 package org.apache.metron.rest.controller;
 
 import com.google.common.collect.ImmutableMap;
+import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.indexing.dao.InMemoryDao;
 import org.apache.metron.indexing.dao.SearchIntegrationTest;
 import org.apache.metron.indexing.dao.search.FieldType;
-import org.apache.metron.rest.service.SearchService;
+import org.apache.metron.rest.service.SensorIndexingConfigService;
 import org.json.simple.parser.ParseException;
 import org.junit.After;
 import org.junit.Before;
@@ -40,6 +41,15 @@ import org.springframework.web.context.WebApplicationContext;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.allQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.exceededMaxResultsQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.filterQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.groupByQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.indexQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.paginationQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortWithMissingFieldsLastQuery;
+import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -50,17 +60,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.*;
-
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles(TEST_PROFILE)
 public class SearchControllerIntegrationTest extends DaoControllerTest {
 
+  /**
+   * {
+   * "indices": [],
+   * "query": "*",
+   * "from": 0,
+   * "size": 10,
+   * "sort": [
+   *   {
+   *     "field": "timestamp",
+   *     "sortOrder": "desc"
+   *   }
+   * ]
+   * }
+   */
+  @Multiline
+  public static String defaultQuery;
+
   @Autowired
-  private SearchService searchService;
+  private SensorIndexingConfigService sensorIndexingConfigService;
+
   @Autowired
   private WebApplicationContext wac;
+
   private MockMvc mockMvc;
   private String searchUrl = "/api/v1/search";
   private String user = "user";
@@ -113,6 +140,34 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .with(csrf())
             .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
             .content(content);
+  }
+
+  @Test
+  public void testDefaultQuery() throws Exception {
+    sensorIndexingConfigService.save("bro", new HashMap<String, Object>() {{
+      put("index", "bro");
+    }});
+
+    try {
+      assertEventually(() -> this.mockMvc
+              .perform(request("/search", defaultQuery))
+              .andExpect(status().isOk())
+              .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
+              .andExpect(jsonPath("$.total").value(5))
+              .andExpect(jsonPath("$.results[0].source.source:type").value("bro"))
+              .andExpect(jsonPath("$.results[0].source.timestamp").value(5))
+              .andExpect(jsonPath("$.results[1].source.source:type").value("bro"))
+              .andExpect(jsonPath("$.results[1].source.timestamp").value(4))
+              .andExpect(jsonPath("$.results[2].source.source:type").value("bro"))
+              .andExpect(jsonPath("$.results[2].source.timestamp").value(3))
+              .andExpect(jsonPath("$.results[3].source.source:type").value("bro"))
+              .andExpect(jsonPath("$.results[3].source.timestamp").value(2))
+              .andExpect(jsonPath("$.results[4].source.source:type").value("bro"))
+              .andExpect(jsonPath("$.results[4].source.timestamp").value(1))
+      );
+    } finally {
+      sensorIndexingConfigService.delete("bro");
+    }
   }
 
   @Test
@@ -177,15 +232,15 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
 
     // sort with missing fields
     this.mockMvc
-            .perform(request("/search", sortWithMissingFieldsQuery))
+            .perform(request("/search", sortWithMissingFieldsLastQuery))
             .andDo((r) -> System.out.println(r.getResponse().getContentAsString()))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(10))
             .andExpect(jsonPath("$.results[0].source.threat:triage:score").value(10))
-            .andExpect(jsonPath("$.results[1].source.threat:triage:score").value(10))
-            .andExpect(jsonPath("$.results[2].source.threat:triage:score").value(20))
-            .andExpect(jsonPath("$.results[3].source.threat:triage:score").value(20))
+            .andExpect(jsonPath("$.results[1].source.threat:triage:score").value(20))
+            .andExpect(jsonPath("$.results[2].source.threat:triage:score").doesNotExist())
+            .andExpect(jsonPath("$.results[3].source.threat:triage:score").doesNotExist())
             .andExpect(jsonPath("$.results[4].source.threat:triage:score").doesNotExist())
             .andExpect(jsonPath("$.results[5].source.threat:triage:score").doesNotExist())
             .andExpect(jsonPath("$.results[6].source.threat:triage:score").doesNotExist())
