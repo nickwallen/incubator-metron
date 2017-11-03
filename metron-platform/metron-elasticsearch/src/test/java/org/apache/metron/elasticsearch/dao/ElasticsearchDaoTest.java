@@ -53,38 +53,21 @@ public class ElasticsearchDaoTest {
   private ElasticsearchDao dao;
   private ElasticsearchSearchSubmitter searchSubmitter;
 
-  private void setup(SearchHit[] hits, RestStatus status, int maxSearchResults) throws Exception {
+  private void setup(RestStatus status, int maxSearchResults, Map<String, Map<String, FieldType>> metadata) throws Exception {
+
+    // setup the mock search hits
+    SearchHit hit1 = mock(SearchHit.class);
+    when(hit1.getId()).thenReturn("id1");
+    when(hit1.getSource()).thenReturn(new HashMap<String, Object>(){{ put("field", "value1"); }});
+    when(hit1.getScore()).thenReturn(0.1f);
+
+    SearchHit hit2 = mock(SearchHit.class);
+    when(hit2.getId()).thenReturn("id2");
+    when(hit2.getSource()).thenReturn(new HashMap<String, Object>(){{ put("field", "value2"); }});
+    when(hit2.getScore()).thenReturn(0.2f);
 
     // search hits
-    SearchHits searchHits = mock(SearchHits.class);
-    when(searchHits.getHits()).thenReturn(hits);
-    when(searchHits.getTotalHits()).thenReturn(Integer.toUnsignedLong(hits.length));
-
-    // search response which returns the search hits
-    org.elasticsearch.action.search.SearchResponse response = mock(org.elasticsearch.action.search.SearchResponse.class);
-    when(response.status()).thenReturn(status);
-    when(response.getHits()).thenReturn(searchHits);
-
-    // provides column metadata
-    ColumnMetadataDao columnMetadataDao = mock(ColumnMetadataDao.class);
-    when(columnMetadataDao.getColumnMetadata(any())).thenReturn(new HashMap<String, Map<String, FieldType>>());
-
-    // returns the search response
-    searchSubmitter = mock(ElasticsearchSearchSubmitter.class);
-    when(searchSubmitter.submitSearch(any())).thenReturn(response);
-
-    TransportClient client = mock(TransportClient.class);
-
-    // provides configuration
-    AccessConfig config = mock(AccessConfig.class);
-    when(config.getMaxSearchResults()).thenReturn(maxSearchResults);
-
-    dao = new ElasticsearchDao(client, columnMetadataDao, searchSubmitter, config);
-  }
-
-  private void setup(SearchHit[] hits, RestStatus status, int maxSearchResults, Map<String, Map<String, FieldType>> metadata) throws Exception {
-
-    // search hits
+    SearchHit[] hits = { hit1, hit2 };
     SearchHits searchHits = mock(SearchHits.class);
     when(searchHits.getHits()).thenReturn(hits);
     when(searchHits.getTotalHits()).thenReturn(Integer.toUnsignedLong(hits.length));
@@ -111,24 +94,12 @@ public class ElasticsearchDaoTest {
     dao = new ElasticsearchDao(client, columnMetadataDao, searchSubmitter, config);
   }
 
+  private void setup(RestStatus status, int maxSearchResults) throws Exception {
+    setup(status, maxSearchResults, new HashMap<>());
+  }
+
   @Test
   public void searchShouldSortByGivenFields() throws Exception {
-
-    // setup the mock search hits
-    SearchHit hit1 = mock(SearchHit.class);
-    when(hit1.getId()).thenReturn("id1");
-    when(hit1.getSource()).thenReturn(new HashMap<String, Object>(){{ put("field", "value1"); }});
-    when(hit1.getScore()).thenReturn(0.1f);
-
-    SearchHit hit2 = mock(SearchHit.class);
-    when(hit2.getId()).thenReturn("id2");
-    when(hit2.getSource()).thenReturn(new HashMap<String, Object>(){{ put("field", "value2"); }});
-    when(hit2.getScore()).thenReturn(0.2f);
-
-    SearchHit[] hits = { hit1, hit2 };
-    SearchHits searchHits = mock(SearchHits.class);
-    when(searchHits.getHits()).thenReturn(hits);
-    when(searchHits.getTotalHits()).thenReturn(Integer.toUnsignedLong(hits.length));
 
     // setup the column metadata
     Map<String, FieldType> broTypes = new HashMap<>();
@@ -138,7 +109,72 @@ public class ElasticsearchDaoTest {
     columnMetadata.put("bro", broTypes);
 
     // setup the dao
-    setup(hits, RestStatus.OK, 25, columnMetadata);
+    setup(RestStatus.OK, 25, columnMetadata);
+
+    // "sort by" fields for the search request
+    SortField[] expectedSortFields = {
+            sortBy("sortByStringDesc", SortOrder.DESC),
+            sortBy("sortByIntAsc", SortOrder.ASC),
+            sortBy("sortByUndefinedDesc", SortOrder.DESC)
+    };
+
+    // create a metron search request
+    final List<String> indices = Arrays.asList("bro", "snort");
+    SearchRequest searchRequest = new SearchRequest();
+    searchRequest.setSize(2);
+    searchRequest.setIndices(indices);
+    searchRequest.setFrom(5);
+    searchRequest.setSort(Arrays.asList(expectedSortFields));
+    searchRequest.setQuery("some query");
+
+    // submit the metron search request
+    SearchResponse searchResponse = dao.search(searchRequest);
+    assertNotNull(searchResponse);
+
+    // capture the elasticsearch search request that was created
+    ArgumentCaptor<org.elasticsearch.action.search.SearchRequest> argument = ArgumentCaptor.forClass(org.elasticsearch.action.search.SearchRequest.class);
+    verify(searchSubmitter).submitSearch(argument.capture());
+    org.elasticsearch.action.search.SearchRequest request = argument.getValue();
+
+    // transform the request to JSON for validation
+    JSONParser parser = new JSONParser();
+    JSONObject json = (JSONObject) parser.parse(ElasticsearchUtils.toJSON(request));
+
+    // validate the sort fields
+    JSONArray sortFields = (JSONArray) json.get("sort");
+    assertEquals(3, sortFields.size());
+
+    {
+      // sort by string descending
+      JSONObject aSortField = (JSONObject) sortFields.get(0);
+      JSONObject sortBy = (JSONObject) aSortField.get("sortByStringDesc");
+      assertEquals("desc", sortBy.get("order"));
+      assertEquals("_last", sortBy.get("missing"));
+      assertEquals("string", sortBy.get("unmapped_type"));
+    }
+    {
+      // sort by integer ascending
+      JSONObject aSortField = (JSONObject) sortFields.get(1);
+      JSONObject sortByIntAsc = (JSONObject) aSortField.get("sortByIntAsc");
+      assertEquals("asc", sortByIntAsc.get("order"));
+      assertEquals("_first", sortByIntAsc.get("missing"));
+      assertEquals("integer", sortByIntAsc.get("unmapped_type"));
+    }
+    {
+      // sort by unknown type
+      JSONObject aSortField = (JSONObject) sortFields.get(2);
+      JSONObject sortByUndefinedDesc = (JSONObject) aSortField.get("sortByUndefinedDesc");
+      assertEquals("desc", sortByUndefinedDesc.get("order"));
+      assertEquals("_last", sortByUndefinedDesc.get("missing"));
+      assertEquals("other", sortByUndefinedDesc.get("unmapped_type"));
+    }
+  }
+
+  @Test
+  public void searchShouldWildcardIndices() throws Exception {
+
+    // setup the dao
+    setup(RestStatus.OK, 25);
 
     // "sort by" fields for the search request
     SortField[] expectedSortFields = {
@@ -172,43 +208,14 @@ public class ElasticsearchDaoTest {
     // ensure that the index names are 'wildcard-ed'
     String[] expected = { "bro_index*", "snort_index*" };
     assertArrayEquals(expected, request.indices());
-
-    // validate the sort fields
-    JSONArray sortFields = (JSONArray) json.get("sort");
-    assertEquals(3, sortFields.size());
-
-    {
-      // sort by string descending
-      JSONObject aSortField = (JSONObject) sortFields.get(0);
-      JSONObject sortBy = (JSONObject) aSortField.get("sortByStringDesc");
-      assertEquals("desc", sortBy.get("order"));
-      assertEquals("_last", sortBy.get("missing"));
-      assertEquals("string", sortBy.get("unmapped_type"));
-    }
-    {
-      // sort by integer ascending
-      JSONObject aSortField = (JSONObject) sortFields.get(1);
-      JSONObject sortByIntAsc = (JSONObject) aSortField.get("sortByIntAsc");
-      assertEquals("asc", sortByIntAsc.get("order"));
-      assertEquals("_first", sortByIntAsc.get("missing"));
-      assertEquals("integer", sortByIntAsc.get("unmapped_type"));
-    }
-    {
-      // sort by unknown type
-      JSONObject aSortField = (JSONObject) sortFields.get(2);
-      JSONObject sortByUndefinedDesc = (JSONObject) aSortField.get("sortByUndefinedDesc");
-      assertEquals("desc", sortByUndefinedDesc.get("order"));
-      assertEquals("_last", sortByUndefinedDesc.get("missing"));
-      assertEquals("other", sortByUndefinedDesc.get("unmapped_type"));
-    }
   }
+
 
   @Test(expected = InvalidSearchException.class)
   public void searchShouldThrowExceptionWhenMaxResultsAreExceeded() throws Exception {
 
     int maxSearchResults = 20;
-    SearchHit[] hits = { };
-    setup(hits, RestStatus.OK, maxSearchResults);
+    setup(RestStatus.OK, maxSearchResults);
 
     SearchRequest searchRequest = new SearchRequest();
     searchRequest.setSize(maxSearchResults+1);

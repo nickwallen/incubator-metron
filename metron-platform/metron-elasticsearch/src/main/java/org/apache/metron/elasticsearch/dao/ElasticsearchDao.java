@@ -84,13 +84,16 @@ public class ElasticsearchDao implements IndexDao {
   /**
    * The value required to ensure that Elasticsearch sorts missing values last.
    */
-  private static final String MISSING_SORT_LAST = "_last";
+  private static final String SORT_MISSING_LAST = "_last";
 
   /**
    * The value required to ensure that Elasticsearch sorts missing values last.
    */
-  private static final String MISSING_SORT_FIRST = "_first";
+  private static final String SORT_MISSING_FIRST = "_first";
 
+  /**
+   * The Elasticsearch client.
+   */
   private transient TransportClient client;
 
   /**
@@ -188,9 +191,9 @@ public class ElasticsearchDao implements IndexDao {
       org.elasticsearch.search.sort.SortOrder sortOrder = getElasticsearchSortOrder(sortField.getSortOrder());
       String missingSortOrder;
       if(sortOrder == org.elasticsearch.search.sort.SortOrder.DESC) {
-        missingSortOrder = MISSING_SORT_LAST;
+        missingSortOrder = SORT_MISSING_LAST;
       } else {
-        missingSortOrder = MISSING_SORT_FIRST;
+        missingSortOrder = SORT_MISSING_FIRST;
       }
 
       // sort by the field - missing fields always last

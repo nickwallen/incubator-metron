@@ -153,7 +153,7 @@ public abstract class SearchIntegrationTest {
    * }
    */
   @Multiline
-  public static String sortWithMissingFieldsFirstQuery;
+  public static String sortAscendingWithMissingFields;
 
   /**
    * {
@@ -173,7 +173,7 @@ public abstract class SearchIntegrationTest {
    * }
    */
   @Multiline
-  public static String sortWithMissingFieldsLastQuery;
+  public static String sortDescendingWithMissingFields;
 
   /**
    * {
@@ -453,9 +453,9 @@ public abstract class SearchIntegrationTest {
         Assert.assertEquals(i, results.get(i-8001).getSource().get("ip_src_port"));
       }
     }
-    //Sort with missing fields last; ascending
+    //Sort descending with missing fields
     {
-      SearchRequest request = JSONUtils.INSTANCE.load(sortWithMissingFieldsLastQuery, SearchRequest.class);
+      SearchRequest request = JSONUtils.INSTANCE.load(sortDescendingWithMissingFields, SearchRequest.class);
       SearchResponse response = dao.search(request);
       Assert.assertEquals(10, response.getTotal());
       List<SearchResult> results = response.getResults();
@@ -475,9 +475,9 @@ public abstract class SearchIntegrationTest {
       Assert.assertFalse(results.get(8).getSource().containsKey("threat:triage:score"));
       Assert.assertFalse(results.get(9).getSource().containsKey("threat:triage:score"));
     }
-    //Sort with missing fields first; descending
+    //Sort ascending with missing fields
     {
-      SearchRequest request = JSONUtils.INSTANCE.load(sortWithMissingFieldsFirstQuery, SearchRequest.class);
+      SearchRequest request = JSONUtils.INSTANCE.load(sortAscendingWithMissingFields, SearchRequest.class);
       SearchResponse response = dao.search(request);
       Assert.assertEquals(10, response.getTotal());
       List<SearchResult> results = response.getResults();

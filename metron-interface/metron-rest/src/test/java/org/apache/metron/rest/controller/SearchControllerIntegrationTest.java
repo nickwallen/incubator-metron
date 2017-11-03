@@ -48,7 +48,7 @@ import static org.apache.metron.indexing.dao.SearchIntegrationTest.groupByQuery;
 import static org.apache.metron.indexing.dao.SearchIntegrationTest.indexQuery;
 import static org.apache.metron.indexing.dao.SearchIntegrationTest.paginationQuery;
 import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortWithMissingFieldsLastQuery;
+import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortDescendingWithMissingFields;
 import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
 import static org.hamcrest.Matchers.hasSize;
@@ -229,24 +229,6 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[7].source.ip_src_port").value(8008))
             .andExpect(jsonPath("$.results[8].source.ip_src_port").value(8009))
             .andExpect(jsonPath("$.results[9].source.ip_src_port").value(8010));
-
-    // sort with missing fields
-    this.mockMvc
-            .perform(request("/search", sortWithMissingFieldsLastQuery))
-            .andDo((r) -> System.out.println(r.getResponse().getContentAsString()))
-            .andExpect(status().isOk())
-            .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
-            .andExpect(jsonPath("$.total").value(10))
-            .andExpect(jsonPath("$.results[0].source.threat:triage:score").value(10))
-            .andExpect(jsonPath("$.results[1].source.threat:triage:score").value(20))
-            .andExpect(jsonPath("$.results[2].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[3].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[4].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[5].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[6].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[7].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[8].source.threat:triage:score").doesNotExist())
-            .andExpect(jsonPath("$.results[9].source.threat:triage:score").doesNotExist());
 
     // pagination
     this.mockMvc
