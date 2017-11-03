@@ -19,8 +19,6 @@ package org.apache.metron.elasticsearch.dao;
 
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -38,26 +36,18 @@ import org.apache.metron.indexing.dao.search.SearchResult;
 import org.apache.metron.indexing.dao.search.SortField;
 import org.apache.metron.indexing.dao.search.SortOrder;
 import org.apache.metron.indexing.dao.update.Document;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.elasticsearch.action.ActionWriteResponse.ShardInfo;
-import org.elasticsearch.action.admin.indices.mapping.get.GetMappingsRequest;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.search.SearchPhaseExecutionException;
 import org.elasticsearch.action.search.SearchRequestBuilder;
-import org.elasticsearch.action.search.ShardSearchFailure;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.transport.TransportClient;
-import org.elasticsearch.cluster.metadata.MappingMetaData;
-import org.elasticsearch.common.collect.ImmutableOpenMap;
-import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryStringQueryBuilder;
-import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.aggregations.Aggregation;
@@ -70,7 +60,6 @@ import org.elasticsearch.search.aggregations.metrics.sum.Sum;
 import org.elasticsearch.search.aggregations.metrics.sum.SumBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.FieldSortBuilder;
-import org.omg.CORBA.DynAnyPackage.Invalid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,65 +70,52 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.apache.metron.elasticsearch.utils.ElasticsearchUtils.INDEX_NAME_DELIMITER;
 
 public class ElasticsearchDao implements IndexDao {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  /**
+   * The value required to ensure that Elasticsearch sorts missing values last.
+   */
+  private static final String MISSING_SORT_LAST = "_last";
+
+  /**
+   * The value required to ensure that Elasticsearch sorts missing values last.
+   */
+  private static final String MISSING_SORT_FIRST = "_first";
+
   private transient TransportClient client;
+
+  /**
+   * Retrieves column metadata about search indices.
+   */
+  private ColumnMetadataDao columnMetadataDao;
+
+  /**
+   * Handles the submission of search requests to Elasticsearch.
+   */
+  private ElasticsearchSearchSubmitter searchSubmitter;
+
   private AccessConfig accessConfig;
   private List<String> ignoredIndices = new ArrayList<>();
 
-  /**
-   * The value required to ensure that Elasticsearch sorts missing values last.
-   */
-  private String MISSING_SORT_LAST = "_last";
-
-  /**
-   * The value required to ensure that Elasticsearch sorts missing values last.
-   */
-  private String MISSING_SORT_FIRST = "_first";
-
-  protected ElasticsearchDao(TransportClient client, AccessConfig config) {
+  protected ElasticsearchDao(TransportClient client, ColumnMetadataDao columnMetadataDao, ElasticsearchSearchSubmitter searchSubmitter, AccessConfig config) {
     this.client = client;
+    this.columnMetadataDao = columnMetadataDao;
+    this.searchSubmitter = searchSubmitter;
     this.accessConfig = config;
     this.ignoredIndices.add(".kibana");
   }
 
   public ElasticsearchDao() {
     //uninitialized.
-  }
-
-  private static Map<String, FieldType> elasticsearchTypeMap;
-
-  static {
-    Map<String, FieldType> fieldTypeMap = new HashMap<>();
-    fieldTypeMap.put("string", FieldType.STRING);
-    fieldTypeMap.put("ip", FieldType.IP);
-    fieldTypeMap.put("integer", FieldType.INTEGER);
-    fieldTypeMap.put("long", FieldType.LONG);
-    fieldTypeMap.put("date", FieldType.DATE);
-    fieldTypeMap.put("float", FieldType.FLOAT);
-    fieldTypeMap.put("double", FieldType.DOUBLE);
-    fieldTypeMap.put("boolean", FieldType.BOOLEAN);
-    elasticsearchTypeMap = Collections.unmodifiableMap(fieldTypeMap);
-  }
-
-  /**
-   * Converts a string type to the corresponding FieldType.
-   * @param type The type to convert.
-   * @return The corresponding FieldType or FieldType.OTHER, if no match.
-   */
-  private FieldType toFieldType(String type) {
-    return elasticsearchTypeMap.getOrDefault(type, FieldType.OTHER);
   }
 
   @Override
@@ -167,7 +143,7 @@ public class ElasticsearchDao implements IndexDao {
     }
 
     esRequest = buildSearchRequest(request, queryBuilder);
-    esResponse = executeSearch(esRequest);
+    esResponse = searchSubmitter.submitSearch(esRequest);
     return buildSearchResponse(request, esResponse);
   }
 
@@ -181,7 +157,7 @@ public class ElasticsearchDao implements IndexDao {
           SearchRequest searchRequest,
           QueryBuilder queryBuilder) throws InvalidSearchException {
 
-    LOG.debug("Got search request; request={}", toJSON(searchRequest));
+    LOG.debug("Got search request; request={}", ElasticsearchUtils.toJSON(searchRequest));
     SearchSourceBuilder searchBuilder = new SearchSourceBuilder()
             .size(searchRequest.getSize())
             .from(searchRequest.getFrom())
@@ -250,86 +226,10 @@ public class ElasticsearchDao implements IndexDao {
   }
 
   /**
-   * Executes a search against Elasticsearch.
-   * @param request The search request.
-   * @return The search response.
-   * @throws InvalidSearchException If the search execution fails for any reason.
-   */
-  private org.elasticsearch.action.search.SearchResponse executeSearch(
-          org.elasticsearch.action.search.SearchRequest request) throws InvalidSearchException {
-
-    // submit the search request
-    org.elasticsearch.action.search.SearchResponse esResponse;
-    try {
-      esResponse = client
-              .search(request)
-              .actionGet();
-
-    } catch (SearchPhaseExecutionException e) {
-      String msg = String.format(
-              "Failed to execute search; error='%s', search='%s'",
-              ExceptionUtils.getRootCauseMessage(e),
-              toJSON(request));
-      LOG.error(msg, e);
-      throw new InvalidSearchException(msg, e);
-    }
-
-    // check for shard failures
-    LOG.debug("Got Elasticsearch response; response={}", esResponse.toString());
-    if(esResponse.getFailedShards() > 0) {
-      logShardFailures(request, esResponse);
-    }
-
-    // validate the response status
-    if(RestStatus.OK == esResponse.status()) {
-      return esResponse;
-
-    } else {
-      // the search was not successful
-      String msg = String.format(
-                "Bad search response; status=%s, timeout=%s, terminatedEarly=%s",
-                esResponse.status(), esResponse.isTimedOut(), esResponse.isTerminatedEarly());
-      LOG.error(msg);
-      throw new InvalidSearchException(msg);
-    }
-  }
-
-  /**
-   * Log individual shard failures that can occur even when the response is OK.  These
-   * can indicate misconfiguration and are important to log.
+   * Builds a search response.
    *
-   * @param request The search request.
-   * @param response  The search response.
-   */
-  private void logShardFailures(
-          org.elasticsearch.action.search.SearchRequest request,
-          org.elasticsearch.action.search.SearchResponse response) {
-
-    int errors = ArrayUtils.getLength(response.getShardFailures());
-    LOG.warn("Search resulted in {}/{} shards failing; errors={}, search={}",
-            response.getFailedShards(),
-            response.getTotalShards(),
-            errors,
-            toJSON(request));
-
-    // log each reported failure
-    int failureCount=1;
-    for(ShardSearchFailure fail: response.getShardFailures()) {
-      String msg = String.format(
-              "Shard search failure [%s/%s]; reason=%s, index=%s, shard=%s, status=%s, nodeId=%s",
-              failureCount,
-              errors,
-              ExceptionUtils.getRootCauseMessage(fail.getCause()),
-              fail.index(),
-              fail.shardId(),
-              fail.status(),
-              fail.shard().getNodeId());
-      LOG.warn(msg, fail.getCause());
-    }
-  }
-
-  /**
-   * Transforms an Elasticsearch search response into a Metron search response.
+   * This effectively transforms an Elasticsearch search response into a Metron search response.
+   *
    * @param searchRequest The Metron search request.
    * @param esResponse The Elasticsearch search response.
    * @return A Metron search response.
@@ -343,11 +243,9 @@ public class ElasticsearchDao implements IndexDao {
     searchResponse.setTotal(esResponse.getHits().getTotalHits());
 
     // search hits --> search results
-    final boolean fieldsPresent = searchRequest.getFields().isPresent();
     List<SearchResult> results = new ArrayList<>();
     for(SearchHit hit: esResponse.getHits().getHits()) {
-      SearchResult result = getSearchResult(hit, fieldsPresent);
-      results.add(result);
+      results.add(getSearchResult(hit, searchRequest.getFields().isPresent()));
     }
     searchResponse.setResults(results);
 
@@ -366,7 +264,7 @@ public class ElasticsearchDao implements IndexDao {
       searchResponse.setFacetCounts(getFacetCounts(facetFields, esResponse.getAggregations(), commonColumnMetadata ));
     }
 
-    LOG.debug("Built search response; response={}", toJSON(searchResponse));
+    LOG.debug("Built search response; response={}", ElasticsearchUtils.toJSON(searchResponse));
     return searchResponse;
   }
 
@@ -384,8 +282,8 @@ public class ElasticsearchDao implements IndexDao {
    */
   protected GroupResponse group(GroupRequest groupRequest, QueryBuilder queryBuilder)
       throws InvalidSearchException {
-    org.elasticsearch.action.search.SearchRequest request;
-    org.elasticsearch.action.search.SearchResponse response;
+    org.elasticsearch.action.search.SearchRequest esRequest;
+    org.elasticsearch.action.search.SearchResponse esResponse;
 
     if (client == null) {
       throw new InvalidSearchException("Uninitialized Dao!  You must call init() prior to use.");
@@ -394,16 +292,46 @@ public class ElasticsearchDao implements IndexDao {
       throw new InvalidSearchException("At least 1 group must be provided.");
     }
 
-    // build the search request
+    esRequest = buildGroupRequest(groupRequest, queryBuilder);
+    esResponse = searchSubmitter.submitSearch(esRequest);
+    GroupResponse response = buildGroupResponse(groupRequest, esResponse);
+
+    return response;
+  }
+
+  /**
+   * Builds a group search request.
+   * @param groupRequest The Metron group request.
+   * @param queryBuilder The search query.
+   * @return An Elasticsearch search request.
+   */
+  private org.elasticsearch.action.search.SearchRequest buildGroupRequest(
+          GroupRequest groupRequest,
+          QueryBuilder queryBuilder) {
+
+    // handle groups
+    TermsBuilder groups = getGroupsTermBuilder(groupRequest, 0);
     final SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder()
             .query(queryBuilder)
-            .aggregation(getGroupsTermBuilder(groupRequest, 0));
-    String[] indices = wildcardIndices(groupRequest.getIndices());
-    request = new org.elasticsearch.action.search.SearchRequest(indices)
-            .source(searchSourceBuilder);
+            .aggregation(groups);
 
-    // search
-    response = executeSearch(request);
+    // return the search request
+    String[] indices = wildcardIndices(groupRequest.getIndices());
+    return new org.elasticsearch.action.search.SearchRequest()
+            .indices(indices)
+            .source(searchSourceBuilder);
+  }
+
+  /**
+   * Build a group response.
+   * @param groupRequest The original group request.
+   * @param response The search response.
+   * @return A group response.
+   * @throws InvalidSearchException
+   */
+  private GroupResponse buildGroupResponse(
+          GroupRequest groupRequest,
+          org.elasticsearch.action.search.SearchResponse response) throws InvalidSearchException {
 
     // build the search response
     Map<String, FieldType> commonColumnMetadata;
@@ -435,6 +363,16 @@ public class ElasticsearchDao implements IndexDao {
     if(this.client == null) {
       this.client = ElasticsearchUtils.getClient(config.getGlobalConfigSupplier().get(), config.getOptionalSettings());
       this.accessConfig = config;
+      this.columnMetadataDao = new ElasticsearchColumnMetadataDao(this.client.admin(), Collections.singletonList(".kibana"));
+      this.searchSubmitter = new ElasticsearchSearchSubmitter(this.client);
+    }
+
+    if(columnMetadataDao == null) {
+      throw new IllegalArgumentException("No ColumnMetadataDao available");
+    }
+
+    if(searchSubmitter == null) {
+      throw new IllegalArgumentException("No ElasticsearchSearchSubmitter available");
     }
   }
 
@@ -588,154 +526,14 @@ public class ElasticsearchDao implements IndexDao {
         .upsert(indexRequest);
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public Map<String, Map<String, FieldType>> getColumnMetadata(List<String> indices) throws IOException {
-    Map<String, Map<String, FieldType>> allColumnMetadata = new HashMap<>();
-    String[] latestIndices = getLatestIndices(indices);
-    ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings = client
-            .admin()
-            .indices()
-            .getMappings(new GetMappingsRequest().indices(latestIndices))
-            .actionGet()
-            .getMappings();
-    for(Object key: mappings.keys().toArray()) {
-      String indexName = key.toString();
-
-      Map<String, FieldType> indexColumnMetadata = new HashMap<>();
-      ImmutableOpenMap<String, MappingMetaData> mapping = mappings.get(indexName);
-      Iterator<String> mappingIterator = mapping.keysIt();
-      while(mappingIterator.hasNext()) {
-        MappingMetaData mappingMetaData = mapping.get(mappingIterator.next());
-        Map<String, Map<String, String>> map = (Map<String, Map<String, String>>) mappingMetaData.getSourceAsMap().get("properties");
-        for(String field: map.keySet()) {
-          indexColumnMetadata.put(field, toFieldType(map.get(field).get("type")));
-        }
-      }
-
-      String baseIndexName = ElasticsearchUtils.getBaseIndexName(indexName);
-      allColumnMetadata.put(baseIndexName, indexColumnMetadata);
-    }
-    return allColumnMetadata;
+    return columnMetadataDao.getColumnMetadata(indices);
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public Map<String, FieldType> getCommonColumnMetadata(List<String> indices) throws IOException {
-    LOG.debug("Getting common metadata; indices={}", indices);
-    Map<String, FieldType> commonColumnMetadata = null;
-
-    // retrieve the mappings for only the latest version of each index
-    String[] latestIndices = getLatestIndices(indices);
-    ImmutableOpenMap<String, ImmutableOpenMap<String, MappingMetaData>> mappings;
-    mappings = client
-            .admin()
-            .indices()
-            .getMappings(new GetMappingsRequest().indices(latestIndices))
-            .actionGet()
-            .getMappings();
-
-    // did we get all the mappings that we expect?
-    if(mappings.size() < latestIndices.length) {
-      String msg = String.format(
-              "Failed to get required mappings; expected mappings for '%s', but got '%s'",
-              latestIndices, mappings.keys().toArray());
-      throw new IllegalStateException(msg);
-    }
-
-    // for each index...
-    for(Object index: mappings.keys().toArray()) {
-      ImmutableOpenMap<String, MappingMetaData> mapping = mappings.get(index.toString());
-      Iterator<String> mappingIterator = mapping.keysIt();
-      while(mappingIterator.hasNext()) {
-        MappingMetaData metadata = mapping.get(mappingIterator.next());
-        Map<String, Map<String, String>> map = (Map<String, Map<String, String>>) metadata.getSourceAsMap().get("properties");
-        Map<String, FieldType> mappingsWithTypes = map
-                .entrySet()
-                .stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        e-> toFieldType(e.getValue().get("type"))));
-
-        // keep only the properties in common
-        if (commonColumnMetadata == null) {
-          commonColumnMetadata = mappingsWithTypes;
-        } else {
-          commonColumnMetadata
-                  .entrySet()
-                  .retainAll(mappingsWithTypes.entrySet());
-        }
-      }
-    }
-
-    return commonColumnMetadata;
-  }
-
-  protected String[] getLatestIndices(List<String> includeIndices) {
-    LOG.debug("Getting latest indices; indices={}", includeIndices);
-    Map<String, String> latestIndices = new HashMap<>();
-    String[] indices = client
-            .admin()
-            .indices()
-            .prepareGetIndex()
-            .setFeatures()
-            .get()
-            .getIndices();
-    for (String index : indices) {
-      if (!ignoredIndices.contains(index)) {
-        int prefixEnd = index.indexOf(INDEX_NAME_DELIMITER);
-        if (prefixEnd != -1) {
-          String prefix = index.substring(0, prefixEnd);
-          if (includeIndices.contains(prefix)) {
-            String latestIndex = latestIndices.get(prefix);
-            if (latestIndex == null || index.compareTo(latestIndex) > 0) {
-              latestIndices.put(prefix, index);
-            }
-          }
-        }
-      }
-    }
-    return latestIndices.values().toArray(new String[latestIndices.size()]);
-  }
-
-  /**
-   * Converts an Elasticsearch SearchRequest to JSON.
-   * @param esRequest The search request.
-   * @return The JSON representation of the SearchRequest.
-   */
-  public static String toJSON(org.elasticsearch.action.search.SearchRequest esRequest) {
-    String json = "null";
-    if(esRequest != null) {
-      try {
-        json = XContentHelper.convertToJson(esRequest.source(), true);
-
-      } catch (IOException io) {
-        json = "JSON conversion failed; request=" + esRequest.toString();
-      }
-    }
-    return json;
-  }
-
-  /**
-   * Convert a SearchRequest to JSON.
-   * @param request The search request.
-   * @return The JSON representation of the SearchRequest.
-   */
-  public static String toJSON(Object request) {
-    String json = "null";
-    if(request != null) {
-      try {
-        json = new ObjectMapper()
-                .writer()
-                .withDefaultPrettyPrinter()
-                .writeValueAsString(request);
-
-      } catch (IOException io) {
-        json = "JSON conversion failed; request=" + request.toString();
-      }
-    }
-
-    return json;
+    return columnMetadataDao.getCommonColumnMetadata(indices);
   }
 
   private org.elasticsearch.search.sort.SortOrder getElasticsearchSortOrder(
@@ -851,5 +649,23 @@ public class ElasticsearchDao implements IndexDao {
     return String.format("%s_score", field);
   }
 
+  public ElasticsearchDao client(TransportClient client) {
+    this.client = client;
+    return this;
+  }
 
+  public ElasticsearchDao columnMetadataDao(ColumnMetadataDao columnMetadataDao) {
+    this.columnMetadataDao = columnMetadataDao;
+    return this;
+  }
+
+  public ElasticsearchDao accessConfig(AccessConfig accessConfig) {
+    this.accessConfig = accessConfig;
+    return this;
+  }
+
+  public ElasticsearchDao ignoredIndices(List<String> ignoredIndices) {
+    this.ignoredIndices = ignoredIndices;
+    return this;
+  }
 }

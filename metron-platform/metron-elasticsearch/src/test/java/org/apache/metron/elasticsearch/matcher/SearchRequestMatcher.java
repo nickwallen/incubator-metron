@@ -17,7 +17,7 @@
  */
 package org.apache.metron.elasticsearch.matcher;
 
-import org.apache.metron.elasticsearch.dao.ElasticsearchDao;
+import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.search.SortField;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.client.Requests;
@@ -87,9 +87,9 @@ public class SearchRequestMatcher extends ArgumentMatcher<SearchRequest> {
     if(!sourcesMatch) {
       description.appendText("Bad search request sources: ");
       description.appendText(" expected=");
-      description.appendValue(ElasticsearchDao.toJSON(expectedSource));
+      description.appendValue(ElasticsearchUtils.toJSON(expectedSource));
       description.appendText(", got=");
-      description.appendValue(ElasticsearchDao.toJSON((actualSource)));
+      description.appendValue(ElasticsearchUtils.toJSON((actualSource)));
       description.appendText("  ");
     }
   }
