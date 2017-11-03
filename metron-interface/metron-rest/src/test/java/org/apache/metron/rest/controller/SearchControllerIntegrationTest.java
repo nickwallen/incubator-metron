@@ -18,11 +18,11 @@
 package org.apache.metron.rest.controller;
 
 import com.google.common.collect.ImmutableMap;
-import org.adrianwalker.multilinestring.Multiline;
+import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.indexing.dao.InMemoryDao;
 import org.apache.metron.indexing.dao.SearchIntegrationTest;
 import org.apache.metron.indexing.dao.search.FieldType;
-import org.apache.metron.rest.service.SensorIndexingConfigService;
+import org.apache.metron.rest.service.SearchService;
 import org.json.simple.parser.ParseException;
 import org.junit.After;
 import org.junit.Before;
@@ -34,22 +34,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.allQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.exceededMaxResultsQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.filterQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.groupByQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.indexQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.paginationQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortQuery;
-import static org.apache.metron.indexing.dao.SearchIntegrationTest.sortDescendingWithMissingFields;
-import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -65,40 +55,23 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles(TEST_PROFILE)
 public class SearchControllerIntegrationTest extends DaoControllerTest {
 
-  /**
-   * {
-   * "indices": [],
-   * "query": "*",
-   * "from": 0,
-   * "size": 10,
-   * "sort": [
-   *   {
-   *     "field": "timestamp",
-   *     "sortOrder": "desc"
-   *   }
-   * ]
-   * }
-   */
-  @Multiline
-  public static String defaultQuery;
+
 
   @Autowired
-  private SensorIndexingConfigService sensorIndexingConfigService;
+  private SearchService searchService;
 
   @Autowired
   private WebApplicationContext wac;
 
   private MockMvc mockMvc;
+
   private String searchUrl = "/api/v1/search";
   private String user = "user";
   private String password = "password";
 
   @Before
   public void setup() throws Exception {
-    this.mockMvc = MockMvcBuilders
-            .webAppContextSetup(this.wac)
-            .apply(springSecurity())
-            .build();
+    this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).apply(springSecurity()).build();
     ImmutableMap<String, String> testData = ImmutableMap.of(
         "bro_index_2017.01.01.01", SearchIntegrationTest.broData,
         "snort_index_2017.01.01.01", SearchIntegrationTest.snortData
@@ -114,68 +87,14 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
 
   @Test
   public void testSecurity() throws Exception {
-
-    // request offers no credentials
-    MockHttpServletRequestBuilder request;
-    request = post(searchUrl + "/search")
-            .with(csrf())
-            .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
-            .content(allQuery);
-
-    // unauthorized
-    this.mockMvc
-            .perform(request)
+    this.mockMvc.perform(post(searchUrl + "/search").with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.allQuery))
             .andExpect(status().isUnauthorized());
-  }
-
-  /**
-   * Builds a mock request.
-   * @param endpoint The API endpoint to request.
-   * @param content The content of the request.
-   * @return A mock request.
-   */
-  private MockHttpServletRequestBuilder request(String endpoint, String content) {
-    return post(searchUrl + endpoint)
-            .with(httpBasic(user, password))
-            .with(csrf())
-            .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
-            .content(content);
-  }
-
-  @Test
-  public void testDefaultQuery() throws Exception {
-    sensorIndexingConfigService.save("bro", new HashMap<String, Object>() {{
-      put("index", "bro");
-    }});
-
-    try {
-      assertEventually(() -> this.mockMvc
-              .perform(request("/search", defaultQuery))
-              .andExpect(status().isOk())
-              .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
-              .andExpect(jsonPath("$.total").value(5))
-              .andExpect(jsonPath("$.results[0].source.source:type").value("bro"))
-              .andExpect(jsonPath("$.results[0].source.timestamp").value(5))
-              .andExpect(jsonPath("$.results[1].source.source:type").value("bro"))
-              .andExpect(jsonPath("$.results[1].source.timestamp").value(4))
-              .andExpect(jsonPath("$.results[2].source.source:type").value("bro"))
-              .andExpect(jsonPath("$.results[2].source.timestamp").value(3))
-              .andExpect(jsonPath("$.results[3].source.source:type").value("bro"))
-              .andExpect(jsonPath("$.results[3].source.timestamp").value(2))
-              .andExpect(jsonPath("$.results[4].source.source:type").value("bro"))
-              .andExpect(jsonPath("$.results[4].source.timestamp").value(1))
-      );
-    } finally {
-      sensorIndexingConfigService.delete("bro");
-    }
   }
 
   @Test
   public void test() throws Exception {
 
-    // search
-    this.mockMvc
-            .perform(request("/search", allQuery))
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.allQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(10))
@@ -200,9 +119,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[9].source.source:type").value("bro"))
             .andExpect(jsonPath("$.results[9].source.timestamp").value(1));
 
-    // filter
-    this.mockMvc
-            .perform(request("/search", filterQuery))
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.filterQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(3))
@@ -213,9 +130,8 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[2].source.source:type").value("bro"))
             .andExpect(jsonPath("$.results[2].source.timestamp").value(1));
 
-    // sort
-    this.mockMvc
-            .perform(request("/search", sortQuery))
+
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.sortQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(10))
@@ -230,9 +146,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[8].source.ip_src_port").value(8009))
             .andExpect(jsonPath("$.results[9].source.ip_src_port").value(8010));
 
-    // pagination
-    this.mockMvc
-            .perform(request("/search", paginationQuery))
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.paginationQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(10))
@@ -243,9 +157,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[2].source.source:type").value("bro"))
             .andExpect(jsonPath("$.results[2].source.timestamp").value(4));
 
-    // index
-    this.mockMvc
-            .perform(request("/search", indexQuery))
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.indexQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.total").value(5))
@@ -260,17 +172,13 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.results[4].source.source:type").value("bro"))
             .andExpect(jsonPath("$.results[4].source.timestamp").value(1));
 
-    // exceed max results
-    this.mockMvc
-            .perform(request("/search", exceededMaxResultsQuery))
+    this.mockMvc.perform(post(searchUrl + "/search").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.exceededMaxResultsQuery))
             .andExpect(status().isInternalServerError())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.responseCode").value(500))
             .andExpect(jsonPath("$.message").value("Search result size must be less than 100"));
 
-    // group by
-    this.mockMvc
-            .perform(request("/group", groupByQuery))
+    this.mockMvc.perform(post(searchUrl + "/group").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(SearchIntegrationTest.groupByQuery))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(2)))
@@ -286,10 +194,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.groupResults[0].groupResults[0].total").value(10))
             .andExpect(jsonPath("$.groupResults[0].groupResults[0].score").value(50));
 
-    // column metadata - bro and snort
-
-    this.mockMvc
-            .perform(request("/column/metadata", "[\"bro\",\"snort\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"bro\",\"snort\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(2)))
@@ -302,18 +207,14 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.snort.snort_field").value("double"))
             .andExpect(jsonPath("$.snort.duplicate_field").value("long"));
 
-    // column metadata common - bro and snort
-    this.mockMvc
-            .perform(request("/column/metadata/common", "[\"bro\",\"snort\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata/common").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"bro\",\"snort\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(2)))
             .andExpect(jsonPath("$.common_string_field").value("string"))
             .andExpect(jsonPath("$.common_integer_field").value("integer"));
 
-    // column metadata - only bro
-    this.mockMvc
-            .perform(request("/column/metadata", "[\"bro\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"bro\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(1)))
@@ -322,9 +223,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.bro.bro_field").value("boolean"))
             .andExpect(jsonPath("$.bro.duplicate_field").value("date"));
 
-    // column metadata common - only bro
-    this.mockMvc
-            .perform(request("/column/metadata/common", "[\"bro\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata/common").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"bro\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(4)))
@@ -333,9 +232,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.bro_field").value("boolean"))
             .andExpect(jsonPath("$.duplicate_field").value("date"));
 
-    // column metadata - only snort
-    this.mockMvc
-            .perform(request("/column/metadata", "[\"snort\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"snort\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(1)))
@@ -344,9 +241,7 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.snort.snort_field").value("double"))
             .andExpect(jsonPath("$.snort.duplicate_field").value("long"));
 
-    // column metadata common - only snort
-    this.mockMvc
-            .perform(request("/column/metadata/common", "[\"snort\"]"))
+    this.mockMvc.perform(post(searchUrl + "/column/metadata/common").with(httpBasic(user, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content("[\"snort\"]"))
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
             .andExpect(jsonPath("$.*", hasSize(4)))
@@ -356,24 +251,21 @@ public class SearchControllerIntegrationTest extends DaoControllerTest {
             .andExpect(jsonPath("$.duplicate_field").value("long"));
   }
 
-  private void loadColumnTypes() throws ParseException {
 
-    // bro types
+
+
+  private void loadColumnTypes() throws ParseException {
+    Map<String, Map<String, FieldType>> columnTypes = new HashMap<>();
     Map<String, FieldType> broTypes = new HashMap<>();
     broTypes.put("common_string_field", FieldType.STRING);
     broTypes.put("common_integer_field", FieldType.INTEGER);
     broTypes.put("bro_field", FieldType.BOOLEAN);
     broTypes.put("duplicate_field", FieldType.DATE);
-
-    // snort types
     Map<String, FieldType> snortTypes = new HashMap<>();
     snortTypes.put("common_string_field", FieldType.STRING);
     snortTypes.put("common_integer_field", FieldType.INTEGER);
     snortTypes.put("snort_field", FieldType.DOUBLE);
     snortTypes.put("duplicate_field", FieldType.LONG);
-
-    // set the column types
-    Map<String, Map<String, FieldType>> columnTypes = new HashMap<>();
     columnTypes.put("bro", broTypes);
     columnTypes.put("snort", snortTypes);
     InMemoryDao.setColumnMetadata(columnTypes);
