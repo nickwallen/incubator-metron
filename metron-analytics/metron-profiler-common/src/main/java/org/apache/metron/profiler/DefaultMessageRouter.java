@@ -22,8 +22,8 @@ package org.apache.metron.profiler;
 
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
-import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
-import org.apache.metron.stellar.common.StellarStatefulExecutor;
+import org.apache.metron.stellar.common.executor.DefaultStellarStatefulExecutor;
+import org.apache.metron.stellar.common.executor.StellarStatefulExecutor;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.json.simple.JSONObject;

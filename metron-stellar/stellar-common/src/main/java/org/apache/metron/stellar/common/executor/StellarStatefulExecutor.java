@@ -18,16 +18,25 @@
  *
  */
 
-package org.apache.metron.stellar.common;
+package org.apache.metron.stellar.common.executor;
 
+import org.apache.metron.stellar.common.shell.StellarShellResult;
+import org.apache.metron.stellar.common.shell.VariableResult;
 import org.apache.metron.stellar.dsl.Context;
+import org.apache.metron.stellar.dsl.functions.resolver.FunctionResolver;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Executes Stellar expressions and maintains state across multiple invocations.
  */
-public interface StellarStatefulExecutor {
+public interface StellarStatefulExecutor exten{
+
+  /**
+   * Initialize the Stellar executor.
+   */
+  void init();
 
   /**
    * Assign a variable a specific value.
@@ -49,6 +58,14 @@ public interface StellarStatefulExecutor {
   void assign(String variable, String expression, Map<String, Object> state);
 
   /**
+   * Update the state of the executor by assign a value to a variable.
+   * @param variable The name of the variable.
+   * @param value The value to assign.
+   * @param expression The expression that resulted in the given value.  Optional.
+   */
+  void assign(String variable, Object value, Optional<String> expression);
+
+  /**
    * Execute a Stellar expression and return the result.  The internal state of the executor
    * is not modified.
    *
@@ -59,17 +76,30 @@ public interface StellarStatefulExecutor {
    * @param clazz      The expected type of the expression's result.
    * @param <T>        The expected type of the expression's result.
    */
-  <T> T execute(String expression, Map<String, Object> state, Class<T> clazz);
+  <T> StellarResult<T> execute(String expression, Map<String, Object> state, Class<T> clazz);
+
+//  /**
+//   * Execute the Stellar expression.
+//   * @param expression The Stellar expression to execute.
+//   * @return The result of executing the Stellar expression.
+//   */
+//  StellarShellResult execute(String expression);
 
   /**
    * The current state of the Stellar execution environment.
    */
-  Map<String, Object> getState();
+  Map<String, VariableResult> getState();
 
   /**
    * Removes all state from the execution environment.
    */
   void clearState();
+
+//  /**
+//   * Returns the Context for the Stellar execution environment.
+//   * @return The execution context.
+//   */
+//  Context getContext();
 
   /**
    * Sets the Context for the Stellar execution environment.  This provides global data used
@@ -78,4 +108,16 @@ public interface StellarStatefulExecutor {
    * @param context The Stellar context.
    */
   void setContext(Context context);
+
+//  /**
+//   * Returns the global configuration of the Stellar execution environment.
+//   * @return A map of values defined in the global configuration.
+//   */
+//  Map<String, Object> getGlobalConfig();
+
+//  /**
+//   * Returns the function resolver of the Stellar execution environment.
+//   * @return The function resolver.
+//   */
+//  FunctionResolver getFunctionResolver();
 }

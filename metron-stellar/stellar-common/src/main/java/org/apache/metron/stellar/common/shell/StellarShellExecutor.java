@@ -79,22 +79,4 @@ public interface StellarShellExecutor {
    * @return The function resolver.
    */
   FunctionResolver getFunctionResolver();
-
-  /**
-   * Add a listener that will be notified when a magic command is defined.
-   * @param listener The listener to notify.
-   */
-  void addSpecialListener(SpecialDefinedListener listener);
-
-  /**
-   * Add a listener that will be notified when a function is defined.
-   * @param listener The listener to notify.
-   */
-  void addFunctionListener(FunctionDefinedListener listener);
-
-  /**
-   * Add a listener that will be notified when a variable is defined.
-   * @param listener The listener to notify.
-   */
-  void addVariableListener(VariableDefinedListener listener);
 }

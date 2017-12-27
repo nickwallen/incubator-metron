@@ -87,7 +87,18 @@ public class StellarInterpreter extends Interpreter {
 
   public StellarShellExecutor createExecutor() throws Exception {
 
-    // TODO set zookeeper URL?
+    // TODO need to pass in all the specials here
+//    List<SpecialCommand> specials = Arrays.asList(
+//            new AssignmentCommand(),
+//            new DocCommand(),
+//            new QuitCommand(),
+//            new Comment(),
+//            new MagicListFunctions(),
+//            new MagicListVariables(),
+//            new MagicDefineGlobal(),
+//            new MagicUndefineGlobal(),
+//            new MagicListGlobals()
+//    );
 
     Properties props = getProperty();
     StellarShellExecutor executor = new DefaultStellarShellExecutor(props, Optional.empty());

@@ -21,7 +21,6 @@
 package org.apache.metron.profiler.bolt;
 
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;

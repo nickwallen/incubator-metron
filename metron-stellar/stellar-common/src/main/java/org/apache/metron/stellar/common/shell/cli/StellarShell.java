@@ -36,6 +36,16 @@ import org.apache.metron.stellar.common.shell.DefaultStellarShellExecutor;
 import org.apache.metron.stellar.common.shell.StellarAutoCompleter;
 import org.apache.metron.stellar.common.shell.StellarShellExecutor;
 import org.apache.metron.stellar.common.shell.StellarShellResult;
+import org.apache.metron.stellar.common.shell.specials.AssignmentCommand;
+import org.apache.metron.stellar.common.shell.specials.Comment;
+import org.apache.metron.stellar.common.shell.specials.DocCommand;
+import org.apache.metron.stellar.common.shell.specials.MagicDefineGlobal;
+import org.apache.metron.stellar.common.shell.specials.MagicListFunctions;
+import org.apache.metron.stellar.common.shell.specials.MagicListGlobals;
+import org.apache.metron.stellar.common.shell.specials.MagicListVariables;
+import org.apache.metron.stellar.common.shell.specials.MagicUndefineGlobal;
+import org.apache.metron.stellar.common.shell.specials.QuitCommand;
+import org.apache.metron.stellar.common.shell.specials.SpecialCommand;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.stellar.common.utils.JSONUtils;
 import org.jboss.aesh.complete.CompleteOperation;
@@ -55,6 +65,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -253,6 +264,19 @@ public class StellarShell extends AeshConsoleCallback implements Completion {
     }
 
     StellarShellExecutor executor = new DefaultStellarShellExecutor(properties, zookeeperUrl);
+
+    // TODO need to pass in all the specials here
+//    List<SpecialCommand> specials = Arrays.asList(
+//            new AssignmentCommand(),
+//            new DocCommand(),
+//            new QuitCommand(),
+//            new Comment(),
+//            new MagicListFunctions(),
+//            new MagicListVariables(),
+//            new MagicDefineGlobal(),
+//            new MagicUndefineGlobal(),
+//            new MagicListGlobals()
+//    );
 
     // the CONSOLE capability is only available with the Aesh-driven REPL
     executor.getContext().addCapability(CONSOLE, () -> console);

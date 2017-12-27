@@ -70,7 +70,7 @@ import static org.apache.metron.stellar.dsl.Context.Capabilities.ZOOKEEPER_CLIEN
 /**
  * Default implementation of a StellarShellExecutor.
  */
-public class DefaultStellarShellExecutor implements StellarShellExecutor {
+public class DefaultStellarShellExecutor implements StellarShellExecutor, StellarExecutionNotifier {
 
   private static final Logger LOG =  LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String SHELL_VARIABLES = "shellVariables";
@@ -143,8 +143,9 @@ public class DefaultStellarShellExecutor implements StellarShellExecutor {
     StellarFunctions.initialize(this.context);
     this.commandRegistry = registerSpecialCommands();
 
-    // TODO this wont really work as functions are probably not defined yet
-    // but the auto-complete reaches out to the function resolver separately
+    // TODO are all the functions defined at this point?
+
+    // notify the listeners about the new functions that have been defined
     for(StellarFunctionInfo fn : functionResolver.getFunctionInfo()) {
       notifyFunctionListeners(fn);
     }
@@ -253,8 +254,12 @@ public class DefaultStellarShellExecutor implements StellarShellExecutor {
 
   @Override
   public void assign(String variableName, Object value, Optional<String> expression) {
-    VariableResult varResult = new VariableResult(expression, value);
+
+    // assign a value to the variable
+    VariableResult varResult = VariableResult.withExpression(value, expression);
     this.variables.put(variableName, varResult);
+
+    // notify listeners about the new variable
     notifyVariableListeners(variableName, varResult);
   }
 
@@ -353,6 +358,7 @@ public class DefaultStellarShellExecutor implements StellarShellExecutor {
             new MagicListGlobals()
     );
 
+    // notify listeners about the new specials
     for(SpecialCommand command : specials) {
       notifySpecialListeners(command);
     }
