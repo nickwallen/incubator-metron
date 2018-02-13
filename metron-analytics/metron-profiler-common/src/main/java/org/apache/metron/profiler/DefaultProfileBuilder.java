@@ -149,6 +149,8 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   public Optional<ProfileMeasurement> flush() {
     LOG.debug("Flushing profile: profile={}, entity={}", profileName, entity);
     Optional<ProfileMeasurement> result = Optional.empty();
+
+    // TODO does the clock need to get passed-in to flush(clock)?
     ProfilePeriod period = new ProfilePeriod(clock.currentTimeMillis(), periodDurationMillis, TimeUnit.MILLISECONDS);
 
     try {

@@ -21,9 +21,10 @@
 package org.apache.metron.profiler.bolt;
 
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
+import org.apache.metron.common.configuration.profiler.ProfileConfig;
+import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.test.bolt.BaseBoltTest;
-import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -31,12 +32,15 @@ import org.json.simple.parser.ParseException;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.util.HashMap;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.refEq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests the ProfileSplitterBolt.
@@ -47,7 +51,10 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    * {
    *   "ip_src_addr": "10.0.0.1",
    *   "ip_dst_addr": "10.0.0.20",
-   *   "protocol": "HTTP"
+   *   "protocol": "HTTP",
+   *   "timestamp": 1111111111111,
+   *   "custom.timestamp": 2222222222222,
+   *   "timestamp.string": "3333333333333"
    * }
    */
   @Multiline
@@ -68,7 +75,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String onlyIfTrue;
+  private String profileWithOnlyIfTrue;
 
   /**
    * {
@@ -85,7 +92,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String onlyIfFalse;
+  private String profileWithOnlyIfFalse;
 
   /**
    * {
@@ -101,7 +108,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String onlyIfMissing;
+  private String profileWithOnlyIfMissing;
 
   /**
    * {
@@ -118,7 +125,58 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String onlyIfInvalid;
+  private String profileWithOnlyIfInvalid;
+
+  /**
+   * {
+   *   "profiles": [
+   *      {
+   *        "profile": "test",
+   *        "foreach": "ip_src_addr",
+   *        "init": {},
+   *        "update": {},
+   *        "result": "2"
+   *      }
+   *   ],
+   *   "timestampField": "custom.timestamp"
+   * }
+   */
+  @Multiline
+  private String profileUsingCustomTimestampField;
+
+  /**
+   * {
+   *   "profiles": [
+   *      {
+   *        "profile": "test",
+   *        "foreach": "ip_src_addr",
+   *        "init": {},
+   *        "update": {},
+   *        "result": "2"
+   *      }
+   *   ],
+   *   "timestampField": "missing.timestamp"
+   * }
+   */
+  @Multiline
+  private String profileUsingMissingTimestampField;
+
+  /**
+   * {
+   *   "profiles": [
+   *      {
+   *        "profile": "test",
+   *        "foreach": "ip_src_addr",
+   *        "init": {},
+   *        "update": {},
+   *        "result": "2"
+   *      }
+   *   ],
+   *   "timestampField": "timestamp.string"
+   * }
+   */
+  @Multiline
+  private String profileUsingStringTimestampField;
 
   private JSONObject message;
 
@@ -134,14 +192,26 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
+   * Creates a ProfilerConfig based on a string containing JSON.
+   *
+   * @param configAsJSON The config as JSON.
+   * @return The ProfilerConfig.
+   * @throws Exception
+   */
+  private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
+    InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
+    return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
+  }
+
+  /**
    * Create a ProfileSplitterBolt to test
    */
-  private ProfileSplitterBolt createBolt(String profilerConfig) throws IOException {
+  private ProfileSplitterBolt createBolt(ProfilerConfig config) throws Exception {
 
     ProfileSplitterBolt bolt = new ProfileSplitterBolt("zookeeperURL");
     bolt.setCuratorFramework(client);
     bolt.setZKCache(cache);
-    bolt.getConfigurations().updateProfilerConfig(profilerConfig.getBytes("UTF-8"));
+    bolt.getConfigurations().updateProfilerConfig(config);
     bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
 
     return bolt;
@@ -154,17 +224,17 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Test
   public void testOnlyIfTrue() throws Exception {
 
-    // setup
-    ProfileSplitterBolt bolt = createBolt(onlyIfTrue);
-
-    // execute
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
+    ProfileSplitterBolt bolt = createBolt(config);
     bolt.execute(tuple);
 
     // a tuple should be emitted for the downstream profile builder
-    verify(outputCollector, times(1)).emit(refEq(tuple), any(Values.class));
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), any(Values.class));
 
     // the original tuple should be ack'd
-    verify(outputCollector, times(1)).ack(tuple);
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
@@ -174,17 +244,17 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Test
   public void testOnlyIfMissing() throws Exception {
 
-    // setup
-    ProfileSplitterBolt bolt = createBolt(onlyIfMissing);
-
-    // execute
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfMissing);
+    ProfileSplitterBolt bolt = createBolt(config);
     bolt.execute(tuple);
 
     // a tuple should be emitted for the downstream profile builder
-    verify(outputCollector, times(1)).emit(refEq(tuple), any(Values.class));
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), any(Values.class));
 
     // the original tuple should be ack'd
-    verify(outputCollector, times(1)).ack(tuple);
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
@@ -194,17 +264,17 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Test
   public void testOnlyIfFalse() throws Exception {
 
-    // setup
-    ProfileSplitterBolt bolt = createBolt(onlyIfFalse);
-
-    // execute
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfFalse);
+    ProfileSplitterBolt bolt = createBolt(config);
     bolt.execute(tuple);
 
     // a tuple should NOT be emitted for the downstream profile builder
-    verify(outputCollector, times(0)).emit(any(Values.class));
+    verify(outputCollector, times(0))
+            .emit(any());
 
     // the original tuple should be ack'd
-    verify(outputCollector, times(1)).ack(tuple);
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
@@ -215,15 +285,23 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Test
   public void testResolveEntityName() throws Exception {
 
-    // setup
-    ProfileSplitterBolt bolt = createBolt(onlyIfTrue);
-
-    // execute
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
+    ProfileSplitterBolt bolt = createBolt(config);
     bolt.execute(tuple);
 
-    // verify - the entity name comes from variable resolution in stella
+    // expected values
     String expectedEntity = "10.0.0.1";
-    verify(outputCollector, times(1)).emit(any(Tuple.class), refEq(new Values(expectedEntity, onlyIfTrue, message)));
+    ProfileConfig expectedConfig = config.getProfiles().get(0);
+    long expectedTimestamp = 1111111111111L;
+    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+
+    // a tuple should be emitted for the downstream profile builder
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), eq(expected));
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
@@ -232,11 +310,107 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Test
   public void testOnlyIfInvalid() throws Exception {
 
-    // setup
-    ProfileSplitterBolt bolt = createBolt(onlyIfInvalid);
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfInvalid);
+    ProfileSplitterBolt bolt = createBolt(config);
     bolt.execute(tuple);
 
     // a tuple should NOT be emitted for the downstream profile builder
-    verify(outputCollector, times(0)).emit(any(Values.class));
+    verify(outputCollector, times(0))
+            .emit(any(Values.class));
   }
+
+  /**
+   * If the profile configuration does not define a custom 'timestampField', a default
+   * field should be used; 'timestamp'.
+   */
+  @Test
+  public void testDefaultTimestampField() throws Exception {
+
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // expected values
+    String expectedEntity = "10.0.0.1";
+    ProfileConfig expectedConfig = config.getProfiles().get(0);
+    long expectedTimestamp = 1111111111111L;
+    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+
+    // a tuple should be emitted for the downstream profile builder
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), eq(expected));
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
+  }
+
+  /**
+   * If a custom timestamp field is defined in the profiler configuration, the timestamp
+   * is extracted from that field.
+   */
+  @Test
+  public void testCustomTimestampField() throws Exception {
+
+    ProfilerConfig config = toProfilerConfig(profileUsingCustomTimestampField);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // expected values
+    String expectedEntity = "10.0.0.1";
+    ProfileConfig expectedConfig = config.getProfiles().get(0);
+    long expectedTimestamp = 2222222222222L;
+    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+
+    // a tuple should be emitted for the downstream profile builder
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), eq(expected));
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
+  }
+
+  /**
+   * If a message does not contain the timestamp field, it should not be emitted.  Messages that
+   * are missing timestamps must be ignored.
+   */
+  @Test
+  public void testMissingTimestampField() throws Exception {
+
+    ProfilerConfig config = toProfilerConfig(profileUsingMissingTimestampField);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // a tuple should NOT be emitted for the downstream profile builder
+    verify(outputCollector, times(0))
+            .emit(any());
+  }
+
+  /**
+   * If a timestamp field contains a string, it should be converted to a long and treated
+   * as epoch milliseconds.
+   */
+  @Test
+  public void testStringTimestampField() throws Exception {
+
+    ProfilerConfig config = toProfilerConfig(profileUsingStringTimestampField);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // expected values
+    String expectedEntity = "10.0.0.1";
+    ProfileConfig expectedConfig = config.getProfiles().get(0);
+    long expectedTimestamp = 3333333333333L;
+    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+
+    // a tuple should be emitted for the downstream profile builder
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), eq(expected));
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
+  }
+
 }

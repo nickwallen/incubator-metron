@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The definition for entire Profiler, which may contain many Profile definitions.
+ * The configuration object for the Profiler, which may contain many Profile definitions.
  */
 public class ProfilerConfig implements Serializable {
 
@@ -30,6 +30,17 @@ public class ProfilerConfig implements Serializable {
    * One or more profile definitions.
    */
   private List<ProfileConfig> profiles = new ArrayList<>();
+
+  /**
+   * The name of a field containing the timestamp that is used to
+   * generate profiles.
+   *
+   * <p>This field must contain a timestamp in epoch milliseconds.
+   *
+   * <p>If a message does NOT contain this field, it will be dropped
+   * and not included in any profiles.
+   */
+  private String timestampField = "timestamp";
 
   public List<ProfileConfig> getProfiles() {
     return profiles;
@@ -39,10 +50,19 @@ public class ProfilerConfig implements Serializable {
     this.profiles = profiles;
   }
 
+  public String getTimestampField() {
+    return timestampField;
+  }
+
+  public void setTimestampField(String timestampField) {
+    this.timestampField = timestampField;
+  }
+
   @Override
   public String toString() {
     return "ProfilerConfig{" +
             "profiles=" + profiles +
+            ", timestampField='" + timestampField + '\'' +
             '}';
   }
 
@@ -50,13 +70,15 @@ public class ProfilerConfig implements Serializable {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-
     ProfilerConfig that = (ProfilerConfig) o;
-    return profiles != null ? profiles.equals(that.profiles) : that.profiles == null;
+    if (profiles != null ? !profiles.equals(that.profiles) : that.profiles != null) return false;
+    return timestampField != null ? timestampField.equals(that.timestampField) : that.timestampField == null;
   }
 
   @Override
   public int hashCode() {
-    return profiles != null ? profiles.hashCode() : 0;
+    int result = profiles != null ? profiles.hashCode() : 0;
+    result = 31 * result + (timestampField != null ? timestampField.hashCode() : 0);
+    return result;
   }
 }
