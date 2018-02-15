@@ -108,15 +108,18 @@ public class DefaultMessageDistributorTest {
    */
   @Test
   public void testDistribute() throws Exception {
+
+    // setup
+    long timestamp = 100;
     ProfileConfig definition = createDefinition(profileOne);
     String entity = (String) messageOne.get("ip_src_addr");
     MessageRoute route = new MessageRoute(definition, entity);
 
-    // distribute one message
-    distributor.distribute(messageOne, route, context);
+    // distribute one message and flush
+    distributor.distribute(messageOne, timestamp, route, context);
+    List<ProfileMeasurement> measurements = distributor.flush();
 
     // expect one measurement coming from one profile
-    List<ProfileMeasurement> measurements = distributor.flush();
     assertEquals(1, measurements.size());
     ProfileMeasurement m = measurements.get(0);
     assertEquals(definition.getProfile(), m.getProfileName());
@@ -126,12 +129,17 @@ public class DefaultMessageDistributorTest {
   @Test
   public void testDistributeWithTwoProfiles() throws Exception {
 
-    // distribute one message to the first profile
+    // setup
+    long timestamp = 100;
     String entity = (String) messageOne.get("ip_src_addr");
-    distributor.distribute(messageOne, new MessageRoute(createDefinition(profileOne), entity), context);
+
+    // distribute one message to the first profile
+    MessageRoute routeOne = new MessageRoute(createDefinition(profileOne), entity);
+    distributor.distribute(messageOne, timestamp, routeOne, context);
 
     // distribute another message to the second profile, but same entity
-    distributor.distribute(messageOne, new MessageRoute(createDefinition(profileTwo), entity), context);
+    MessageRoute routeTwo = new MessageRoute(createDefinition(profileTwo), entity);
+    distributor.distribute(messageOne, timestamp, routeTwo, context);
 
     // expect 2 measurements; 1 for each profile
     List<ProfileMeasurement> measurements = distributor.flush();
@@ -141,13 +149,18 @@ public class DefaultMessageDistributorTest {
   @Test
   public void testDistributeWithTwoEntities() throws Exception {
 
+    // setup
+    long timestamp = 100;
+
     // distribute one message
     String entityOne = (String) messageOne.get("ip_src_addr");
-    distributor.distribute(messageOne, new MessageRoute(createDefinition(profileOne), entityOne), context);
+    MessageRoute routeOne = new MessageRoute(createDefinition(profileOne), entityOne);
+    distributor.distribute(messageOne, timestamp, routeOne, context);
 
     // distribute another message with a different entity
     String entityTwo = (String) messageTwo.get("ip_src_addr");
-    distributor.distribute(messageTwo, new MessageRoute(createDefinition(profileTwo), entityTwo), context);
+    MessageRoute routeTwo =  new MessageRoute(createDefinition(profileTwo), entityTwo);
+    distributor.distribute(messageTwo, timestamp, routeTwo, context);
 
     // expect 2 measurements; 1 for each entity
     List<ProfileMeasurement> measurements = distributor.flush();

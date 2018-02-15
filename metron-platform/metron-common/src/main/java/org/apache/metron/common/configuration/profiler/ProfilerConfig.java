@@ -20,6 +20,7 @@ package org.apache.metron.common.configuration.profiler;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The configuration object for the Profiler, which may contain many Profile definitions.
@@ -35,12 +36,15 @@ public class ProfilerConfig implements Serializable {
    * The name of a field containing the timestamp that is used to
    * generate profiles.
    *
-   * <p>This field must contain a timestamp in epoch milliseconds.
+   * <p>By default, the processing time of the Profiler is used rather
+   * than event time; a value contained within the message itself.
+   *
+   * <p>The field must contain a timestamp in epoch milliseconds.
    *
    * <p>If a message does NOT contain this field, it will be dropped
    * and not included in any profiles.
    */
-  private String timestampField = "timestamp";
+  private Optional<String> timestampField = Optional.empty();
 
   public List<ProfileConfig> getProfiles() {
     return profiles;
@@ -50,11 +54,11 @@ public class ProfilerConfig implements Serializable {
     this.profiles = profiles;
   }
 
-  public String getTimestampField() {
+  public Optional<String> getTimestampField() {
     return timestampField;
   }
 
-  public void setTimestampField(String timestampField) {
+  public void setTimestampField(Optional<String> timestampField) {
     this.timestampField = timestampField;
   }
 

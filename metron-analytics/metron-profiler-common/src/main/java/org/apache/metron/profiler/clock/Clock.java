@@ -20,16 +20,20 @@
 
 package org.apache.metron.profiler.clock;
 
+import org.json.simple.JSONObject;
+
+import java.util.Optional;
+
 /**
- * A clock can tell time; imagine that.
+ * A clock manages the progression of time in the Profiler.
  *
- * This allows the Profiler to support different treatments of time like wall clock versus event time.
+ * <p>The Profiler can operate on either processing time or event time.  This
+ * abstraction deals with the differences between the two.
  */
 public interface Clock {
 
   /**
    * The current time in epoch milliseconds.
    */
-  long currentTimeMillis();
-
+  Optional<Long> currentTimeMillis(JSONObject message);
 }

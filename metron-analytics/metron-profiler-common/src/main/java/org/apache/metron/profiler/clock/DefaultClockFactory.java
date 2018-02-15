@@ -17,25 +17,38 @@
  *  limitations under the License.
  *
  */
-
 package org.apache.metron.profiler.clock;
 
-import org.json.simple.JSONObject;
-
-import java.io.Serializable;
-import java.util.Optional;
+import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 
 /**
- * A clock that advances based on system time.
+ * Creates the appropriate Clock based on the profiler configuration.
  *
- * <p>This clock allows the Profiler to create profiles based on processing time.
+ * <p>The default implementation of a ClockFactory.
  */
-public class WallClock implements Clock, Serializable {
+public class DefaultClockFactory implements ClockFactory {
 
+  /**
+   * @param config The profiler configuration.
+   * @return The appropriate Clock based on the profiler configuration.
+   */
   @Override
-  public Optional<Long> currentTimeMillis(JSONObject message) {
+  public Clock createClock(ProfilerConfig config) {
+    Clock clock;
 
-    // the message does not matter; use system time
-    return Optional.of(System.currentTimeMillis());
+    boolean isEventTime = config.getTimestampField().isPresent();
+    if(isEventTime) {
+
+      // using event time
+      String timestampField = config.getTimestampField().get();
+      clock = new EventTimeClock(timestampField);
+
+    } else {
+
+      // using processing time
+      clock = new WallClock();
+    }
+
+    return clock;
   }
 }

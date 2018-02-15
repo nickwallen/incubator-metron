@@ -20,7 +20,18 @@
 
 package org.apache.metron.profiler;
 
-import static java.lang.String.format;
+import org.apache.commons.collections4.ListUtils;
+import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.metron.common.configuration.profiler.ProfileConfig;
+import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
+import org.apache.metron.stellar.common.StellarStatefulExecutor;
+import org.apache.metron.stellar.dsl.Context;
+import org.apache.metron.stellar.dsl.ParseException;
+import org.apache.metron.stellar.dsl.StellarFunctions;
+import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
@@ -34,20 +45,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.collections4.ListUtils;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.profiler.clock.Clock;
-import org.apache.metron.profiler.clock.WallClock;
-import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
-import org.apache.metron.stellar.common.StellarStatefulExecutor;
-import org.apache.metron.stellar.dsl.Context;
-import org.apache.metron.stellar.dsl.ParseException;
-import org.apache.metron.stellar.dsl.StellarFunctions;
-import org.json.simple.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static java.lang.String.format;
 
 /**
  * Responsible for building and maintaining a Profile.
@@ -94,16 +93,15 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   private long periodDurationMillis;
 
   /**
-   * A clock is used to tell time; imagine that.
+   * Tracks the latest timestamp for use when flushing the profile.
    */
-  private Clock clock;
+  private long maxTimestamp;
 
   /**
    * Use the ProfileBuilder.Builder to create a new ProfileBuilder.
    */
   private DefaultProfileBuilder(ProfileConfig definition,
                                 String entity,
-                                Clock clock,
                                 long periodDurationMillis,
                                 Context stellarContext) {
 
@@ -111,26 +109,35 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
     this.definition = definition;
     this.profileName = definition.getProfile();
     this.entity = entity;
-    this.clock = clock;
     this.periodDurationMillis = periodDurationMillis;
     this.executor = new DefaultStellarStatefulExecutor();
     StellarFunctions.initialize(stellarContext);
     this.executor.setContext(stellarContext);
+    this.maxTimestamp = 0;
   }
 
   /**
    * Apply a message to the profile.
    * @param message The message to apply.
+   * @param timestamp The timestamp of the message.
    */
   @Override
-  public void apply(JSONObject message) {
+  public void apply(JSONObject message, long timestamp) {
     try {
       if (!isInitialized()) {
+
+        // execute each 'init' expression
         assign(definition.getInit(), message, "init");
         isInitialized = true;
       }
 
+      // execute each 'update' expression
       assign(definition.getUpdate(), message, "update");
+
+      // keep track of the 'latest' timestamp seen for use when flushing the profile
+      if(timestamp > maxTimestamp) {
+        maxTimestamp = timestamp;
+      }
 
     } catch(Throwable e) {
       LOG.error(format("Unable to apply message to profile: %s", e.getMessage()), e);
@@ -140,18 +147,17 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   /**
    * Flush the Profile.
    *
-   * Completes and emits the ProfileMeasurement.  Clears all state in preparation for
+   * <p>Completes and emits the ProfileMeasurement.  Clears all state in preparation for
    * the next window period.
    *
    * @return Returns the completed profile measurement.
    */
   @Override
   public Optional<ProfileMeasurement> flush() {
-    LOG.debug("Flushing profile: profile={}, entity={}", profileName, entity);
-    Optional<ProfileMeasurement> result = Optional.empty();
 
-    // TODO does the clock need to get passed-in to flush(clock)?
-    ProfilePeriod period = new ProfilePeriod(clock.currentTimeMillis(), periodDurationMillis, TimeUnit.MILLISECONDS);
+    Optional<ProfileMeasurement> result;
+    ProfilePeriod period = new ProfilePeriod(maxTimestamp, periodDurationMillis, TimeUnit.MILLISECONDS);
+    LOG.debug("Flushing profile: profile={}, entity={}, timestamp={}", profileName, entity, maxTimestamp);
 
     try {
       // execute the 'profile' expression(s)
@@ -189,6 +195,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
     } catch(Throwable e) {
       // if any of the Stellar expressions fail, a measurement should NOT be returned
       LOG.error(format("Unable to flush profile: error=%s", e.getMessage()), e);
+      result = Optional.empty();
     }
 
     isInitialized = false;
@@ -314,17 +321,11 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
     private ProfileConfig definition;
     private String entity;
-    private long periodDurationMillis;
-    private Clock clock = new WallClock();
+    private Long periodDurationMillis;
     private Context context;
 
     public Builder withContext(Context context) {
       this.context = context;
-      return this;
-    }
-
-    public Builder withClock(Clock clock) {
-      this.clock = clock;
       return this;
     }
 
@@ -372,8 +373,11 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
       if(StringUtils.isEmpty(entity)) {
         throw new IllegalArgumentException(format("missing entity name; got '%s'", entity));
       }
+      if(periodDurationMillis == null) {
+        throw new IllegalArgumentException("missing period duration");
+      }
 
-      return new DefaultProfileBuilder(definition, entity, clock, periodDurationMillis, context);
+      return new DefaultProfileBuilder(definition, entity, periodDurationMillis, context);
     }
   }
 }

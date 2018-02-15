@@ -20,21 +20,51 @@
 
 package org.apache.metron.profiler.clock;
 
+import org.json.simple.JSONObject;
+
 import java.io.Serializable;
+import java.util.Optional;
 
 /**
- * A clock that reports whatever time you tell it to.  Most useful for testing.
+ * A clock that always reports the same time.
+ *
+ * <p>This is only useful for testing.
  */
 public class FixedClock implements Clock, Serializable {
 
+  /**
+   * The time in milliseconds since the epoch.
+   */
   private long epochMillis;
 
+  /**
+   * Create a clock.  The time defaults to the epoch.
+   */
+  public FixedClock() {
+    this(0);
+  }
+
+  /**
+   * Create a clock.
+   * @param epochMillis The time in milliseconds since the epoch.
+   */
+  public FixedClock(long epochMillis) {
+    this.setTime(epochMillis);
+  }
+
+  /**
+   * Set the clock's time.
+   * @param epochMillis The time in milliseconds since the epoch.
+   */
   public void setTime(long epochMillis) {
     this.epochMillis = epochMillis;
   }
 
+  /**
+   * @return The time in milliseconds since the epoch.
+   */
   @Override
-  public long currentTimeMillis() {
-    return this.epochMillis;
+  public Optional<Long> currentTimeMillis(JSONObject message) {
+    return Optional.of(this.epochMillis);
   }
 }

@@ -39,14 +39,16 @@ public interface ProfileBuilder {
 
   /**
    * Apply a message to the profile.
+   *
    * @param message The message to apply.
+   * @param timestamp The timestamp of the message.
    */
-  void apply(JSONObject message);
+  void apply(JSONObject message, long timestamp);
 
   /**
    * Flush the Profile.
    *
-   * Completes and emits the ProfileMeasurement.  Clears all state in preparation for
+   * <p>Completes and emits the ProfileMeasurement.  Clears all state in preparation for
    * the next window period.
    *
    * @return Returns the completed profile measurement.
@@ -55,18 +57,22 @@ public interface ProfileBuilder {
 
   /**
    * Has the ProfileBuilder been initialized?
+   *
    * @return True, if initialization has occurred.  False, otherwise.
    */
   boolean isInitialized();
 
   /**
    * Returns the definition of the profile being built.
+   *
    * @return ProfileConfig definition of the profile
    */
   ProfileConfig getDefinition();
 
   /**
    * Returns the value of a variable being maintained by the builder.
+   *
+   *
    * @param variable The variable name.
    * @return The value of the variable.
    */

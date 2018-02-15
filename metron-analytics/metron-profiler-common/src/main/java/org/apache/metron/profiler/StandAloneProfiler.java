@@ -21,10 +21,17 @@
 package org.apache.metron.profiler;
 
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.metron.profiler.clock.Clock;
+import org.apache.metron.profiler.clock.ClockFactory;
+import org.apache.metron.profiler.clock.DefaultClockFactory;
 import org.apache.metron.stellar.dsl.Context;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 /**
@@ -32,6 +39,8 @@ import java.util.concurrent.ExecutionException;
  * distributed execution environment like Apache Storm.
  */
 public class StandAloneProfiler {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * The Stellar execution context.
@@ -54,6 +63,11 @@ public class StandAloneProfiler {
   private MessageDistributor distributor;
 
   /**
+   * The factory that creates Clock objects.
+   */
+  private ClockFactory clockFactory;
+
+  /**
    * Counts the number of messages that have been applied.
    */
   private int messageCount;
@@ -73,6 +87,7 @@ public class StandAloneProfiler {
     this.router = new DefaultMessageRouter(context);
     // the period TTL does not matter in this context
     this.distributor = new DefaultMessageDistributor(periodDurationMillis, Long.MAX_VALUE);
+    this.clockFactory = new DefaultClockFactory();
     this.messageCount = 0;
     this.routeCount = 0;
   }
@@ -84,23 +99,27 @@ public class StandAloneProfiler {
    */
   public void apply(JSONObject message) throws ExecutionException {
 
-    List<MessageRoute> routes = router.route(message, config, context);
-    for(MessageRoute route : routes) {
-      distributor.distribute(message, route, context);
+    // what time is it?
+    Clock clock = clockFactory.createClock(config);
+    Optional<Long> timestamp = clock.currentTimeMillis(message);
+
+    // can only route the message, if we have a timestamp
+    if(timestamp.isPresent()) {
+
+      // route the message to the correct profile builders
+      List<MessageRoute> routes = router.route(message, config, context);
+      for (MessageRoute route : routes) {
+        distributor.distribute(message, timestamp.get(), route, context);
+      }
+
+      routeCount += routes.size();
+      messageCount += 1;
+
+    } else {
+      LOG.warn("No timestamp available for the message. The message will be ignored.");
     }
-
-    routeCount += routes.size();
-    messageCount += 1;
   }
 
-  @Override
-  public String toString() {
-    return "Profiler{" +
-            getProfileCount() + " profile(s), " +
-            getMessageCount() + " messages(s), " +
-            getRouteCount() + " route(s)" +
-            '}';
-  }
 
   /**
    * Flush the set of profiles.
@@ -124,5 +143,14 @@ public class StandAloneProfiler {
 
   public int getRouteCount() {
     return routeCount;
+  }
+
+  @Override
+  public String toString() {
+    return "Profiler{" +
+            getProfileCount() + " profile(s), " +
+            getMessageCount() + " messages(s), " +
+            getRouteCount() + " route(s)" +
+            '}';
   }
 }

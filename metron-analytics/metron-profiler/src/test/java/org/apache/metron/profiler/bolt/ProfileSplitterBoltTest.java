@@ -23,6 +23,7 @@ package org.apache.metron.profiler.bolt;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.metron.profiler.clock.FixedClockFactory;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.storm.tuple.Values;
@@ -52,8 +53,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    *   "ip_src_addr": "10.0.0.1",
    *   "ip_dst_addr": "10.0.0.20",
    *   "protocol": "HTTP",
-   *   "timestamp": 1111111111111,
-   *   "custom.timestamp": 2222222222222,
+   *   "timestamp.custom": 2222222222222,
    *   "timestamp.string": "3333333333333"
    * }
    */
@@ -138,7 +138,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    *        "result": "2"
    *      }
    *   ],
-   *   "timestampField": "custom.timestamp"
+   *   "timestampField": "timestamp.custom"
    * }
    */
   @Multiline
@@ -155,7 +155,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
    *        "result": "2"
    *      }
    *   ],
-   *   "timestampField": "missing.timestamp"
+   *   "timestampField": "timestamp.missing"
    * }
    */
   @Multiline
@@ -179,6 +179,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   private String profileUsingStringTimestampField;
 
   private JSONObject message;
+  private long timestamp = 3333333;
 
   @Before
   public void setup() throws ParseException {
@@ -212,8 +213,9 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
     bolt.setCuratorFramework(client);
     bolt.setZKCache(cache);
     bolt.getConfigurations().updateProfilerConfig(config);
-    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
+    bolt.setClockFactory(new FixedClockFactory(timestamp));
 
+    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
     return bolt;
   }
 
@@ -278,9 +280,11 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * The entity associated with a ProfileMeasurement can be defined using a variable that is resolved
-   * via Stella.  In this case the entity is defined as 'ip_src_addr' which is resolved to
-   * '10.0.0.1' based on the data contained within the message.
+   * The entity associated with a profile is defined with a Stellar expression.  That expression
+   * can refer to any field within the message.
+   *
+   * In this case the entity is defined as 'ip_src_addr' which is resolved to '10.0.0.1' based on
+   * the data contained within the message.
    */
   @Test
   public void testResolveEntityName() throws Exception {
@@ -292,8 +296,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
     // expected values
     String expectedEntity = "10.0.0.1";
     ProfileConfig expectedConfig = config.getProfiles().get(0);
-    long expectedTimestamp = 1111111111111L;
-    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+    Values expected = new Values(expectedEntity, expectedConfig, message, timestamp);
 
     // a tuple should be emitted for the downstream profile builder
     verify(outputCollector, times(1))
@@ -320,11 +323,11 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * If the profile configuration does not define a custom 'timestampField', a default
-   * field should be used; 'timestamp'.
+   * If the profile configuration does not define a 'timestampField' then the Profiler
+   * will default to using processing time; the system time of the Profiler itself.
    */
   @Test
-  public void testDefaultTimestampField() throws Exception {
+  public void testDefaultToProcessingTime() throws Exception {
 
     ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
     ProfileSplitterBolt bolt = createBolt(config);
@@ -333,8 +336,9 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
     // expected values
     String expectedEntity = "10.0.0.1";
     ProfileConfig expectedConfig = config.getProfiles().get(0);
-    long expectedTimestamp = 1111111111111L;
-    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+
+    // since the profiler defaults to processing time, the timestamp should come from the clock
+    Values expected = new Values(message, timestamp, expectedEntity, expectedConfig);
 
     // a tuple should be emitted for the downstream profile builder
     verify(outputCollector, times(1))
@@ -346,11 +350,11 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * If a custom timestamp field is defined in the profiler configuration, the timestamp
-   * is extracted from that field.
+   * If a timestamp field is defined in the profiler configuration, the timestamp
+   * is extracted from that field.  This can be used for event time processing.
    */
   @Test
-  public void testCustomTimestampField() throws Exception {
+  public void testEventTimeProcessing() throws Exception {
 
     ProfilerConfig config = toProfilerConfig(profileUsingCustomTimestampField);
     ProfileSplitterBolt bolt = createBolt(config);
@@ -372,11 +376,12 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * If a message does not contain the timestamp field, it should not be emitted.  Messages that
-   * are missing timestamps must be ignored.
+   * If the Profiler is configured for event time processing and a message does not contain
+   * the specified timestamp field, it should not be emitted.  Messages that are missing
+   * timestamps must be ignored.
    */
   @Test
-  public void testMissingTimestampField() throws Exception {
+  public void testEventTimeProcessingWithMissingTimestampField() throws Exception {
 
     ProfilerConfig config = toProfilerConfig(profileUsingMissingTimestampField);
     ProfileSplitterBolt bolt = createBolt(config);
@@ -388,11 +393,12 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * If a timestamp field contains a string, it should be converted to a long and treated
-   * as epoch milliseconds.
+   * If a timestamp field is defined in the profiler configuration, the timestamp
+   * is extracted from that field.  We expect epoch milliseconds as a long, but if
+   * the field is a String, the Profiler should accept the value.
    */
   @Test
-  public void testStringTimestampField() throws Exception {
+  public void testEventTimeProcessingWithStringTimestampField() throws Exception {
 
     ProfilerConfig config = toProfilerConfig(profileUsingStringTimestampField);
     ProfileSplitterBolt bolt = createBolt(config);

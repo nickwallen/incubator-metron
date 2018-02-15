@@ -23,7 +23,6 @@ package org.apache.metron.profiler;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.profiler.clock.WallClock;
 import org.apache.metron.stellar.dsl.Context;
 import org.json.simple.JSONObject;
 
@@ -79,13 +78,15 @@ public class DefaultMessageDistributor implements MessageDistributor {
    * Distribute a message along a MessageRoute.
    *
    * @param message The message that needs distributed.
+   * @param timestamp The timestamp of the message.
    * @param route The message route.
    * @param context The Stellar execution context.
    * @throws ExecutionException
    */
   @Override
-  public void distribute(JSONObject message, MessageRoute route, Context context) throws ExecutionException {
-    getBuilder(route, context).apply(message);
+  public void distribute(JSONObject message, long timestamp, MessageRoute route, Context context) throws ExecutionException {
+    ProfileBuilder builder = getBuilder(route, context);
+    builder.apply(message, timestamp);
   }
 
   /**
@@ -124,7 +125,6 @@ public class DefaultMessageDistributor implements MessageDistributor {
                     .withEntity(entity)
                     .withPeriodDurationMillis(periodDurationMillis)
                     .withContext(context)
-                    .withClock(new WallClock())
                     .build());
   }
 

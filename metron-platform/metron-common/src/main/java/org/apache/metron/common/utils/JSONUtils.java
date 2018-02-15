@@ -23,6 +23,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.flipkart.zjsonpatch.JsonPatch;
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -74,7 +75,9 @@ public enum JSONUtils {
       new JSONParser());
 
   private static ThreadLocal<ObjectMapper> _mapper = ThreadLocal.withInitial(() ->
-      new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL));
+      new ObjectMapper()
+              .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+              .registerModule(new Jdk8Module()));
 
   public <T> T convert(Object original, Class<T> targetClass) {
     return _mapper.get().convertValue(original, targetClass);

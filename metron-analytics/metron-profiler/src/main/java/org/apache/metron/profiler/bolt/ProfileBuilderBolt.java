@@ -20,6 +20,9 @@
 
 package org.apache.metron.profiler.bolt;
 
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.ENTITY_TUPLE_FIELD;
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.*;
+
 import org.apache.metron.common.bolt.ConfiguredProfilerBolt;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.profiler.DefaultMessageDistributor;
@@ -160,7 +163,7 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
       }
 
     } catch (Throwable e) {
-      LOG.error(format("Unexpected failure: message='%s', tuple='%s'", e.getMessage(), input), e);
+      LOG.error(format("Unexpected failure: error='%s', tuple='%s'", e.getMessage(), input), e);
       collector.reportError(e);
 
     } finally {
@@ -173,12 +176,16 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
    * @param input The tuple.
    */
   private void handleMessage(Tuple input) throws ExecutionException {
-    JSONObject message = getField("message", input, JSONObject.class);
-    ProfileConfig definition = getField("profile", input, ProfileConfig.class);
-    String entity = getField("entity", input, String.class);
-    MessageRoute route = new MessageRoute(definition, entity);
 
-    messageDistributor.distribute(message, route, getStellarContext());
+    // crack open the tuple
+    JSONObject message = getField(MESSAGE_TUPLE_FIELD, input, JSONObject.class);
+    ProfileConfig definition = getField(PROFILE_TUPLE_FIELD, input, ProfileConfig.class);
+    String entity = getField(ENTITY_TUPLE_FIELD, input, String.class);
+    Long timestamp = getField(TIMESTAMP_TUPLE_FIELD, input, Long.class);
+
+    // distribute the message
+    MessageRoute route = new MessageRoute(definition, entity);
+    messageDistributor.distribute(message, timestamp, route, getStellarContext());
   }
 
   /**

@@ -17,25 +17,38 @@
  *  limitations under the License.
  *
  */
-
 package org.apache.metron.profiler.clock;
 
 import org.json.simple.JSONObject;
+import org.junit.Test;
 
-import java.io.Serializable;
 import java.util.Optional;
 
-/**
- * A clock that advances based on system time.
- *
- * <p>This clock allows the Profiler to create profiles based on processing time.
- */
-public class WallClock implements Clock, Serializable {
+import static org.junit.Assert.assertTrue;
 
-  @Override
-  public Optional<Long> currentTimeMillis(JSONObject message) {
+public class WallClockTest {
 
-    // the message does not matter; use system time
-    return Optional.of(System.currentTimeMillis());
+  public JSONObject createMessage() {
+    return new JSONObject();
+  }
+
+  /**
+   * The wall clock time ALWAYS comes from the system clock.
+   */
+  @Test
+  public void testCurrentTimeMillis() {
+
+    JSONObject message = createMessage();
+    long before = System.currentTimeMillis();
+
+    // what time is it?
+    WallClock clock = new WallClock();
+    Optional<Long> result = clock.currentTimeMillis(message);
+
+    // validate
+    long after = System.currentTimeMillis();
+    assertTrue(result.isPresent());
+    assertTrue(result.get() >= before);
+    assertTrue(result.get() <= after);
   }
 }

@@ -41,14 +41,17 @@ public interface MessageDistributor {
    * Distribute a message along a MessageRoute.
    *
    * @param message The message that needs distributed.
+   * @param timestamp The timestamp of the message.
    * @param route The message route.
    * @param context The Stellar execution context.
    * @throws ExecutionException
    */
-  void distribute(JSONObject message, MessageRoute route, Context context) throws ExecutionException;
+  void distribute(JSONObject message, long timestamp, MessageRoute route, Context context) throws ExecutionException;
 
   /**
-   * Flushes all profiles.  Flushes all ProfileBuilders that this distributor is responsible for.
+   * Flushes all profiles.
+   *
+   * <p>Flushes all ProfileBuilders that this distributor is responsible for.
    *
    * @return The profile measurements; one for each (profile, entity) pair.
    */
