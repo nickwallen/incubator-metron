@@ -26,6 +26,7 @@ import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.profiler.clock.FixedClockFactory;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.test.bolt.BaseBoltTest;
+import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -178,6 +179,34 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   @Multiline
   private String profileUsingStringTimestampField;
 
+  /**
+   * {
+   *   "profiles": [
+   *   ]
+   * }
+   */
+  @Multiline
+  private String noProfilesDefined;
+
+  /**
+   * {
+   *   "profiles": [
+   *      {
+   *        "profile": "profile1",
+   *        "foreach": "'global'",
+   *        "result": "1"
+   *      },
+   *      {
+   *        "profile": "profile2",
+   *        "foreach": "'global'",
+   *        "result": "2"
+   *      }
+   *   ]
+   * }
+   */
+  @Multiline
+  private String twoProfilesDefined;
+
   private JSONObject message;
   private long timestamp = 3333333;
 
@@ -193,30 +222,83 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * Creates a ProfilerConfig based on a string containing JSON.
-   *
-   * @param configAsJSON The config as JSON.
-   * @return The ProfilerConfig.
-   * @throws Exception
+   * Ensure that a tuple with the correct fields is emitted to downstream bolts
+   * when a profile is defined.
    */
-  private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
-    InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
-    return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
+  @Test
+  public void testEmitTupleWithOneProfile() throws Exception {
+
+    // setup the bolt and execute a tuple
+    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // the expected tuple fields
+    String expectedEntity = "10.0.0.1";
+    ProfileConfig expectedConfig = config.getProfiles().get(0);
+    Values expected = new Values(message, timestamp, expectedEntity, expectedConfig);
+
+    // a tuple should be emitted for the downstream profile builder
+    verify(outputCollector, times(1))
+            .emit(eq(tuple), eq(expected));
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
-   * Create a ProfileSplitterBolt to test
+   * If there are two profiles that need the same message, then two tuples should
+   * be emitted.  One tuple for each profile.
    */
-  private ProfileSplitterBolt createBolt(ProfilerConfig config) throws Exception {
+  @Test
+  public void testEmitTupleWithTwoProfiles() throws Exception {
 
-    ProfileSplitterBolt bolt = new ProfileSplitterBolt("zookeeperURL");
-    bolt.setCuratorFramework(client);
-    bolt.setZKCache(cache);
-    bolt.getConfigurations().updateProfilerConfig(config);
-    bolt.setClockFactory(new FixedClockFactory(timestamp));
+    // setup the bolt and execute a tuple
+    ProfilerConfig config = toProfilerConfig(twoProfilesDefined);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
 
-    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
-    return bolt;
+    // the expected tuple fields
+    final String expectedEntity = "global";
+    {
+      // a tuple should be emitted for the first profile
+      ProfileConfig profile1 = config.getProfiles().get(0);
+      Values expected = new Values(message, timestamp, expectedEntity, profile1);
+      verify(outputCollector, times(1))
+              .emit(eq(tuple), eq(expected));
+    }
+    {
+      // a tuple should be emitted for the second profile
+      ProfileConfig profile2 = config.getProfiles().get(1);
+      Values expected = new Values(message, timestamp, expectedEntity, profile2);
+      verify(outputCollector, times(1))
+              .emit(eq(tuple), eq(expected));
+    }
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
+  }
+
+  /**
+   * No tuples should be emitted, if no profiles are defined.
+   */
+  @Test
+  public void testNoProfilesDefined() throws Exception {
+
+    // setup the bolt and execute a tuple
+    ProfilerConfig config = toProfilerConfig(noProfilesDefined);
+    ProfileSplitterBolt bolt = createBolt(config);
+    bolt.execute(tuple);
+
+    // no tuple should be emitted
+    verify(outputCollector, times(0))
+            .emit(any(Tuple.class), any());
+
+    // the original tuple should be ack'd
+    verify(outputCollector, times(1))
+            .ack(eq(tuple));
   }
 
   /**
@@ -296,7 +378,7 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
     // expected values
     String expectedEntity = "10.0.0.1";
     ProfileConfig expectedConfig = config.getProfiles().get(0);
-    Values expected = new Values(expectedEntity, expectedConfig, message, timestamp);
+    Values expected = new Values(message, timestamp, expectedEntity, expectedConfig);
 
     // a tuple should be emitted for the downstream profile builder
     verify(outputCollector, times(1))
@@ -323,100 +405,32 @@ public class ProfileSplitterBoltTest extends BaseBoltTest {
   }
 
   /**
-   * If the profile configuration does not define a 'timestampField' then the Profiler
-   * will default to using processing time; the system time of the Profiler itself.
+   * Creates a ProfilerConfig based on a string containing JSON.
+   *
+   * @param configAsJSON The config as JSON.
+   * @return The ProfilerConfig.
+   * @throws Exception
    */
-  @Test
-  public void testDefaultToProcessingTime() throws Exception {
-
-    ProfilerConfig config = toProfilerConfig(profileWithOnlyIfTrue);
-    ProfileSplitterBolt bolt = createBolt(config);
-    bolt.execute(tuple);
-
-    // expected values
-    String expectedEntity = "10.0.0.1";
-    ProfileConfig expectedConfig = config.getProfiles().get(0);
-
-    // since the profiler defaults to processing time, the timestamp should come from the clock
-    Values expected = new Values(message, timestamp, expectedEntity, expectedConfig);
-
-    // a tuple should be emitted for the downstream profile builder
-    verify(outputCollector, times(1))
-            .emit(eq(tuple), eq(expected));
-
-    // the original tuple should be ack'd
-    verify(outputCollector, times(1))
-            .ack(eq(tuple));
+  private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
+    InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
+    return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
   }
 
   /**
-   * If a timestamp field is defined in the profiler configuration, the timestamp
-   * is extracted from that field.  This can be used for event time processing.
+   * Create a ProfileSplitterBolt to test
    */
-  @Test
-  public void testEventTimeProcessing() throws Exception {
+  private ProfileSplitterBolt createBolt(ProfilerConfig config) throws Exception {
 
-    ProfilerConfig config = toProfilerConfig(profileUsingCustomTimestampField);
-    ProfileSplitterBolt bolt = createBolt(config);
-    bolt.execute(tuple);
+    ProfileSplitterBolt bolt = new ProfileSplitterBolt("zookeeperURL");
+    bolt.setCuratorFramework(client);
+    bolt.setZKCache(cache);
+    bolt.getConfigurations().updateProfilerConfig(config);
+    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
 
-    // expected values
-    String expectedEntity = "10.0.0.1";
-    ProfileConfig expectedConfig = config.getProfiles().get(0);
-    long expectedTimestamp = 2222222222222L;
-    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
+    // set the clock factory AFTER calling prepare to use the fixed clock factory
+    bolt.setClockFactory(new FixedClockFactory(timestamp));
 
-    // a tuple should be emitted for the downstream profile builder
-    verify(outputCollector, times(1))
-            .emit(eq(tuple), eq(expected));
-
-    // the original tuple should be ack'd
-    verify(outputCollector, times(1))
-            .ack(eq(tuple));
-  }
-
-  /**
-   * If the Profiler is configured for event time processing and a message does not contain
-   * the specified timestamp field, it should not be emitted.  Messages that are missing
-   * timestamps must be ignored.
-   */
-  @Test
-  public void testEventTimeProcessingWithMissingTimestampField() throws Exception {
-
-    ProfilerConfig config = toProfilerConfig(profileUsingMissingTimestampField);
-    ProfileSplitterBolt bolt = createBolt(config);
-    bolt.execute(tuple);
-
-    // a tuple should NOT be emitted for the downstream profile builder
-    verify(outputCollector, times(0))
-            .emit(any());
-  }
-
-  /**
-   * If a timestamp field is defined in the profiler configuration, the timestamp
-   * is extracted from that field.  We expect epoch milliseconds as a long, but if
-   * the field is a String, the Profiler should accept the value.
-   */
-  @Test
-  public void testEventTimeProcessingWithStringTimestampField() throws Exception {
-
-    ProfilerConfig config = toProfilerConfig(profileUsingStringTimestampField);
-    ProfileSplitterBolt bolt = createBolt(config);
-    bolt.execute(tuple);
-
-    // expected values
-    String expectedEntity = "10.0.0.1";
-    ProfileConfig expectedConfig = config.getProfiles().get(0);
-    long expectedTimestamp = 3333333333333L;
-    Values expected = new Values(expectedEntity, expectedConfig, message, expectedTimestamp);
-
-    // a tuple should be emitted for the downstream profile builder
-    verify(outputCollector, times(1))
-            .emit(eq(tuple), eq(expected));
-
-    // the original tuple should be ack'd
-    verify(outputCollector, times(1))
-            .ack(eq(tuple));
+    return bolt;
   }
 
 }

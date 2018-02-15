@@ -40,6 +40,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Tests the StandAloneProfiler class.
+ */
 public class StandAloneProfilerTest {
 
   /**
@@ -109,18 +112,6 @@ public class StandAloneProfilerTest {
     // parse the input message
     JSONParser parser = new JSONParser();
     message = (JSONObject) parser.parse(messageJson);
-  }
-
-  /**
-   * Creates a ProfilerConfig based on a string containing JSON.
-   *
-   * @param configAsJSON The config as JSON.
-   * @return The ProfilerConfig.
-   * @throws Exception
-   */
-  private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
-    InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
-    return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
   }
 
   @Test
@@ -234,6 +225,18 @@ public class StandAloneProfilerTest {
       StandAloneProfiler profiler = createProfiler(twoProfiles);
       assertEquals(2, profiler.getProfileCount());
     }
+  }
+
+  /**
+   * Creates a ProfilerConfig based on a string containing JSON.
+   *
+   * @param configAsJSON The config as JSON.
+   * @return The ProfilerConfig.
+   * @throws Exception
+   */
+  private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
+    InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
+    return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
   }
 
   /**

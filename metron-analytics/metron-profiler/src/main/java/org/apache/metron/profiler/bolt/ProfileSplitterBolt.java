@@ -28,7 +28,6 @@ import org.apache.metron.profiler.MessageRouter;
 import org.apache.metron.profiler.clock.Clock;
 import org.apache.metron.profiler.clock.ClockFactory;
 import org.apache.metron.profiler.clock.DefaultClockFactory;
-import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -163,7 +162,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
 
     // ensure there is a valid profiler configuration
     ProfilerConfig config = getProfilerConfig();
-    if(config != null) {
+    if(config != null && config.getProfiles().size() > 0) {
 
       // what time is it?
       Clock clock = clockFactory.createClock(config);
@@ -193,35 +192,6 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
       Values values = new Values(message, timestamp, route.getEntity(), route.getProfileDefinition());
       collector.emit(input, values);
     }
-  }
-
-  /**
-   * Extracts the timestamp from a given telemetry message.
-   *
-   * <p>The outgoing tuples are timestamped so that Storm's window and event-time
-   * processing functionality can recognize the time for each message.
-   *
-   * <p>The timestamp that is attached to each outgoing tuple is what decides if
-   * the Profiler is operating on processing time or event time.
-   *
-   * @param message The telemetry message.
-   * @param timestampField The name of the field containing a timestamp in epoch milliseconds.
-   * @return The timestamp of the telemetry message.
-   */
-  private Optional<Long> getTimestamp(JSONObject message, String timestampField) {
-    Long result = null;
-
-    if(message.containsKey(timestampField)) {
-      // use the timestamp from the message. the profiler is using 'event time'
-      result = ConversionUtils.convert( message.get(timestampField), Long.class);
-
-    } else {
-      // most likely scenario is that the message does not contain the specified timestamp field
-      LOG.warn("missing timestamp field '{}': message will be ignored: message='{}'",
-              timestampField, JSONObject.toJSONString(message));
-    }
-
-    return Optional.ofNullable(result);
   }
 
   /**

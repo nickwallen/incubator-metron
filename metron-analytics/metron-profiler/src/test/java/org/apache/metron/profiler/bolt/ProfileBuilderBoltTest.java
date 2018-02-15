@@ -66,7 +66,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String inputOne;
+  private String messageOneJSON;
   private JSONObject messageOne;
 
   /**
@@ -76,7 +76,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
    * }
    */
   @Multiline
-  private String inputTwo;
+  private String messageTwoJSON;
   private JSONObject messageTwo;
 
   /**
@@ -91,7 +91,6 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   @Multiline
   private String profileOne;
 
-
   /**
    * {
    *   "profile": "profileTwo",
@@ -104,59 +103,11 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   @Multiline
   private String profileTwo;
 
-  public static Tuple mockTickTuple() {
-    Tuple tuple = mock(Tuple.class);
-    when(tuple.getSourceComponent()).thenReturn(Constants.SYSTEM_COMPONENT_ID);
-    when(tuple.getSourceStreamId()).thenReturn(Constants.SYSTEM_TICK_STREAM_ID);
-    return tuple;
-  }
-
   @Before
   public void setup() throws Exception {
     JSONParser parser = new JSONParser();
-    messageOne = (JSONObject) parser.parse(inputOne);
-    messageTwo = (JSONObject) parser.parse(inputTwo);
-  }
-
-  /**
-   * Creates a profile definition based on a string of JSON.
-   * @param json The string of JSON.
-   */
-  private ProfileConfig createDefinition(String json) throws IOException {
-    return JSONUtils.INSTANCE.load(json, ProfileConfig.class);
-  }
-
-  /**
-   * Create a tuple that will contain the message, the entity name, and profile definition.
-   * @param entity The entity name
-   * @param message The telemetry message.
-   * @param profile The profile definition.
-   */
-  private Tuple createTuple(String entity, JSONObject message, ProfileConfig profile) {
-    Tuple tuple = mock(Tuple.class);
-    when(tuple.getValueByField(eq("message"))).thenReturn(message);
-    when(tuple.getValueByField(eq("entity"))).thenReturn(entity);
-    when(tuple.getValueByField(eq("profile"))).thenReturn(profile);
-    return tuple;
-  }
-
-  /**
-   * Create a ProfileBuilderBolt to test
-   */
-  private ProfileBuilderBolt createBolt() throws IOException {
-
-    ProfileBuilderBolt bolt = new ProfileBuilderBolt("zookeeperURL");
-    bolt.setCuratorFramework(client);
-    bolt.setZKCache(cache);
-    bolt.withPeriodDuration(10, TimeUnit.MINUTES);
-    bolt.withProfileTimeToLive(30, TimeUnit.MINUTES);
-
-    // define the valid destinations for the profiler
-    bolt.withDestinationHandler(new HBaseDestinationHandler());
-    bolt.withDestinationHandler(new KafkaDestinationHandler());
-
-    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
-    return bolt;
+    messageOne = (JSONObject) parser.parse(messageOneJSON);
+    messageTwo = (JSONObject) parser.parse(messageTwoJSON);
   }
 
   /**
@@ -168,7 +119,8 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     ProfileBuilderBolt bolt = createBolt();
     ProfileConfig definition = createDefinition(profileOne);
     String entity = (String) messageOne.get("ip_src_addr");
-    Tuple tupleOne = createTuple(entity, messageOne, definition);
+    long timestamp = System.currentTimeMillis();
+    Tuple tupleOne = createTuple(entity, messageOne, definition, timestamp);
 
     // execute - send two tuples with different entities
     bolt.execute(tupleOne);
@@ -193,13 +145,13 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
     // apply a message to the profile
     String entityOne = (String) messageOne.get("ip_src_addr");
-    Tuple tupleOne = createTuple(entityOne, messageOne, definition);
+    Tuple tupleOne = createTuple(entityOne, messageOne, definition, System.currentTimeMillis());
     bolt.execute(tupleOne);
     bolt.execute(tupleOne);
 
     // apply a different message (with different entity) to the same profile
     String entityTwo = (String) messageTwo.get("ip_src_addr");
-    Tuple tupleTwo = createTuple(entityTwo, messageTwo, definition);
+    Tuple tupleTwo = createTuple(entityTwo, messageTwo, definition, System.currentTimeMillis());
     bolt.execute(tupleTwo);
 
     // validate - 2 messages applied
@@ -230,12 +182,12 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
     // apply a message to the first profile
     ProfileConfig definitionOne = createDefinition(profileOne);
-    Tuple tupleOne = createTuple(entity, messageOne, definitionOne);
+    Tuple tupleOne = createTuple(entity, messageOne, definitionOne, System.currentTimeMillis());
     bolt.execute(tupleOne);
 
     // apply the same message to the second profile
     ProfileConfig definitionTwo = createDefinition(profileTwo);
-    Tuple tupleTwo = createTuple(entity, messageOne, definitionTwo);
+    Tuple tupleTwo = createTuple(entity, messageOne, definitionTwo, System.currentTimeMillis());
     bolt.execute(tupleTwo);
 
     // validate - 1 message applied
@@ -266,12 +218,12 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
     // apply the message to the first profile
     ProfileConfig definitionOne = createDefinition(profileOne);
-    Tuple tupleOne = createTuple(entity, messageOne, definitionOne);
+    Tuple tupleOne = createTuple(entity, messageOne, definitionOne, System.currentTimeMillis());
     bolt.execute(tupleOne);
 
     // apply the same message to the second profile
     ProfileConfig definitionTwo = createDefinition(profileTwo);
-    Tuple tupleTwo = createTuple(entity, messageOne, definitionTwo);
+    Tuple tupleTwo = createTuple(entity, messageOne, definitionTwo, System.currentTimeMillis());
     bolt.execute(tupleTwo);
 
     // execute - the tick tuple triggers a flush of the profile
@@ -322,7 +274,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
     // apply the message to the first profile
     final String entity = (String) messageOne.get("ip_src_addr");
-    Tuple tupleOne = createTuple(entity, messageOne, definitionOne);
+    Tuple tupleOne = createTuple(entity, messageOne, definitionOne, System.currentTimeMillis());
     bolt.execute(tupleOne);
 
     // trigger a flush of the profile
@@ -338,5 +290,56 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     // validate measurements emitted to Kafka
     verify(outputCollector, times(1)).emit(eq("kafka"), arg.capture());
     assertTrue(arg.getValue().get(0) instanceof JSONObject);
+  }
+
+  private static Tuple mockTickTuple() {
+    Tuple tuple = mock(Tuple.class);
+    when(tuple.getSourceComponent()).thenReturn(Constants.SYSTEM_COMPONENT_ID);
+    when(tuple.getSourceStreamId()).thenReturn(Constants.SYSTEM_TICK_STREAM_ID);
+    return tuple;
+  }
+
+  /**
+   * Creates a profile definition based on a string of JSON.
+   * @param json The string of JSON.
+   */
+  private ProfileConfig createDefinition(String json) throws IOException {
+    return JSONUtils.INSTANCE.load(json, ProfileConfig.class);
+  }
+
+  /**
+   * Create a tuple that will contain the message, the entity name, and profile definition.
+   * @param entity The entity name
+   * @param message The telemetry message.
+   * @param profile The profile definition.
+   */
+  private Tuple createTuple(String entity, JSONObject message, ProfileConfig profile, long timestamp) {
+
+    Tuple tuple = mock(Tuple.class);
+    when(tuple.getValueByField(eq(ProfileSplitterBolt.MESSAGE_TUPLE_FIELD))).thenReturn(message);
+    when(tuple.getValueByField(eq(ProfileSplitterBolt.TIMESTAMP_TUPLE_FIELD))).thenReturn(timestamp);
+    when(tuple.getValueByField(eq(ProfileSplitterBolt.ENTITY_TUPLE_FIELD))).thenReturn(entity);
+    when(tuple.getValueByField(eq(ProfileSplitterBolt.PROFILE_TUPLE_FIELD))).thenReturn(profile);
+
+    return tuple;
+  }
+
+  /**
+   * Create a ProfileBuilderBolt to test
+   */
+  private ProfileBuilderBolt createBolt() throws IOException {
+
+    ProfileBuilderBolt bolt = new ProfileBuilderBolt("zookeeperURL");
+    bolt.setCuratorFramework(client);
+    bolt.setZKCache(cache);
+    bolt.withPeriodDuration(10, TimeUnit.MINUTES);
+    bolt.withProfileTimeToLive(30, TimeUnit.MINUTES);
+
+    // define the valid destinations for the profiler
+    bolt.withDestinationHandler(new HBaseDestinationHandler());
+    bolt.withDestinationHandler(new KafkaDestinationHandler());
+
+    bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
+    return bolt;
   }
 }
