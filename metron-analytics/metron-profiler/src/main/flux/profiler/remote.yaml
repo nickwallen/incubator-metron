@@ -113,6 +113,18 @@ components:
     -   id: "hbaseDestinationHandler"
         className: "org.apache.metron.profiler.bolt.HBaseDestinationHandler"
 
+    -   id: "windowDuration"
+        className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
+        constructorArgs:
+            - ${profiler.period.duration}
+            - "${profiler.period.duration.units}"
+
+    -   id: "eventTimeLag"
+        className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
+        constructorArgs:
+            - ${profiler.event.time.lag}
+            - "${profiler.event.time.lag.units}"
+
 spouts:
 
     -   id: "kafkaSpout"
@@ -140,6 +152,10 @@ bolts:
               args: [ref: "kafkaDestinationHandler"]
             - name: "withDestinationHandler"
               args: [ref: "hbaseDestinationHandler"]
+            - name: "withTumblingWindow"
+              args: [ref: "windowDuration"]
+            - name: "withLag"
+              args: [ref: "eventTimeLag"]
 
     -   id: "hbaseBolt"
         className: "org.apache.metron.hbase.bolt.HBaseBolt"

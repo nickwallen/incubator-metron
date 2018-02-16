@@ -160,8 +160,9 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
     LOG.debug("Flushing profile: profile={}, entity={}, timestamp={}", profileName, entity, maxTimestamp);
 
     try {
-      // execute the 'profile' expression(s)
-      Object profileValue = execute(definition.getResult().getProfileExpressions().getExpression(), "result/profile");
+      // execute the 'profile' expression
+      String profileExpression = definition.getResult().getProfileExpressions().getExpression();
+      Object profileValue = execute(profileExpression, "result/profile");
 
       // execute the 'triage' expression(s)
       Map<String, Object> triageValues = definition.getResult().getTriageExpressions().getExpressions()
@@ -193,6 +194,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
               .withDefinition(definition));
 
     } catch(Throwable e) {
+
       // if any of the Stellar expressions fail, a measurement should NOT be returned
       LOG.error(format("Unable to flush profile: error=%s", e.getMessage()), e);
       result = Optional.empty();
@@ -263,6 +265,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
       String expr = entry.getValue();
 
       try {
+
         // assign the result of the expression to the variable
         executor.assign(var, expr, transientState);
 
@@ -293,6 +296,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
     for(String expr: ListUtils.emptyIfNull(expressions)) {
       try {
+
         // execute an expression
         Object result = executor.execute(expr, transientState, Object.class);
         results.add(result);

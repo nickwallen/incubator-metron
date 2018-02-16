@@ -20,22 +20,32 @@
 
 package org.apache.metron.profiler.bolt;
 
-import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.ENTITY_TUPLE_FIELD;
-import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.*;
-
-import org.apache.metron.common.bolt.ConfiguredProfilerBolt;
+import org.apache.curator.RetryPolicy;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.recipes.cache.TreeCacheEvent;
+import org.apache.curator.retry.ExponentialBackoffRetry;
+import org.apache.metron.common.Constants;
+import org.apache.metron.common.configuration.ConfigurationType;
+import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
+import org.apache.metron.common.configuration.profiler.ProfilerConfigurations;
+import org.apache.metron.common.zookeeper.configurations.ConfigurationsUpdater;
+import org.apache.metron.common.zookeeper.configurations.ProfilerUpdater;
+import org.apache.metron.common.zookeeper.configurations.Reloadable;
 import org.apache.metron.profiler.DefaultMessageDistributor;
 import org.apache.metron.profiler.MessageRoute;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.stellar.dsl.Context;
-import org.apache.storm.Config;
+import org.apache.metron.zookeeper.SimpleEventListener;
+import org.apache.metron.zookeeper.ZKCache;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
+import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.tuple.Tuple;
-import org.apache.storm.utils.TupleUtils;
+import org.apache.storm.windowing.TupleWindow;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.slf4j.Logger;
@@ -49,6 +59,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.ENTITY_TUPLE_FIELD;
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.MESSAGE_TUPLE_FIELD;
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.PROFILE_TUPLE_FIELD;
+import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.TIMESTAMP_TUPLE_FIELD;
 
 /**
  * A bolt that is responsible for building a Profile.
@@ -58,11 +72,31 @@ import static java.lang.String.format;
  * flushed, and the ProfileMeasurement is emitted.
  *
  */
-public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
+public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private OutputCollector collector;
+
+  /**
+   * The URL to connect to Zookeeper.
+   */
+  private String zookeeperUrl;
+
+  /**
+   * The Zookeeper client connection.
+   */
+  protected CuratorFramework zookeeperClient;
+
+  /**
+   * The Zookeeper cache.
+   */
+  protected ZKCache zookeeperCache;
+
+  /**
+   * Manages configuration for the Profiler.
+   */
+  private ProfilerConfigurations configurations;
 
   /**
    * The duration of each profile period in milliseconds.
@@ -93,24 +127,8 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
    */
   private List<DestinationHandler> destinationHandlers;
 
-  /**
-   * @param zookeeperUrl The Zookeeper URL that contains the configuration data.
-   */
-  public ProfileBuilderBolt(String zookeeperUrl) {
-    super(zookeeperUrl);
+  public ProfileBuilderBolt() {
     this.destinationHandlers = new ArrayList<>();
-  }
-
-  /**
-   * Defines the frequency at which the bolt will receive tick tuples.  Tick tuples are
-   * used to control how often a profile is flushed.
-   */
-  @Override
-  public Map<String, Object> getComponentConfiguration() {
-    // how frequently should the bolt receive tick tuples?
-    Config conf = new Config();
-    conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, TimeUnit.MILLISECONDS.toSeconds(periodDurationMillis));
-    return conf;
   }
 
   @Override
@@ -126,6 +144,57 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
     this.collector = collector;
     this.parser = new JSONParser();
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis);
+    setupZookeeper();
+  }
+
+  @Override
+  public void cleanup() {
+    zookeeperCache.close();
+    zookeeperClient.close();
+  }
+
+  private void setupZookeeper() {
+    try {
+      if (zookeeperClient == null) {
+        RetryPolicy retryPolicy = new ExponentialBackoffRetry(1000, 3);
+        zookeeperClient = CuratorFrameworkFactory.newClient(zookeeperUrl, retryPolicy);
+      }
+      zookeeperClient.start();
+
+      //this is temporary to ensure that any validation passes.
+      //The individual bolt will reinitialize stellar to dynamically pull from
+      //zookeeper.
+      ConfigurationsUtils.setupStellarStatically(zookeeperClient);
+      if (zookeeperCache == null) {
+        ConfigurationsUpdater<ProfilerConfigurations> updater = createUpdater();
+        SimpleEventListener listener = new SimpleEventListener.Builder()
+                .with( updater::update, TreeCacheEvent.Type.NODE_ADDED, TreeCacheEvent.Type.NODE_UPDATED)
+                .with( updater::delete, TreeCacheEvent.Type.NODE_REMOVED)
+                .build();
+        zookeeperCache = new ZKCache.Builder()
+                .withClient(zookeeperClient)
+                .withListener(listener)
+                .withRoot(Constants.ZOOKEEPER_TOPOLOGY_ROOT)
+                .build();
+        updater.forceUpdate(zookeeperClient);
+        zookeeperCache.start();
+      }
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      throw new RuntimeException(e);
+    }
+  }
+
+  protected ConfigurationsUpdater<ProfilerConfigurations> createUpdater() {
+    return new ProfilerUpdater(this, this::getConfigurations);
+  }
+
+  public ProfilerConfigurations getConfigurations() {
+    return configurations;
+  }
+
+  @Override
+  public void reloadCallback(String name, ConfigurationType type) {
   }
 
   @Override
@@ -141,41 +210,53 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
   private Context getStellarContext() {
     Map<String, Object> global = getConfigurations().getGlobalConfig();
     return new Context.Builder()
-            .with(Context.Capabilities.ZOOKEEPER_CLIENT, () -> client)
+            .with(Context.Capabilities.ZOOKEEPER_CLIENT, () -> zookeeperClient)
             .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
             .with(Context.Capabilities.STELLAR_CONFIG, () -> global)
             .build();
   }
 
-  /**
-   * Expect to receive either a tick tuple or a telemetry message that needs applied
-   * to a profile.
-   * @param input The tuple.
-   */
   @Override
-  public void execute(Tuple input) {
-    try {
-      if(TupleUtils.isTick(input)) {
-        handleTick();
+  public void execute(TupleWindow window) {
 
-      } else {
-        handleMessage(input);
-      }
+    LOG.debug("Received window containing '{}' tuple(s)", window.get().size());
+    if(window.getExpired().size() > 0) {
+      LOG.debug("{} tuple(s) expired", window.getExpired().size());
+    }
+
+    try {
+      doExecute(window);
 
     } catch (Throwable e) {
-      LOG.error(format("Unexpected failure: error='%s', tuple='%s'", e.getMessage(), input), e);
+      LOG.error(format("Unexpected failure: %s", e.getMessage()), e);
       collector.reportError(e);
+    }
+  }
 
-    } finally {
-      collector.ack(input);
+  private void doExecute(TupleWindow window) throws ExecutionException {
+
+    // handle each tuple in the window
+    for(Tuple tuple : window.get()) {
+      handleTuple(tuple);
+    }
+
+    // flush each profile
+    List<ProfileMeasurement> measurements = messageDistributor.flush();
+    for(ProfileMeasurement measurement: measurements) {
+
+      // allow the destination handlers to emit each measurement
+      for (DestinationHandler handler : destinationHandlers) {
+        handler.emit(measurement, collector);
+      }
     }
   }
 
   /**
-   * Handles a telemetry message
-   * @param input The tuple.
+   * Handles the processing of a single tuple.
+   *
+   * @param input The tuple containing a telemetry message.
    */
-  private void handleMessage(Tuple input) throws ExecutionException {
+  private void handleTuple(Tuple input) throws ExecutionException {
 
     // crack open the tuple
     JSONObject message = getField(MESSAGE_TUPLE_FIELD, input, JSONObject.class);
@@ -189,18 +270,6 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
   }
 
   /**
-   * Handles a tick tuple.
-   */
-  private void handleTick() {
-    List<ProfileMeasurement> measurements = messageDistributor.flush();
-
-    // forward the measurements to each destination handler
-    for(ProfileMeasurement m : measurements ) {
-      destinationHandlers.forEach(handler -> handler.emit(m, collector));
-    }
-  }
-
-  /**
    * Retrieves an expected field from a Tuple.  If the field is missing an exception is thrown to
    * indicate a fatal error.
    * @param fieldName The name of the field.
@@ -211,10 +280,14 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
   private <T> T getField(String fieldName, Tuple tuple, Class<T> clazz) {
     T value = ConversionUtils.convert(tuple.getValueByField(fieldName), clazz);
     if(value == null) {
-      throw new IllegalStateException(format("invalid tuple received: missing or invalid field '%s'", fieldName));
+      throw new IllegalStateException(format("Invalid tuple: missing or invalid field '%s'", fieldName));
     }
 
     return value;
+  }
+
+  public long getPeriodDurationMillis() {
+    return periodDurationMillis;
   }
 
   public ProfileBuilderBolt withPeriodDurationMillis(long periodDurationMillis) {
@@ -242,5 +315,25 @@ public class ProfileBuilderBolt extends ConfiguredProfilerBolt {
 
   public DefaultMessageDistributor getMessageDistributor() {
     return messageDistributor;
+  }
+
+  public ProfileBuilderBolt withZookeeperUrl(String zookeeperUrl) {
+    this.zookeeperUrl = zookeeperUrl;
+    return this;
+  }
+
+  public ProfileBuilderBolt withZookeeperClient(CuratorFramework zookeeperClient) {
+    this.zookeeperClient = zookeeperClient;
+    return this;
+  }
+
+  public ProfileBuilderBolt withZookeeperCache(ZKCache zookeeperCache) {
+    this.zookeeperCache = zookeeperCache;
+    return this;
+  }
+
+  public ProfileBuilderBolt withProfilerConfigurations(ProfilerConfigurations configurations) {
+    this.configurations = configurations;
+    return this;
   }
 }

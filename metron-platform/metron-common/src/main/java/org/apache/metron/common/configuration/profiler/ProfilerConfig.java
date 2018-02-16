@@ -54,12 +54,22 @@ public class ProfilerConfig implements Serializable {
     this.profiles = profiles;
   }
 
+  public ProfilerConfig withProfile(ProfileConfig profileConfig) {
+    this.profiles.add(profileConfig);
+    return this;
+  }
+
   public Optional<String> getTimestampField() {
     return timestampField;
   }
 
   public void setTimestampField(Optional<String> timestampField) {
     this.timestampField = timestampField;
+  }
+
+  public ProfilerConfig withTimestampField(Optional<String> timestampField) {
+    this.timestampField = timestampField;
+    return this;
   }
 
   @Override
