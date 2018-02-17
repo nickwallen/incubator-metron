@@ -21,6 +21,7 @@ config:
     topology.workers: ${profiler.workers}
     topology.acker.executors: ${profiler.executors}
     topology.auto-credentials: ${topology.auto-credentials}
+    topology.message.timeout.secs: ${topology.message.timeout.secs}
 
 components:
 
@@ -141,9 +142,9 @@ bolts:
 
     -   id: "builderBolt"
         className: "org.apache.metron.profiler.bolt.ProfileBuilderBolt"
-        constructorArgs:
-            - "${kafka.zk}"
         configMethods:
+            - name: "withZookeeperUrl"
+              args: ["${kafka.zk}"]
             - name: "withPeriodDuration"
               args: [${profiler.period.duration}, "${profiler.period.duration.units}"]
             - name: "withProfileTimeToLive"

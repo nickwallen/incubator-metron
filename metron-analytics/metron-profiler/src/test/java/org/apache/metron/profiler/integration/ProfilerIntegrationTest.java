@@ -304,6 +304,9 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("storm.auto.credentials", "[]");
       setProperty("kafka.security.protocol", "PLAINTEXT");
       setProperty("topology.auto-credentials", "[]");
+      setProperty("profiler.event.time.lag", "20");
+      setProperty("profiler.event.time.lag.units", "SECONDS");
+      setProperty("topology.message.timeout.secs", "60");
     }};
 
     // create the mock table

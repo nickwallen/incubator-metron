@@ -144,6 +144,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.collector = collector;
     this.parser = new JSONParser();
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis);
+    this.configurations = new ProfilerConfigurations();
     setupZookeeper();
   }
 
