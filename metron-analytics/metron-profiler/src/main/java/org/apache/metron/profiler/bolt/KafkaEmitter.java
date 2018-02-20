@@ -32,10 +32,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles emitting a ProfileMeasurement to the stream which writes
- * profile measurements to Kafka.
+ * Responsible for emitting a {@link ProfileMeasurement} to an output stream that will
+ * persist data in HBase.
  */
-public class KafkaDestinationHandler implements DestinationHandler, Serializable {
+public class KafkaEmitter implements ProfileMeasurementEmitter, Serializable {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 

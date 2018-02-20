@@ -21,6 +21,7 @@
 package org.apache.metron.profiler.bolt;
 
 import org.apache.metron.common.bolt.ConfiguredProfilerBolt;
+import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.profiler.DefaultMessageRouter;
 import org.apache.metron.profiler.MessageRoute;
@@ -48,9 +49,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The bolt responsible for filtering incoming messages and directing
- * each to the one or more bolts responsible for building a Profile.  Each
- * message may be needed by 0, 1 or even many Profiles.
+ * The Storm bolt responsible for filtering incoming messages and directing
+ * each to the downstream bolts responsible for building a Profile.
  */
 public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
 
@@ -78,7 +78,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    * The name of the tuple field containing the timestamp of the telemetry message.
    *
    * <p>If a 'timestampField' has been configured, the timestamp was extracted
-   * from the telemetry message.  This enables event time processing.
+   * from a field within the telemetry message.  This enables event time processing.
    *
    * <p>If a 'timestampField' has not been configured, then the Profiler uses
    * processing time and the timestamp originated from the system clock.
@@ -98,7 +98,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
   private transient MessageRouter router;
 
   /**
-   * Responsible for creating the appropriate clock.
+   * Responsible for creating the {@link Clock}.
    */
   private transient ClockFactory clockFactory;
 
@@ -185,11 +185,11 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    */
   private void routeMessage(Tuple input, JSONObject message, ProfilerConfig config, Long timestamp) {
 
-    // emit a message for each 'route'
+    // emit a tuple for each 'route'
     List<MessageRoute> routes = router.route(message, config, getStellarContext());
     for (MessageRoute route : routes) {
 
-      Values values = new Values(message, timestamp, route.getEntity(), route.getProfileDefinition());
+      Values values = createValues(message, timestamp, route);
       collector.emit(input, values);
     }
   }
@@ -207,8 +207,24 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    */
   @Override
   public void declareOutputFields(OutputFieldsDeclarer declarer) {
+
+    // the order here must match 'createValues'
     Fields fields = new Fields(MESSAGE_TUPLE_FIELD, TIMESTAMP_TUPLE_FIELD, ENTITY_TUPLE_FIELD, PROFILE_TUPLE_FIELD);
     declarer.declare(fields);
+  }
+
+  /**
+   * Creates the {@link Values} attached to the outgoing tuple.
+   *
+   * @param message The telemetry message.
+   * @param timestamp The timestamp of the message.
+   * @param route The route the message must take.
+   * @return
+   */
+  private Values createValues(JSONObject message, Long timestamp, MessageRoute route) {
+
+    // the order here must match `declareOutputFields`
+    return new Values(message, timestamp, route.getEntity(), route.getProfileDefinition());
   }
 
   protected MessageRouter getMessageRouter() {

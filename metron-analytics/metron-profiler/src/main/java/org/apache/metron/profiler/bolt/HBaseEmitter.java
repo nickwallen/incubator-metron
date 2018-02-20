@@ -21,36 +21,38 @@ package org.apache.metron.profiler.bolt;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.OutputFieldsDeclarer;
+import org.apache.storm.tuple.Fields;
+import org.apache.storm.tuple.Values;
+
+import java.io.Serializable;
 
 /**
- * This class handles the mechanics of emitting a profile measurement to a
- * stream responsible for writing to a specific destination.
- *
- * The measurements produced by a profile can be written to one or more
- * destinations; HBase, Kafka, etc.  Each of the destinations leverage a
- * separate stream within the topology definition.
+ * Responsible for emitting a {@link ProfileMeasurement} to an output stream that will
+ * persist data in HBase.
  */
-public interface DestinationHandler {
+public class HBaseEmitter implements ProfileMeasurementEmitter, Serializable {
 
   /**
-   * Each destination leverages a unique stream.  This method defines
-   * the unique stream identifier.
-   *
-   * The stream identifier must also be declared within the topology
-   * definition.
+   * The stream identifier used for this destination;
    */
-  String getStreamId();
+  private  String streamId = "hbase";
 
-  /**
-   * Declares the output fields for the stream.
-   * @param declarer
-   */
-  void declareOutputFields(OutputFieldsDeclarer declarer);
+  @Override
+  public void declareOutputFields(OutputFieldsDeclarer declarer) {
+    declarer.declareStream(getStreamId(), new Fields("measurement"));
+  }
 
-  /**
-   * Emit the measurement.
-   * @param measurement The measurement to emit.
-   * @param collector The output collector.
-   */
-  void emit(ProfileMeasurement measurement, OutputCollector collector);
+  @Override
+  public void emit(ProfileMeasurement measurement, OutputCollector collector) {
+    collector.emit(getStreamId(), new Values(measurement));
+  }
+
+  @Override
+  public String getStreamId() {
+    return streamId;
+  }
+
+  public void setStreamId(String streamId) {
+    this.streamId = streamId;
+  }
 }

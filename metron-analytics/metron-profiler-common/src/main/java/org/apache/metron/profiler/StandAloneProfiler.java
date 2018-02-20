@@ -35,8 +35,10 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
 /**
- * A stand alone version of the Profiler that does not require a
- * distributed execution environment like Apache Storm.
+ * A stand alone version of the Profiler that does not require a distributed
+ * execution environment like Apache Storm.
+ *
+ * <p>This class is used to create and manage profiles within the REPL environment.
  */
 public class StandAloneProfiler {
 

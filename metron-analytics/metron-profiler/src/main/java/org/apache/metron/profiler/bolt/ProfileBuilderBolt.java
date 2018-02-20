@@ -20,6 +20,7 @@
 
 package org.apache.metron.profiler.bolt;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.curator.RetryPolicy;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
@@ -65,12 +66,11 @@ import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.PROFILE_TUPLE_
 import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.TIMESTAMP_TUPLE_FIELD;
 
 /**
- * A bolt that is responsible for building a Profile.
+ * A Storm bolt that is responsible for building a profile.
  *
- * This bolt maintains the state required to build a Profile.  When the window
+ * <p>This bolt maintains the state required to build a Profile.  When the window
  * period expires, the data is summarized as a ProfileMeasurement, all state is
- * flushed, and the ProfileMeasurement is emitted.
- *
+ * flushed, and the {@link ProfileMeasurement} is emitted.
  */
 public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
@@ -125,10 +125,10 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * The measurements produced by a profile can be written to multiple destinations.  Each
    * destination is handled by a separate `DestinationHandler`.
    */
-  private List<DestinationHandler> destinationHandlers;
+  private List<ProfileMeasurementEmitter> measurementEmitters;
 
   public ProfileBuilderBolt() {
-    this.destinationHandlers = new ArrayList<>();
+    this.measurementEmitters = new ArrayList<>();
   }
 
   @Override
@@ -200,12 +200,12 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
   @Override
   public void declareOutputFields(OutputFieldsDeclarer declarer) {
-    if(destinationHandlers.size() == 0) {
+    if(measurementEmitters.size() == 0) {
       throw new IllegalStateException("At least one destination handler must be defined.");
     }
 
     // each destination will define its own stream
-    destinationHandlers.forEach(dest -> dest.declareOutputFields(declarer));
+    measurementEmitters.forEach(dest -> dest.declareOutputFields(declarer));
   }
 
   private Context getStellarContext() {
@@ -220,9 +220,11 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   @Override
   public void execute(TupleWindow window) {
 
-    LOG.debug("Received window containing '{}' tuple(s)", window.get().size());
-    if(window.getExpired().size() > 0) {
-      LOG.debug("{} tuple(s) expired", window.getExpired().size());
+    if(LOG.isDebugEnabled()) {
+      LOG.debug("Tuple window contains {} tuple(s), {} expired, {} new",
+              CollectionUtils.size(window.get()),
+              CollectionUtils.size(window.getExpired()),
+              CollectionUtils.size(window.getNew()));
     }
 
     try {
@@ -246,7 +248,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     for(ProfileMeasurement measurement: measurements) {
 
       // allow the destination handlers to emit each measurement
-      for (DestinationHandler handler : destinationHandlers) {
+      for (ProfileMeasurementEmitter handler : measurementEmitters) {
         handler.emit(measurement, collector);
       }
     }
@@ -309,8 +311,8 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     return withProfileTimeToLiveMillis(units.toMillis(duration));
   }
 
-  public ProfileBuilderBolt withDestinationHandler(DestinationHandler handler) {
-    this.destinationHandlers.add(handler);
+  public ProfileBuilderBolt withDestinationHandler(ProfileMeasurementEmitter handler) {
+    this.measurementEmitters.add(handler);
     return this;
   }
 

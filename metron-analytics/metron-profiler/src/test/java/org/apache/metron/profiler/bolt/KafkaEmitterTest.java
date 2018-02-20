@@ -45,7 +45,7 @@ import static org.junit.Assert.*;
 /**
  * Tests the KafkaDestinationHandler.
  */
-public class KafkaDestinationHandlerTest {
+public class KafkaEmitterTest {
 
   /**
    * {
@@ -59,13 +59,13 @@ public class KafkaDestinationHandlerTest {
   @Multiline
   private String profileDefinition;
 
-  private KafkaDestinationHandler handler;
+  private KafkaEmitter handler;
   private ProfileConfig profile;
   private OutputCollector collector;
 
   @Before
   public void setup() throws Exception {
-    handler = new KafkaDestinationHandler();
+    handler = new KafkaEmitter();
     profile = createDefinition(profileDefinition);
     collector = Mockito.mock(OutputCollector.class);
   }

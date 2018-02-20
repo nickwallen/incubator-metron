@@ -45,6 +45,10 @@ import static java.lang.String.format;
  */
 public class DefaultMessageDistributor implements MessageDistributor {
 
+  public static final int DEFAULT_CACHE_SIZE = 500;
+
+  private int cacheSize;
+
   /**
    * The duration of each profile period in milliseconds.
    */
@@ -90,20 +94,24 @@ public class DefaultMessageDistributor implements MessageDistributor {
   }
 
   /**
-   * Flushes all profiles.  Flushes all ProfileBuilders that this distributor is responsible for.
+   * Flushes all profiles and returns the {@link ProfileMeasurement} values.
    *
    * @return The profile measurements; one for each (profile, entity) pair.
    */
   @Override
   public List<ProfileMeasurement> flush() {
-    List<ProfileMeasurement> measurements = new ArrayList<>();
 
-    profileCache.asMap().forEach((key, profileBuilder) -> {
+    List<ProfileMeasurement> measurements = new ArrayList<>();
+    for(ProfileBuilder profileBuilder: profileCache.asMap().values()) {
+
+      // only need to flush, if the profile has been initialized
       if(profileBuilder.isInitialized()) {
+
+        // flush the profiler and save the measurement, if one exists
         Optional<ProfileMeasurement> measurement = profileBuilder.flush();
-        measurement.ifPresent(measurements::add);
+        measurement.ifPresent(m -> measurements.add(m));
       }
-    });
+    }
 
     profileCache.cleanUp();
     return measurements;
@@ -129,7 +137,7 @@ public class DefaultMessageDistributor implements MessageDistributor {
   }
 
   /**
-   * Builds the key that is used to lookup the ProfileState within the cache.
+   * Builds the key that is used to lookup the {@link ProfileBuilder} within the cache.
    * @param profile The profile definition.
    * @param entity The entity.
    */

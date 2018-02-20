@@ -84,7 +84,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
 
   private ProfileConfig profile1;
   private ProfileConfig profile2;
-  private DestinationHandler destinationHandler;
+  private ProfileMeasurementEmitter measurementEmitter;
 
   @Before
   public void setup() throws Exception {
@@ -251,7 +251,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   private List<ProfileMeasurement> getProfileMeasurements(OutputCollector collector, int expected) {
 
     // the 'streamId' is defined by the DestinationHandler being used by the bolt
-    final String streamId = destinationHandler.getStreamId();
+    final String streamId = measurementEmitter.getStreamId();
 
     // capture the emitted tuple(s)
     ArgumentCaptor<Values> argCaptor = ArgumentCaptor.forClass(Values.class);
@@ -268,11 +268,11 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   /**
    * An implementation for testing purposes only.
    */
-  private class TestDestinationHandler implements DestinationHandler {
+  private class TestEmitter implements ProfileMeasurementEmitter {
 
     private String streamId;
 
-    public TestDestinationHandler(String streamId) {
+    public TestEmitter(String streamId) {
       this.streamId = streamId;
     }
 
@@ -309,9 +309,9 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
             .withPeriodDuration(10, TimeUnit.MINUTES)
             .withZookeeperClient(client)
             .withZookeeperCache(cache)
-            .withDestinationHandler(new TestDestinationHandler("destination1"))
-            .withDestinationHandler(new TestDestinationHandler("destination2"))
-            .withDestinationHandler(new TestDestinationHandler("destination3"))
+            .withDestinationHandler(new TestEmitter("destination1"))
+            .withDestinationHandler(new TestEmitter("destination2"))
+            .withDestinationHandler(new TestEmitter("destination3"))
             .withProfilerConfigurations(configurations)
             .withTumblingWindow(new BaseWindowedBolt.Duration(10, TimeUnit.MINUTES));
     bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
@@ -360,14 +360,14 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     ProfilerConfigurations configurations = new ProfilerConfigurations();
     configurations.updateGlobalConfig(Collections.emptyMap());
 
-    destinationHandler = new HBaseDestinationHandler();
+    measurementEmitter = new HBaseEmitter();
 
     ProfileBuilderBolt bolt = (ProfileBuilderBolt) new ProfileBuilderBolt()
             .withProfileTimeToLive(30, TimeUnit.MINUTES)
             .withPeriodDuration(10, TimeUnit.MINUTES)
             .withZookeeperClient(client)
             .withZookeeperCache(cache)
-            .withDestinationHandler(destinationHandler)
+            .withDestinationHandler(measurementEmitter)
             .withProfilerConfigurations(configurations)
             .withTumblingWindow(new BaseWindowedBolt.Duration(10, TimeUnit.MINUTES));
 

@@ -109,10 +109,10 @@ components:
                 args: [ref: "kafkaWriterProps"]
 
     -   id: "kafkaDestinationHandler"
-        className: "org.apache.metron.profiler.bolt.KafkaDestinationHandler"
+        className: "org.apache.metron.profiler.bolt.KafkaEmitter"
 
     -   id: "hbaseDestinationHandler"
-        className: "org.apache.metron.profiler.bolt.HBaseDestinationHandler"
+        className: "org.apache.metron.profiler.bolt.HBaseEmitter"
 
     -   id: "windowDuration"
         className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
