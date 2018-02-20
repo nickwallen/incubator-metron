@@ -122,7 +122,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @Test
   public void testExample1() throws Exception {
 
-    update(TEST_RESOURCES + "/config/zookeeper/readme-example-1");
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/readme-example-1");
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
@@ -147,7 +147,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @Test
   public void testExample2() throws Exception {
 
-    update(TEST_RESOURCES + "/config/zookeeper/readme-example-2");
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/readme-example-2");
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
@@ -164,13 +164,13 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
 
     // verify - 10.0.0.3 -> 1/6
-    Assert.assertTrue( "Could not find a value near 1/6. Actual values read are are: " + Joiner.on(",").join(actuals)
-                     , actuals.stream().anyMatch(val -> MathUtils.equals(val, 1.0/6.0, epsilon)
+    Assert.assertTrue( "Could not find a value near 1/6. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 1.0/6.0, epsilon)
     ));
 
     // verify - 10.0.0.2 -> 6/1
-    Assert.assertTrue("Could not find a value near 6. Actual values read are are: " + Joiner.on(",").join(actuals)
-            ,actuals.stream().anyMatch(val -> MathUtils.equals(val, 6.0/1.0, epsilon)
+    Assert.assertTrue("Could not find a value near 6. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 6.0/1.0, epsilon)
     ));
   }
 
@@ -180,7 +180,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @Test
   public void testExample3() throws Exception {
 
-    update(TEST_RESOURCES + "/config/zookeeper/readme-example-3");
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/readme-example-3");
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
@@ -194,8 +194,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
 
     // verify - there are 5 'HTTP' messages each with a length of 20, thus the average should be 20
-    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals)
-                     , actuals.stream().anyMatch(val -> MathUtils.equals(val, 20.0, epsilon)
+    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 20.0, epsilon)
     ));
   }
 
@@ -205,7 +205,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @Test
   public void testExample4() throws Exception {
 
-    update(TEST_RESOURCES + "/config/zookeeper/readme-example-4");
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/readme-example-4");
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
@@ -220,15 +220,15 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<OnlineStatisticsProvider> actuals = read(profilerTable.getPutLog(), columnFamily, column, OnlineStatisticsProvider.class);
 
     // verify - there are 5 'HTTP' messages each with a length of 20, thus the average should be 20
-    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals)
-                     , actuals.stream().anyMatch(val -> MathUtils.equals(val.getMean(), 20.0, epsilon)
+    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val.getMean(), 20.0, epsilon)
     ));
   }
 
   @Test
   public void testPercentiles() throws Exception {
 
-    update(TEST_RESOURCES + "/config/zookeeper/percentiles");
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/percentiles");
 
 
     // start the topology and write test messages to kafka
@@ -242,8 +242,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
 
     // verify - the 70th percentile of 5 x 20s = 20.0
-    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals)
-                     , actuals.stream().anyMatch(val -> MathUtils.equals(val, 20.0, epsilon)));
+    Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 20.0, epsilon)));
   }
 
   /**
@@ -271,11 +271,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   public static void setupBeforeClass() throws UnableToStartException {
     columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
 
-    List<String> inputNew = Stream.of(message1, message2, message3)
-        .map(m -> Collections.nCopies(5, m))
-        .flatMap(l -> l.stream())
-        .collect(Collectors.toList());
-
     // create input messages for the profiler to consume
     input = Stream.of(message1, message2, message3)
             .map(Bytes::toBytes)
@@ -285,25 +280,34 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // storm topology properties
     final Properties topologyProperties = new Properties() {{
-      setProperty("kafka.start", "UNCOMMITTED_EARLIEST");
-      setProperty("profiler.workers", "1");
-      setProperty("profiler.executors", "0");
+
+      // storm settings
       setProperty("profiler.input.topic", inputTopic);
       setProperty("profiler.output.topic", outputTopic);
-      setProperty("profiler.period.duration", "20");
-      setProperty("profiler.period.duration.units", "SECONDS");
-      setProperty("profiler.ttl", "30");
-      setProperty("profiler.ttl.units", "MINUTES");
+      setProperty("profiler.workers", "1");
+      setProperty("profiler.executors", "0");
+      setProperty("storm.auto.credentials", "[]");
+      setProperty("topology.auto-credentials", "[]");
+
+      // kafka settings
+      setProperty("kafka.start", "UNCOMMITTED_EARLIEST");
+      setProperty("kafka.security.protocol", "PLAINTEXT");
+
+      // hbase settings
       setProperty("profiler.hbase.salt.divisor", "10");
       setProperty("profiler.hbase.table", tableName);
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");
-      setProperty("profiler.profile.ttl", "20");
       setProperty("hbase.provider.impl", "" + MockHBaseTableProvider.class.getName());
-      setProperty("storm.auto.credentials", "[]");
-      setProperty("kafka.security.protocol", "PLAINTEXT");
-      setProperty("topology.auto-credentials", "[]");
+
+      // profile settings
+      setProperty("profiler.period.duration", "20");
+      setProperty("profiler.period.duration.units", "SECONDS");
+      setProperty("profiler.ttl", "30");
+      setProperty("profiler.ttl.units", "MINUTES");
+
+      // profile event time processing
       setProperty("profiler.event.time.lag", "20");
       setProperty("profiler.event.time.lag.units", "SECONDS");
       setProperty("topology.message.timeout.secs", "60");
@@ -343,10 +347,16 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     runner.start();
   }
 
-  public void update(String path) throws Exception {
-    configUploadComponent.withGlobalConfiguration(path)
-        .withProfilerConfiguration(path);
-    configUploadComponent.update();
+  /**
+   * Uploads config values to Zookeeper.
+   * @param path The path on the local filesystem to the config values.
+   * @throws Exception
+   */
+  public void uploadConfig(String path) throws Exception {
+    configUploadComponent
+            .withGlobalConfiguration(path)
+            .withProfilerConfiguration(path)
+            .update();
   }
 
   @AfterClass
