@@ -19,13 +19,7 @@
  */
 package org.apache.metron.profiler;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.commons.lang.ArrayUtils;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.stellar.dsl.Context;
@@ -39,6 +33,9 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the StandAloneProfiler class.
@@ -235,6 +232,7 @@ public class StandAloneProfilerTest {
    * @throws Exception
    */
   private ProfilerConfig toProfilerConfig(String configAsJSON) throws Exception {
+
     InputStream in = new ByteArrayInputStream(configAsJSON.getBytes("UTF-8"));
     return JSONUtils.INSTANCE.load(in, ProfilerConfig.class);
   }
@@ -246,9 +244,12 @@ public class StandAloneProfilerTest {
    * @throws Exception
    */
   private StandAloneProfiler createProfiler(String profileJson) throws Exception {
+
+    // the TTL and max routes need not be bounded
+    long profileTimeToLiveMillis = Long.MAX_VALUE;
+    long maxNumberOfRoutes = Long.MAX_VALUE;
+
     ProfilerConfig config = toProfilerConfig(profileJson);
-    return new StandAloneProfiler(config, periodDurationMillis, context);
+    return new StandAloneProfiler(config, periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes, context);
   }
-
-
 }

@@ -90,9 +90,14 @@ public class DefaultMessageDistributorTest {
     JSONParser parser = new JSONParser();
     messageOne = (JSONObject) parser.parse(inputOne);
     messageTwo = (JSONObject) parser.parse(inputTwo);
+
+    long periodDurationMillis = TimeUnit.MINUTES.toMillis(15);
+    long profileTimeToLiveMillis = TimeUnit.MINUTES.toMillis(30);
+    long maxNumberOfRoutes = Long.MAX_VALUE;
     distributor = new DefaultMessageDistributor(
-            TimeUnit.MINUTES.toMillis(15),
-            TimeUnit.MINUTES.toMillis(30));
+            periodDurationMillis,
+            profileTimeToLiveMillis,
+            maxNumberOfRoutes);
   }
 
   /**

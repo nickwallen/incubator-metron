@@ -27,13 +27,17 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Distributes a message along a MessageRoute.  A MessageRoute will lead to one or
- * more ProfileBuilders.
+ * Distributes a telemetry message along a {@link MessageRoute}. A {@link MessageRoute} will lead to a
+ * {@link ProfileBuilder} that is responsible for building and maintaining a profile.
  *
- * A ProfileBuilder is responsible for maintaining the state of a single profile,
- * for a single entity.  There will be one ProfileBuilder for each (profile, entity) pair.
- * This class ensures that each ProfileBuilder receives the telemetry messages that
- * it needs.
+ * <p>A {@link ProfileBuilder} is responsible for maintaining the state of a single (profile, entity)
+ * pairing.  There will be one {@link ProfileBuilder} for each (profile, entity) pair.
+ *
+ * <p>A {@link MessageDistributor} ensures that each {@link ProfileBuilder} receives the telemetry
+ * messages that it needs.
+ *
+ * @see MessageRoute
+ * @see ProfileMeasurement
  */
 public interface MessageDistributor {
 
@@ -46,7 +50,7 @@ public interface MessageDistributor {
    * @param context The Stellar execution context.
    * @throws ExecutionException
    */
-  void distribute(JSONObject message, long timestamp, MessageRoute route, Context context) throws ExecutionException;
+  void distribute(JSONObject message, long timestamp, MessageRoute route, Context context);
 
   /**
    * Flushes all profiles.

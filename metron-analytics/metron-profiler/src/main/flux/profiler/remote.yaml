@@ -149,14 +149,16 @@ bolts:
               args: [${profiler.period.duration}, "${profiler.period.duration.units}"]
             - name: "withProfileTimeToLive"
               args: [${profiler.ttl}, "${profiler.ttl.units}"]
-            - name: "withDestinationHandler"
+            - name: "withEmitter"
               args: [ref: "kafkaDestinationHandler"]
-            - name: "withDestinationHandler"
+            - name: "withEmitter"
               args: [ref: "hbaseDestinationHandler"]
             - name: "withTumblingWindow"
               args: [ref: "windowDuration"]
             - name: "withLag"
               args: [ref: "eventTimeLag"]
+            - name: "withMaxNumberOfRoutes"
+              args: [${profiler.max.routes.per.bolt}]
 
     -   id: "hbaseBolt"
         className: "org.apache.metron.hbase.bolt.HBaseBolt"

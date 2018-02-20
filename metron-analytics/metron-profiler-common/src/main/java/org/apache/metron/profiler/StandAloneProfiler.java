@@ -83,12 +83,25 @@ public class StandAloneProfiler {
    */
   private int routeCount;
 
-  public StandAloneProfiler(ProfilerConfig config, long periodDurationMillis, Context context) {
+  /**
+   * Create a new Profiler.
+   *
+   * @param config The Profiler configuration.
+   * @param periodDurationMillis The period duration in milliseconds.
+   * @param profileTimeToLiveMillis The time-to-live of a profile in milliseconds.
+   * @param maxNumberOfRoutes The max number of unique routes to maintain.  After this is exceeded, lesser
+   *                          used routes will be evicted from the internal cache.
+   * @param context The Stellar execution context.
+   */
+  public StandAloneProfiler(ProfilerConfig config,
+                            long periodDurationMillis,
+                            long profileTimeToLiveMillis,
+                            long maxNumberOfRoutes,
+                            Context context) {
     this.context = context;
     this.config = config;
     this.router = new DefaultMessageRouter(context);
-    // the period TTL does not matter in this context
-    this.distributor = new DefaultMessageDistributor(periodDurationMillis, Long.MAX_VALUE);
+    this.distributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.clockFactory = new DefaultClockFactory();
     this.messageCount = 0;
     this.routeCount = 0;
@@ -97,9 +110,8 @@ public class StandAloneProfiler {
   /**
    * Apply a message to a set of profiles.
    * @param message The message to apply.
-   * @throws ExecutionException
    */
-  public void apply(JSONObject message) throws ExecutionException {
+  public void apply(JSONObject message) {
 
     // what time is it?
     Clock clock = clockFactory.createClock(config);
@@ -122,7 +134,6 @@ public class StandAloneProfiler {
     }
   }
 
-
   /**
    * Flush the set of profiles.
    * @return A ProfileMeasurement for each (Profile, Entity) pair.
@@ -131,18 +142,35 @@ public class StandAloneProfiler {
     return distributor.flush();
   }
 
+  /**
+   * Returns the Profiler configuration.
+   * @return The Profiler configuration.
+   */
   public ProfilerConfig getConfig() {
     return config;
   }
 
+  /**
+   * Returns the number of defined profiles.
+   * @return The number of defined profiles.
+   */
   public int getProfileCount() {
     return (config == null) ? 0: config.getProfiles().size();
   }
 
+  /**
+   * Returns the number of messages that have been applied.
+   * @return The number of messages that have been applied.
+   */
   public int getMessageCount() {
     return messageCount;
   }
 
+  /**
+   * Returns the number of routes.
+   * @return The number of routes.
+   * @see MessageRoute
+   */
   public int getRouteCount() {
     return routeCount;
   }

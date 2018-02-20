@@ -306,6 +306,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.period.duration.units", "SECONDS");
       setProperty("profiler.ttl", "30");
       setProperty("profiler.ttl.units", "MINUTES");
+      setProperty("profiler.max.routes.per.bolt", "10000");
 
       // profile event time processing
       setProperty("profiler.event.time.lag", "20");

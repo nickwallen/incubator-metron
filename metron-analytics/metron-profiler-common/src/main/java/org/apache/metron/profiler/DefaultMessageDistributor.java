@@ -25,7 +25,10 @@ import com.google.common.cache.CacheBuilder;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.stellar.dsl.Context;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -35,19 +38,11 @@ import java.util.concurrent.TimeUnit;
 import static java.lang.String.format;
 
 /**
- * Distributes a message along a MessageRoute.  A MessageRoute will lead to one or
- * more ProfileBuilders.
- *
- * A ProfileBuilder is responsible for maintaining the state of a single profile,
- * for a single entity.  There will be one ProfileBuilder for each (profile, entity) pair.
- * This class ensures that each ProfileBuilder receives the telemetry messages that
- * it needs.
+ * The default implementation of a {@link MessageDistributor}.
  */
 public class DefaultMessageDistributor implements MessageDistributor {
 
-  public static final int DEFAULT_CACHE_SIZE = 500;
-
-  private int cacheSize;
+  protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * The duration of each profile period in milliseconds.
@@ -61,10 +56,14 @@ public class DefaultMessageDistributor implements MessageDistributor {
 
   /**
    * Create a new message distributor.
+   *
    * @param periodDurationMillis The period duration in milliseconds.
-   * @param profileTimeToLiveMillis The TTL of a profile in milliseconds.
+   * @param profileTimeToLiveMillis The time-to-live of a profile in milliseconds.
+   * @param maxNumberOfRoutes The max number of unique routes to maintain.  After this is exceeded, lesser
+   *                          used routes will be evicted from the internal cache.
    */
-  public DefaultMessageDistributor(long periodDurationMillis, long profileTimeToLiveMillis) {
+  public DefaultMessageDistributor(long periodDurationMillis, long profileTimeToLiveMillis, long maxNumberOfRoutes) {
+
     if(profileTimeToLiveMillis < periodDurationMillis) {
       throw new IllegalStateException(format(
               "invalid configuration: expect profile TTL (%d) to be greater than period duration (%d)",
@@ -74,6 +73,7 @@ public class DefaultMessageDistributor implements MessageDistributor {
     this.periodDurationMillis = periodDurationMillis;
     this.profileCache = CacheBuilder
             .newBuilder()
+            .maximumSize(maxNumberOfRoutes)
             .expireAfterAccess(profileTimeToLiveMillis, TimeUnit.MILLISECONDS)
             .build();
   }
@@ -88,9 +88,15 @@ public class DefaultMessageDistributor implements MessageDistributor {
    * @throws ExecutionException
    */
   @Override
-  public void distribute(JSONObject message, long timestamp, MessageRoute route, Context context) throws ExecutionException {
-    ProfileBuilder builder = getBuilder(route, context);
-    builder.apply(message, timestamp);
+  public void distribute(JSONObject message, long timestamp, MessageRoute route, Context context) {
+    try {
+      ProfileBuilder builder = getBuilder(route, context);
+      builder.apply(message, timestamp);
+
+    } catch(ExecutionException e) {
+      LOG.error("Unexpected error", e);
+      throw new RuntimeException(e);
+    }
   }
 
   /**
