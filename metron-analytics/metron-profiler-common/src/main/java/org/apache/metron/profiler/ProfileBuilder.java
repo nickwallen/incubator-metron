@@ -48,15 +48,15 @@ public interface ProfileBuilder {
   /**
    * Flush the Profile.
    *
-   * <p>Completes and emits the ProfileMeasurement.  Clears all state in preparation for
+   * <p>Completes the period and returns the {@link ProfileMeasurement}.  Clears all state in preparation for
    * the next window period.
    *
-   * @return Returns the completed profile measurement.
+   * @return Returns the {@link ProfileMeasurement}.
    */
   Optional<ProfileMeasurement> flush();
 
   /**
-   * Has the ProfileBuilder been initialized?
+   * Has the {@link ProfileBuilder} been initialized?
    *
    * @return True, if initialization has occurred.  False, otherwise.
    */
@@ -65,13 +65,12 @@ public interface ProfileBuilder {
   /**
    * Returns the definition of the profile being built.
    *
-   * @return ProfileConfig definition of the profile
+   * @return The profile definition.
    */
   ProfileConfig getDefinition();
 
   /**
-   * Returns the value of a variable being maintained by the builder.
-   *
+   * Returns the value of a variable within the current profile state.
    *
    * @param variable The variable name.
    * @return The value of the variable.

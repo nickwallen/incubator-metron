@@ -22,15 +22,17 @@ package org.apache.metron.profiler.clock;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 
 /**
- * A factory for creating Clocks.
+ * A factory for creating {@link Clock} objects.
+ *
+ * The type of {@link Clock} needed will depend on the Profiler configuration.
  */
 public interface ClockFactory {
 
   /**
-   * Creates and returns a Clock.
+   * Creates and returns a {@link Clock}.
    *
    * @param config The profiler configuration.
-   * @return A clock.
+   * @return A {@link Clock}.
    */
   Clock createClock(ProfilerConfig config);
 }

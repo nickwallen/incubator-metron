@@ -34,6 +34,8 @@ public interface Clock {
 
   /**
    * The current time in epoch milliseconds.
+   *
+   * @param message The telemetry message.
    */
   Optional<Long> currentTimeMillis(JSONObject message);
 }

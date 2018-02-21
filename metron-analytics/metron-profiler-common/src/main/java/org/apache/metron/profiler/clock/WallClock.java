@@ -26,9 +26,10 @@ import java.io.Serializable;
 import java.util.Optional;
 
 /**
- * A clock that advances based on system time.
+ * A {@link Clock} that advances based on system time.
  *
- * <p>This clock allows the Profiler to create profiles based on processing time.
+ * <p>This {@link Clock} is used to advance time when the Profiler is running
+ * on processing time, rather than event time.
  */
 public class WallClock implements Clock, Serializable {
 

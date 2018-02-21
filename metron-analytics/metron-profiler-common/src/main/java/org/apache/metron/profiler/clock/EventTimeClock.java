@@ -28,8 +28,10 @@ import java.lang.invoke.MethodHandles;
 import java.util.Optional;
 
 /**
- * A clock that advances based on event time; the timestamps originating in
- * the telemetry messages.
+ * A {@link Clock} that advances based on event time.
+ *
+ * Event time is advanced by the timestamps contained within telemetry messages, rather
+ * than the system clock.
  */
 public class EventTimeClock implements Clock {
 

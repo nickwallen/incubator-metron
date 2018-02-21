@@ -26,7 +26,7 @@ import java.io.Serializable;
 import java.util.Optional;
 
 /**
- * A clock that always reports the same time.
+ * A {@link Clock} that always reports the same time.
  *
  * <p>This is only useful for testing.
  */
@@ -38,14 +38,14 @@ public class FixedClock implements Clock, Serializable {
   private long epochMillis;
 
   /**
-   * Create a clock.  The time defaults to the epoch.
+   * Create a {@link Clock}.  The time defaults to the epoch.
    */
   public FixedClock() {
     this(0);
   }
 
   /**
-   * Create a clock.
+   * Create a {@link Clock}.
    * @param epochMillis The time in milliseconds since the epoch.
    */
   public FixedClock(long epochMillis) {
@@ -53,7 +53,7 @@ public class FixedClock implements Clock, Serializable {
   }
 
   /**
-   * Set the clock's time.
+   * Set the current time.
    * @param epochMillis The time in milliseconds since the epoch.
    */
   public void setTime(long epochMillis) {
