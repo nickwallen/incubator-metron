@@ -63,6 +63,10 @@ public class ProfilerConfig implements Serializable {
     return timestampField;
   }
 
+  public void setTimestampField(String timestampField) {
+    this.timestampField = Optional.of(timestampField);
+  }
+
   public void setTimestampField(Optional<String> timestampField) {
     this.timestampField = timestampField;
   }

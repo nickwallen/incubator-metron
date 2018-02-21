@@ -20,12 +20,12 @@
 
 package org.apache.metron.profiler.bolt;
 
-import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfigurations;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
+import org.apache.metron.profiler.integration.MessageBuilder;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -35,7 +35,6 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.windowing.TupleWindow;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -62,41 +61,32 @@ import static org.mockito.Mockito.when;
  */
 public class ProfileBuilderBoltTest extends BaseBoltTest {
 
-  /**
-   * {
-   *   "ip_src_addr": "10.0.0.1",
-   *   "value": "22"
-   * }
-   */
-  @Multiline
-  private String message1JSON;
   private JSONObject message1;
-
-  /**
-   * {
-   *   "ip_src_addr": "10.0.0.2",
-   *   "value": "22"
-   * }
-   */
-  @Multiline
-  private String message2JSON;
   private JSONObject message2;
-
   private ProfileConfig profile1;
   private ProfileConfig profile2;
   private ProfileMeasurementEmitter emitter;
 
   @Before
   public void setup() throws Exception {
-    JSONParser parser = new JSONParser();
-    message1 = (JSONObject) parser.parse(message1JSON);
-    message2 = (JSONObject) parser.parse(message2JSON);
+
+    message1 = new MessageBuilder()
+            .withField("ip_src_addr", "10.0.0.1")
+            .withField("value", "22")
+            .build();
+
+    message2 = new MessageBuilder()
+            .withField("ip_src_addr", "10.0.0.2")
+            .withField("value", "22")
+            .build();
+
     profile1 = new ProfileConfig()
             .withProfile("profile1")
             .withForeach("ip_src_addr")
-            .withInit(Collections.singletonMap("x", "0"))
-            .withUpdate(Collections.singletonMap("x", "x + 1"))
+            .withInit("x", "0")
+            .withUpdate("x", "x + 1")
             .withResult("x");
+
     profile2 = new ProfileConfig()
             .withProfile("profile2")
             .withForeach("ip_src_addr")

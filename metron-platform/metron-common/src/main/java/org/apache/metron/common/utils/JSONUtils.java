@@ -23,8 +23,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.flipkart.zjsonpatch.JsonPatch;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -32,16 +35,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-
-import com.google.common.reflect.TypeToken;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 public enum JSONUtils {
   INSTANCE;
@@ -75,9 +71,7 @@ public enum JSONUtils {
       new JSONParser());
 
   private static ThreadLocal<ObjectMapper> _mapper = ThreadLocal.withInitial(() ->
-      new ObjectMapper()
-              .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-              .registerModule(new Jdk8Module()));
+      new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL));
 
   public <T> T convert(Object original, Class<T> targetClass) {
     return _mapper.get().convertValue(original, targetClass);
