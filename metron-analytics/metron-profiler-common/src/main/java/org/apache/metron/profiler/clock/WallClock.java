@@ -22,7 +22,6 @@ package org.apache.metron.profiler.clock;
 
 import org.json.simple.JSONObject;
 
-import java.io.Serializable;
 import java.util.Optional;
 
 /**
@@ -31,7 +30,7 @@ import java.util.Optional;
  * <p>This {@link Clock} is used to advance time when the Profiler is running
  * on processing time, rather than event time.
  */
-public class WallClock implements Clock, Serializable {
+public class WallClock implements Clock {
 
   @Override
   public Optional<Long> currentTimeMillis(JSONObject message) {

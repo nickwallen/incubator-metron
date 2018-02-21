@@ -98,7 +98,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   private long maxTimestamp;
 
   /**
-   * Use the ProfileBuilder.Builder to create a new ProfileBuilder.
+   * Private constructor.  Use the {@link Builder} to create a new {@link ProfileBuilder).
    */
   private DefaultProfileBuilder(ProfileConfig definition,
                                 String entity,
@@ -118,6 +118,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
   /**
    * Apply a message to the profile.
+   *
    * @param message The message to apply.
    * @param timestamp The timestamp of the message.
    */
@@ -147,10 +148,10 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   /**
    * Flush the Profile.
    *
-   * <p>Completes and emits the ProfileMeasurement.  Clears all state in preparation for
+   * <p>Completes and emits the {@link ProfileMeasurement}.  Clears all state in preparation for
    * the next window period.
    *
-   * @return Returns the completed profile measurement.
+   * @return Returns the completed {@link ProfileMeasurement}.
    */
   @Override
   public Optional<ProfileMeasurement> flush() {
@@ -225,6 +226,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
   /**
    * Executes an expression contained within the profile definition.
+   *
    * @param expression The expression to execute.
    * @param transientState Additional transient state provided to the expression.
    * @param expressionType The type of expression; init, update, result.  Provides additional context if expression execution fails.
@@ -243,6 +245,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
   /**
    * Executes an expression contained within the profile definition.
+   *
    * @param expression The expression to execute.
    * @param expressionType The type of expression; init, update, result.  Provides additional context if expression execution fails.
    * @return The result of executing the expression.
@@ -253,6 +256,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
   /**
    * Executes a set of expressions whose results need to be assigned to a variable.
+   *
    * @param expressions Maps the name of a variable to the expression whose result should be assigned to it.
    * @param transientState Additional transient state provided to the expression.
    * @param expressionType The type of expression; init, update, result.  Provides additional context if expression execution fails.
@@ -286,6 +290,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
   /**
    * Executes the expressions contained within the profile definition.
+   *
    * @param expressions A list of expressions to execute.
    * @param transientState Additional transient state provided to the expressions.
    * @param expressionType The type of expression; init, update, result.  Provides additional context if expression execution fails.
@@ -319,7 +324,7 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
   }
 
   /**
-   * A builder used to construct a new ProfileBuilder.
+   * A builder should be used to construct a new {@link ProfileBuilder} object.
    */
   public static class Builder {
 

@@ -51,7 +51,7 @@ public interface MessageDistributor {
   void distribute(JSONObject message, long timestamp, MessageRoute route, Context context);
 
   /**
-   * Flushes all profiles.
+   * Flush all profiles.
    *
    * <p>Flushes all {@link ProfileBuilder} objects that this distributor is responsible for.
    *

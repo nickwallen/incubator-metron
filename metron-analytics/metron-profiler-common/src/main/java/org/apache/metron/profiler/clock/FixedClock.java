@@ -22,7 +22,6 @@ package org.apache.metron.profiler.clock;
 
 import org.json.simple.JSONObject;
 
-import java.io.Serializable;
 import java.util.Optional;
 
 /**
@@ -30,7 +29,7 @@ import java.util.Optional;
  *
  * <p>This is only useful for testing.
  */
-public class FixedClock implements Clock, Serializable {
+public class FixedClock implements Clock {
 
   /**
    * The time in milliseconds since the epoch.

@@ -25,7 +25,7 @@ import org.json.simple.JSONObject;
 import java.util.Optional;
 
 /**
- * A clock manages the progression of time in the Profiler.
+ * A {@link Clock} manages the progression of time in the Profiler.
  *
  * <p>The Profiler can operate on either processing time or event time.  This
  * abstraction deals with the differences between the two.
@@ -33,9 +33,11 @@ import java.util.Optional;
 public interface Clock {
 
   /**
-   * The current time in epoch milliseconds.
+   * Returns the current time in epoch milliseconds.
    *
    * @param message The telemetry message.
+   * @return An optional value containing the current time in epoch milliseconds, if
+   *         the current time is known.  Otherwise, empty.
    */
   Optional<Long> currentTimeMillis(JSONObject message);
 }

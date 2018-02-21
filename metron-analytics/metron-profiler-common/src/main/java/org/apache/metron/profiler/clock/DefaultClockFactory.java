@@ -22,9 +22,9 @@ package org.apache.metron.profiler.clock;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 
 /**
- * Creates the appropriate Clock based on the profiler configuration.
+ * Creates the {@link Clock} that is needed based on the profiler configuration.
  *
- * <p>The default implementation of a ClockFactory.
+ * <p>The default implementation of a {@link ClockFactory}.
  */
 public class DefaultClockFactory implements ClockFactory {
 
