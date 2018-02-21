@@ -28,15 +28,18 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.utils.SerDeUtils;
-import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
+import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.FluxTopologyComponent;
 import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
+import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
+import org.apache.metron.profiler.hbase.RowKeyBuilder;
+import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
 import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
 import org.apache.metron.statistics.OnlineStatisticsProvider;
 import org.junit.After;
@@ -49,15 +52,15 @@ import org.junit.Test;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.TimeUnit;
 
 import static com.google.code.tempusfugit.temporal.Duration.seconds;
 import static com.google.code.tempusfugit.temporal.Timeout.timeout;
 import static com.google.code.tempusfugit.temporal.WaitFor.waitOrTimeout;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
 /**
  * An integration test of the Profiler topology.
@@ -105,7 +108,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static FluxTopologyComponent fluxComponent;
   private static KafkaComponent kafkaComponent;
   private static ConfigUploadComponent configUploadComponent;
-  private static List<byte[]> input;
   private static ComponentRunner runner;
   private static MockHTable profilerTable;
 
@@ -114,7 +116,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final double epsilon = 0.001;
   private static final String inputTopic = Constants.INDEXING_TOPIC;
   private static final String outputTopic = "profiles";
-
+  private static final int saltDivisor = 10;
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(20);
 
   /**
    * Tests the first example contained within the README.
@@ -126,7 +129,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, input);
+    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
@@ -151,7 +154,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, input);
+    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
 
     // expect 2 values written by the profile; one for 10.0.0.2 and another for 10.0.0.3
     final int expected = 2;
@@ -184,7 +187,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, input);
+    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
@@ -209,7 +212,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, input);
+    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
@@ -230,10 +233,9 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     uploadConfig(TEST_RESOURCES + "/config/zookeeper/percentiles");
 
-
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, input);
+    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
@@ -247,7 +249,80 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
+   * The Profiler can optionally perform event time processing.  With event time processing,
+   * the Profiler uses timestamps contained in the source telemetry.
+   *
+   * <p>Defining a 'timestampField' within the Profiler configuration tells the Profiler
+   * from which field the timestamp should be extracted.
+   */
+  @Test
+  public void testEventTimeProcessing() throws Exception {
+
+    // constants used for the test
+    final long startAt = 10;
+    final String entity = "10.0.0.1";
+    final String profileName = "event-time-test";
+
+    // create some messages that contain a timestamp - a really old timestamp; close to 1970
+    String message1 = new MessageBuilder()
+            .withField("ip_src_addr", entity)
+            .withField("timestamp", startAt)
+            .build()
+            .toJSONString();
+
+    String message2 = new MessageBuilder()
+            .withField("ip_src_addr", entity)
+            .withField("timestamp", startAt + 100)
+            .build()
+            .toJSONString();
+
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/event-time-test");
+
+    // start the topology and write test messages to kafka
+    fluxComponent.submitTopology();
+    kafkaComponent.writeMessages(inputTopic, message1, message2);
+
+    // verify - ensure the profile is being persisted
+    waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
+            timeout(seconds(90)));
+
+    List<Put> puts = profilerTable.getPutLog();
+    assertEquals(1, puts.size());
+
+    // inspect the row key to ensure the profiler used event time correctly.  the timestamp
+    // embedded in the row key should match those in the source telemetry
+    byte[] expectedRowKey = generateExpectedRowKey(profileName, entity, startAt);
+    byte[] actualRowKey = puts.get(0).getRow();
+    String msg = String.format("expected '%s', got '%s'",
+            new String(expectedRowKey, "UTF-8"),
+            new String(actualRowKey, "UTF-8"));
+    assertArrayEquals(msg, expectedRowKey, actualRowKey);
+  }
+
+  /**
+   * Generates the expected row key.
+   *
+   * @param profileName The name of the profile.
+   * @param entity The entity.
+   * @param whenMillis A timestamp in epoch milliseconds.
+   * @return A row key.
+   */
+  private byte[] generateExpectedRowKey(String profileName, String entity, long whenMillis) {
+
+    // only the profile name, entity, and period are used to generate the row key
+    ProfileMeasurement measurement = new ProfileMeasurement()
+            .withProfileName(profileName)
+            .withEntity(entity)
+            .withPeriod(whenMillis, periodDurationMillis, TimeUnit.MILLISECONDS);
+
+    // build the row key
+    RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder(saltDivisor, periodDurationMillis, TimeUnit.MILLISECONDS);
+    return rowKeyBuilder.rowKey(measurement);
+  }
+
+  /**
    * Reads a value written by the Profiler.
+   *
    * @param family The column family.
    * @param qualifier The column qualifier.
    * @param clazz The expected type of the value.
@@ -258,7 +333,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<T> results = new ArrayList<>();
 
     for(Put put: puts) {
-      for(Cell cell: put.get(Bytes.toBytes(family), qualifier)) {
+      List<Cell> cells = put.get(Bytes.toBytes(family), qualifier);
+      for(Cell cell : cells) {
         T value = SerDeUtils.fromBytes(cell.getValue(), clazz);
         results.add(value);
       }
@@ -270,13 +346,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @BeforeClass
   public static void setupBeforeClass() throws UnableToStartException {
     columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-
-    // create input messages for the profiler to consume
-    input = Stream.of(message1, message2, message3)
-            .map(Bytes::toBytes)
-            .map(m -> Collections.nCopies(5, m))
-            .flatMap(l -> l.stream())
-            .collect(Collectors.toList());
 
     // storm topology properties
     final Properties topologyProperties = new Properties() {{
@@ -294,7 +363,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("kafka.security.protocol", "PLAINTEXT");
 
       // hbase settings
-      setProperty("profiler.hbase.salt.divisor", "10");
+      setProperty("profiler.hbase.salt.divisor", Integer.toString(saltDivisor));
       setProperty("profiler.hbase.table", tableName);
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
@@ -302,8 +371,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("hbase.provider.impl", "" + MockHBaseTableProvider.class.getName());
 
       // profile settings
-      setProperty("profiler.period.duration", "20");
-      setProperty("profiler.period.duration.units", "SECONDS");
+      setProperty("profiler.period.duration", Long.toString(periodDurationMillis));
+      setProperty("profiler.period.duration.units", "MILLISECONDS");
       setProperty("profiler.ttl", "30");
       setProperty("profiler.ttl.units", "MINUTES");
       setProperty("profiler.max.routes.per.bolt", "10000");
@@ -319,7 +388,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     zkComponent = getZKServerComponent(topologyProperties);
 
-    // create the input topic
+    // create the input and output topics
     kafkaComponent = getKafkaComponent(topologyProperties, Arrays.asList(
             new KafkaComponent.Topic(inputTopic, 1),
             new KafkaComponent.Topic(outputTopic, 1)));
@@ -348,18 +417,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     runner.start();
   }
 
-  /**
-   * Uploads config values to Zookeeper.
-   * @param path The path on the local filesystem to the config values.
-   * @throws Exception
-   */
-  public void uploadConfig(String path) throws Exception {
-    configUploadComponent
-            .withGlobalConfiguration(path)
-            .withProfilerConfiguration(path)
-            .update();
-  }
-
   @AfterClass
   public static void tearDownAfterClass() throws Exception {
     MockHBaseTableProvider.clear();
@@ -381,5 +438,17 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     if (runner != null) {
       runner.reset();
     }
+  }
+
+  /**
+   * Uploads config values to Zookeeper.
+   * @param path The path on the local filesystem to the config values.
+   * @throws Exception
+   */
+  public void uploadConfig(String path) throws Exception {
+    configUploadComponent
+            .withGlobalConfiguration(path)
+            .withProfilerConfiguration(path)
+            .update();
   }
 }

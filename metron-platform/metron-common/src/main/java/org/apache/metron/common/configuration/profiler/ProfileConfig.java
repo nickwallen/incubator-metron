@@ -157,7 +157,12 @@ public class ProfileConfig implements Serializable {
   }
 
   public ProfileConfig withInit(Map<String, String> init) {
-    this.init = init;
+    this.init.putAll(init);
+    return this;
+  }
+
+  public ProfileConfig withInit(String var, String expression) {
+    this.init.put(var, expression);
     return this;
   }
 
@@ -170,7 +175,12 @@ public class ProfileConfig implements Serializable {
   }
 
   public ProfileConfig withUpdate(Map<String, String> update) {
-    this.update = update;
+    this.update.putAll(update);
+    return this;
+  }
+
+  public ProfileConfig withUpdate(String var, String expression) {
+    this.update.put(var, expression);
     return this;
   }
 
