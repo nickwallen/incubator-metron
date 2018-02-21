@@ -108,10 +108,10 @@ components:
             -   name: "withProducerConfigs"
                 args: [ref: "kafkaWriterProps"]
 
-    -   id: "kafkaDestinationHandler"
+    -   id: "kafkaEmitter"
         className: "org.apache.metron.profiler.bolt.KafkaEmitter"
 
-    -   id: "hbaseDestinationHandler"
+    -   id: "hbaseEmitter"
         className: "org.apache.metron.profiler.bolt.HBaseEmitter"
 
     -   id: "windowDuration"
@@ -150,9 +150,9 @@ bolts:
             - name: "withProfileTimeToLive"
               args: [${profiler.ttl}, "${profiler.ttl.units}"]
             - name: "withEmitter"
-              args: [ref: "kafkaDestinationHandler"]
+              args: [ref: "kafkaEmitter"]
             - name: "withEmitter"
-              args: [ref: "hbaseDestinationHandler"]
+              args: [ref: "hbaseEmitter"]
             - name: "withTumblingWindow"
               args: [ref: "windowDuration"]
             - name: "withLag"
