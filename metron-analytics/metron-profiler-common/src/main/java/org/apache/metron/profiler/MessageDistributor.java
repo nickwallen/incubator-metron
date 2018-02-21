@@ -24,7 +24,6 @@ import org.apache.metron.stellar.dsl.Context;
 import org.json.simple.JSONObject;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 /**
  * Distributes a telemetry message along a {@link MessageRoute}. A {@link MessageRoute} will lead to a
@@ -42,22 +41,21 @@ import java.util.concurrent.ExecutionException;
 public interface MessageDistributor {
 
   /**
-   * Distribute a message along a MessageRoute.
+   * Distribute a message along a {@link MessageRoute}.
    *
    * @param message The message that needs distributed.
    * @param timestamp The timestamp of the message.
    * @param route The message route.
    * @param context The Stellar execution context.
-   * @throws ExecutionException
    */
   void distribute(JSONObject message, long timestamp, MessageRoute route, Context context);
 
   /**
    * Flushes all profiles.
    *
-   * <p>Flushes all ProfileBuilders that this distributor is responsible for.
+   * <p>Flushes all {@link ProfileBuilder} objects that this distributor is responsible for.
    *
-   * @return The profile measurements; one for each (profile, entity) pair.
+   * @return The {@link ProfileMeasurement} values; one for each (profile, entity) pair.
    */
   List<ProfileMeasurement> flush();
 }

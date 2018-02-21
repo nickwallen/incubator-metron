@@ -101,7 +101,7 @@ public class ProfilerFunctions {
         throw new IllegalArgumentException("Invalid profiler configuration", e);
       }
 
-      // the TTL and max cache size need not be bounded
+      // the TTL and max routes do not matter here
       long profileTimeToLiveMillis = Long.MAX_VALUE;
       long maxNumberOfRoutes = Long.MAX_VALUE;
       return new StandAloneProfiler(profilerConfig, periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes, context);

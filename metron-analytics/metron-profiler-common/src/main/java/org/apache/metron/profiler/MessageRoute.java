@@ -45,6 +45,12 @@ public class MessageRoute {
    */
   private String entity;
 
+  /**
+   * Create a {@link MessageRoute}.
+   *
+   * @param profileDefinition The profile definition.
+   * @param entity The entity.
+   */
   public MessageRoute(ProfileConfig profileDefinition, String entity) {
     this.entity = entity;
     this.profileDefinition = profileDefinition;
