@@ -381,6 +381,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.event.time.lag", "20");
       setProperty("profiler.event.time.lag.units", "SECONDS");
       setProperty("topology.message.timeout.secs", "60");
+      setProperty("topology.max.spout.pending", "100000");
     }};
 
     // create the mock table
