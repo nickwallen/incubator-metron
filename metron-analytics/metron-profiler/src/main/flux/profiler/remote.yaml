@@ -17,11 +17,12 @@
 name: "profiler"
 
 config:
-    topology.worker.childopts: ${topology.worker.childopts}
     topology.workers: ${profiler.workers}
     topology.acker.executors: ${profiler.executors}
+    topology.worker.childopts: ${topology.worker.childopts}
     topology.auto-credentials: ${topology.auto-credentials}
     topology.message.timeout.secs: ${topology.message.timeout.secs}
+    topology.max.spout.pending: ${topology.max.spout.pending}
 
 components:
 

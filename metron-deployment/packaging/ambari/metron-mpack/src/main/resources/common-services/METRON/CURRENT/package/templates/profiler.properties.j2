@@ -22,6 +22,10 @@
 
 topology.worker.childopts={{profiler_topology_worker_childopts}}
 topology.auto-credentials={{topology_auto_credentials}}
+profiler.workers={{profiler_topology_workers}}
+profiler.executors={{profiler_acker_executors}}
+topology.message.timeout.secs={{profiler_topology_message_timeout_secs}}
+topology.max.spout.pending={{profiler_topology_max_spout_pending}}
 
 ##### Profiler #####
 
@@ -29,10 +33,14 @@ profiler.input.topic={{enrichment_output_topic}}
 profiler.output.topic={{enrichment_input_topic}}
 profiler.period.duration={{profiler_period_duration}}
 profiler.period.duration.units={{profiler_period_units}}
-profiler.workers={{profiler_topology_workers}}
-profiler.executors={{profiler_acker_executors}}
 profiler.ttl={{profiler_ttl}}
 profiler.ttl.units={{profiler_ttl_units}}
+profiler.event.time.lag={{profiler_event_time_lag}}
+profiler.event.time.lag.units={{profiler_event_time_lag_units}}
+profiler.max.routes.per.bolt={{profiler_max_routes_per_bolt}}
+
+##### HBase #####
+
 profiler.hbase.salt.divisor=1000
 profiler.hbase.table={{profiler_hbase_table}}
 profiler.hbase.column.family={{profiler_hbase_cf}}
