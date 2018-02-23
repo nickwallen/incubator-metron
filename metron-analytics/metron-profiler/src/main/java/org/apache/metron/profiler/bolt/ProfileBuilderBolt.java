@@ -56,7 +56,6 @@ import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
@@ -104,6 +103,22 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   private long periodDurationMillis;
 
   /**
+   * The duration of Storm's window.
+   *
+   * <p>The Profile duration must be a multiple of Storm's window duration.
+   */
+  private long windowDurationMillis;
+
+  /**
+   * Counts down until the next flush event.
+   *
+   * <p>There will be at least 1 (most often many) Storm windows for each profile period.
+   * When a window of tuples is received from Storm, this counter is decremented.  Once
+   * the counter reaches zero, it is time to flush the profiles.
+   */
+  private long flushCountdown;
+
+  /**
    * If a message has not been applied to a Profile in this number of milliseconds,
    * the Profile will be forgotten and its resources will be cleaned up.
    *
@@ -143,16 +158,26 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   public void prepare(Map stormConf, TopologyContext context, OutputCollector collector) {
     super.prepare(stormConf, context, collector);
 
-    if(profileTimeToLiveMillis < periodDurationMillis) {
-      String msg = format("invalid configuration: expect profile TTL (%d) >= period duration (%d)",
-              profileTimeToLiveMillis,
-              periodDurationMillis);
-      throw new IllegalStateException(msg);
+    if(periodDurationMillis <= 0) {
+      throw new IllegalArgumentException("expect 'profiler.period.duration' >= 0");
     }
-
+    if(profileTimeToLiveMillis <= 0) {
+      throw new IllegalArgumentException("expect 'profiler.ttl' >= 0");
+    }
+    if(profileTimeToLiveMillis < periodDurationMillis) {
+      throw new IllegalArgumentException("expect 'profiler.ttl' >= 'profiler.period.duration'");
+    }
     if(maxNumberOfRoutes <= 0) {
-      String msg = format("invalid configuration: expect maxNumberOfRoutes > 0, got %d", maxNumberOfRoutes);
-      throw new IllegalArgumentException(msg);
+      throw new IllegalArgumentException("expect 'profiler.max.routes.per.bolt' > 0");
+    }
+    if(windowDurationMillis <= 0) {
+      throw new IllegalArgumentException("expect 'profiler.window.duration' > 0");
+    }
+    if(windowDurationMillis > periodDurationMillis) {
+      throw new IllegalArgumentException("expect 'profiler.period.duration' >= 'profiler.window.duration'");
+    }
+    if(periodDurationMillis % windowDurationMillis != 0) {
+      throw new IllegalArgumentException("expect 'profiler.period.duration' % 'profiler.window.duration' == 0");
     }
 
     this.collector = collector;
@@ -160,6 +185,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.configurations = new ProfilerConfigurations();
     setupZookeeper();
+    reset();
   }
 
   @Override
@@ -210,10 +236,12 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
   @Override
   public void reloadCallback(String name, ConfigurationType type) {
+    // nothing to do
   }
 
   @Override
   public void declareOutputFields(OutputFieldsDeclarer declarer) {
+
     if(emitters.size() == 0) {
       throw new IllegalStateException("At least one destination handler must be defined.");
     }
@@ -223,6 +251,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   private Context getStellarContext() {
+
     Map<String, Object> global = getConfigurations().getGlobalConfig();
     return new Context.Builder()
             .with(Context.Capabilities.ZOOKEEPER_CLIENT, () -> zookeeperClient)
@@ -248,12 +277,28 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     }
   }
 
-  private void doExecute(TupleWindow window) throws ExecutionException {
+  private void doExecute(TupleWindow window) {
 
     // handle each tuple in the window
     for(Tuple tuple : window.get()) {
       handleTuple(tuple);
     }
+
+    // is it time to flush?
+    if(flushCountdown == 0) {
+      flush();
+      reset();
+
+    } else {
+      // not time to flush yet
+      flushCountdown--;
+    }
+  }
+
+  /**
+   * Flush the profiles.
+   */
+  private void flush() {
 
     // flush each profile
     List<ProfileMeasurement> measurements = messageDistributor.flush();
@@ -267,11 +312,22 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   /**
+   * Resets the flush count-down counter.
+   *
+   * <p>There must be at least 1 (most often many) Storm windows for each profile period.
+   * When a window of tuples is received from Storm, this counter is decremented.  Once
+   * the counter reaches zero, it is time to flush the profiles.
+   */
+  private void reset() {
+    flushCountdown = (periodDurationMillis / windowDurationMillis) - 1;
+  }
+
+  /**
    * Handles the processing of a single tuple.
    *
    * @param input The tuple containing a telemetry message.
    */
-  private void handleTuple(Tuple input) throws ExecutionException {
+  private void handleTuple(Tuple input) {
 
     // crack open the tuple
     JSONObject message = getField(MESSAGE_TUPLE_FIELD, input, JSONObject.class);
@@ -293,12 +349,21 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * @param <T> The type of the field value.
    */
   private <T> T getField(String fieldName, Tuple tuple, Class<T> clazz) {
+
     T value = ConversionUtils.convert(tuple.getValueByField(fieldName), clazz);
     if(value == null) {
       throw new IllegalStateException(format("Invalid tuple: missing or invalid field '%s'", fieldName));
     }
 
     return value;
+  }
+
+  @Override
+  public BaseWindowedBolt withTumblingWindow(BaseWindowedBolt.Duration duration) {
+
+    // need to capture the window duration for setting the flush count down
+    this.windowDurationMillis = duration.value;
+    return super.withTumblingWindow(duration);
   }
 
   public long getPeriodDurationMillis() {
@@ -317,6 +382,10 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   public ProfileBuilderBolt withProfileTimeToLiveMillis(long timeToLiveMillis) {
     this.profileTimeToLiveMillis = timeToLiveMillis;
     return this;
+  }
+
+  public long getWindowDurationMillis() {
+    return windowDurationMillis;
   }
 
   public ProfileBuilderBolt withProfileTimeToLive(int duration, TimeUnit units) {

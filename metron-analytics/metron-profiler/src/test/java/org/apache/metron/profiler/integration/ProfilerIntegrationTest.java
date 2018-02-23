@@ -357,6 +357,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.executors", "0");
       setProperty("storm.auto.credentials", "[]");
       setProperty("topology.auto-credentials", "[]");
+      setProperty("topology.message.timeout.secs", "60");
+      setProperty("topology.max.spout.pending", "100000");
 
       // kafka settings
       setProperty("kafka.start", "UNCOMMITTED_EARLIEST");
@@ -375,13 +377,11 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.period.duration.units", "MILLISECONDS");
       setProperty("profiler.ttl", "30");
       setProperty("profiler.ttl.units", "MINUTES");
-      setProperty("profiler.max.routes.per.bolt", "10000");
-
-      // profile event time processing
+      setProperty("profiler.window.duration", "30");
+      setProperty("profiler.window.duration.units", "SECONDS");
       setProperty("profiler.event.time.lag", "20");
       setProperty("profiler.event.time.lag.units", "SECONDS");
-      setProperty("topology.message.timeout.secs", "60");
-      setProperty("topology.max.spout.pending", "100000");
+      setProperty("profiler.max.routes.per.bolt", "10000");
     }};
 
     // create the mock table

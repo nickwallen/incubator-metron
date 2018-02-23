@@ -118,8 +118,8 @@ components:
     -   id: "windowDuration"
         className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
         constructorArgs:
-            - ${profiler.period.duration}
-            - "${profiler.period.duration.units}"
+            - ${profiler.window.duration}
+            - "${profiler.window.duration.units}"
 
     -   id: "eventTimeLag"
         className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
