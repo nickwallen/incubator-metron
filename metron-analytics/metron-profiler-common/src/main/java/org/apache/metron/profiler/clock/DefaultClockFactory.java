@@ -22,7 +22,10 @@ package org.apache.metron.profiler.clock;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 
 /**
- * Creates the {@link Clock} that is needed based on the profiler configuration.
+ * Creates a {@link Clock} based on the profiler configuration.
+ *
+ * <p>If the Profiler is configured to use event time, a {@link EventTimeClock} will
+ * be created.  Otherwise, a {@link WallClock} will be created.
  *
  * <p>The default implementation of a {@link ClockFactory}.
  */
