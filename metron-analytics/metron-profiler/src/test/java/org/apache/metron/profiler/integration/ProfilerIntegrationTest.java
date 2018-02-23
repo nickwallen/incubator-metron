@@ -117,7 +117,12 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final String inputTopic = Constants.INDEXING_TOPIC;
   private static final String outputTopic = "profiles";
   private static final int saltDivisor = 10;
-  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(20);
+
+  private static final long eventTimeLagMillis = TimeUnit.SECONDS.toMillis(5);
+  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(15);
+  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(60);
+  private static final long maxRoutesPerBolt = 100000;
 
   /**
    * Tests the first example contained within the README.
@@ -129,18 +134,21 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
+    kafkaComponent.writeMessages(inputTopic, message1, message1, message1);
+    kafkaComponent.writeMessages(inputTopic, message2, message2, message2);
+    kafkaComponent.writeMessages(inputTopic, message3, message3, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
-            timeout(seconds(90)));
+            timeout(seconds(180)));
 
     // verify - only 10.0.0.2 sends 'HTTP', thus there should be only 1 value
-    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
+    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily,
+            columnBuilder.getColumnQualifier("value"), Double.class);
 
-    // verify - there are 5 'HTTP' each with 390 bytes
+    // verify - there are 3 'HTTP' each with 390 bytes
     Assert.assertTrue(actuals.stream().anyMatch(val ->
-            MathUtils.equals(390.0 * 5, val, epsilon)
+            MathUtils.equals(390.0 * 3, val, epsilon)
     ));
   }
 
@@ -154,7 +162,9 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
+    kafkaComponent.writeMessages(inputTopic, message1, message1, message1);
+    kafkaComponent.writeMessages(inputTopic, message2, message2, message2);
+    kafkaComponent.writeMessages(inputTopic, message3, message3, message3);
 
     // expect 2 values written by the profile; one for 10.0.0.2 and another for 10.0.0.3
     final int expected = 2;
@@ -164,16 +174,17 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
             timeout(seconds(90)));
 
     // verify - expect 2 results as 2 hosts involved; 10.0.0.2 sends 'HTTP' and 10.0.0.3 send 'DNS'
-    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
+    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily,
+            columnBuilder.getColumnQualifier("value"), Double.class);
 
-    // verify - 10.0.0.3 -> 1/6
-    Assert.assertTrue( "Could not find a value near 1/6. Actual values read are are: " + Joiner.on(",").join(actuals),
-            actuals.stream().anyMatch(val -> MathUtils.equals(val, 1.0/6.0, epsilon)
+    // verify - 10.0.0.3 -> 1/4
+    Assert.assertTrue( "Could not find a value near 1/4. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 1.0/4.0, epsilon)
     ));
 
-    // verify - 10.0.0.2 -> 6/1
-    Assert.assertTrue("Could not find a value near 6. Actual values read are are: " + Joiner.on(",").join(actuals),
-            actuals.stream().anyMatch(val -> MathUtils.equals(val, 6.0/1.0, epsilon)
+    // verify - 10.0.0.2 -> 4/1
+    Assert.assertTrue("Could not find a value near 4. Actual values read are are: " + Joiner.on(",").join(actuals),
+            actuals.stream().anyMatch(val -> MathUtils.equals(val, 4.0/1.0, epsilon)
     ));
   }
 
@@ -187,14 +198,17 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
+    kafkaComponent.writeMessages(inputTopic, message1, message1, message1);
+    kafkaComponent.writeMessages(inputTopic, message2, message2, message2);
+    kafkaComponent.writeMessages(inputTopic, message3, message3, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
             timeout(seconds(90)));
 
     // verify - only 10.0.0.2 sends 'HTTP', thus there should be only 1 value
-    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
+    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily,
+            columnBuilder.getColumnQualifier("value"), Double.class);
 
     // verify - there are 5 'HTTP' messages each with a length of 20, thus the average should be 20
     Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals),
@@ -212,7 +226,9 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
+    kafkaComponent.writeMessages(inputTopic, message1, message1, message1);
+    kafkaComponent.writeMessages(inputTopic, message2, message2, message2);
+    kafkaComponent.writeMessages(inputTopic, message3, message3, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
@@ -235,15 +251,18 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1, message2, message3);
+    kafkaComponent.writeMessages(inputTopic, message1, message1, message1);
+    kafkaComponent.writeMessages(inputTopic, message2, message2, message2);
+    kafkaComponent.writeMessages(inputTopic, message3, message3, message3);
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
             timeout(seconds(90)));
 
-    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily, columnBuilder.getColumnQualifier("value"), Double.class);
+    List<Double> actuals = read(profilerTable.getPutLog(), columnFamily,
+            columnBuilder.getColumnQualifier("value"), Double.class);
 
-    // verify - the 70th percentile of 5 x 20s = 20.0
+    // verify - the 70th percentile of x3, 20s = 20.0
     Assert.assertTrue("Could not find a value near 20. Actual values read are are: " + Joiner.on(",").join(actuals),
             actuals.stream().anyMatch(val -> MathUtils.equals(val, 20.0, epsilon)));
   }
@@ -351,8 +370,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     final Properties topologyProperties = new Properties() {{
 
       // storm settings
-      setProperty("profiler.input.topic", inputTopic);
-      setProperty("profiler.output.topic", outputTopic);
       setProperty("profiler.workers", "1");
       setProperty("profiler.executors", "0");
       setProperty("storm.auto.credentials", "[]");
@@ -361,6 +378,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("topology.max.spout.pending", "100000");
 
       // kafka settings
+      setProperty("profiler.input.topic", inputTopic);
+      setProperty("profiler.output.topic", outputTopic);
       setProperty("kafka.start", "UNCOMMITTED_EARLIEST");
       setProperty("kafka.security.protocol", "PLAINTEXT");
 
@@ -375,13 +394,13 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       // profile settings
       setProperty("profiler.period.duration", Long.toString(periodDurationMillis));
       setProperty("profiler.period.duration.units", "MILLISECONDS");
-      setProperty("profiler.ttl", "30");
-      setProperty("profiler.ttl.units", "MINUTES");
-      setProperty("profiler.window.duration", "30");
-      setProperty("profiler.window.duration.units", "SECONDS");
-      setProperty("profiler.event.time.lag", "20");
-      setProperty("profiler.event.time.lag.units", "SECONDS");
-      setProperty("profiler.max.routes.per.bolt", "10000");
+      setProperty("profiler.ttl", Long.toString(profileTimeToLiveMillis));
+      setProperty("profiler.ttl.units", "MILLISECONDS");
+      setProperty("profiler.window.duration", Long.toString(windowDurationMillis));
+      setProperty("profiler.window.duration.units", "MILLISECONDS");
+      setProperty("profiler.event.time.lag", Long.toString(eventTimeLagMillis));
+      setProperty("profiler.event.time.lag.units", "MILLISECONDS");
+      setProperty("profiler.max.routes.per.bolt", Long.toString(maxRoutesPerBolt));
     }};
 
     // create the mock table
