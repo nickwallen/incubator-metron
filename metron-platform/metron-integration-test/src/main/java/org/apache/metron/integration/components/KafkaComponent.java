@@ -343,8 +343,6 @@ public class KafkaComponent implements InMemoryComponent {
     // convert each message to raw bytes
     List<byte[]> messagesAsBytes = Stream.of(messages)
             .map(Bytes::toBytes)
-            .map(m -> Collections.nCopies(5, m))
-            .flatMap(l -> l.stream())
             .collect(Collectors.toList());
 
     writeMessages(topic, messagesAsBytes);
