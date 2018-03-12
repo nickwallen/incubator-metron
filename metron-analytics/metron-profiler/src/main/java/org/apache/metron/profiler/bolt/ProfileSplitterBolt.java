@@ -21,6 +21,7 @@
 package org.apache.metron.profiler.bolt;
 
 import org.apache.metron.common.bolt.ConfiguredProfilerBolt;
+import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.profiler.DefaultMessageRouter;
 import org.apache.metron.profiler.MessageRoute;
@@ -29,14 +30,12 @@ import org.apache.metron.profiler.clock.Clock;
 import org.apache.metron.profiler.clock.ClockFactory;
 import org.apache.metron.profiler.clock.DefaultClockFactory;
 import org.apache.metron.stellar.dsl.Context;
-import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
-import org.apache.storm.utils.TupleUtils;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -48,7 +47,6 @@ import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
 /**
  * The Storm bolt responsible for filtering incoming messages and directing
@@ -87,7 +85,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    */
   protected static final String TIMESTAMP_TUPLE_FIELD = "timestamp";
 
-  private transient OutputCollector collector;
+  private OutputCollector collector;
 
   /**
    * JSON parser.
@@ -103,14 +101,6 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    * Responsible for creating the {@link Clock}.
    */
   private transient ClockFactory clockFactory;
-
-  /**
-   * The frequency at which ticks are received.
-   *
-   * <p>When operating under processing time, the bolt needs a regular 'tick' to ensure that
-   * profiles flush, even when they cease to receive telemetry messages.
-   */
-  private long tickFrequencyMillis = TimeUnit.SECONDS.toMillis(60);
 
   /**
    * @param zookeeperUrl The Zookeeper URL that contains the configuration for this bolt.
@@ -129,30 +119,12 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
   }
 
   private Context getStellarContext() {
-
     Map<String, Object> global = getConfigurations().getGlobalConfig();
     return new Context.Builder()
             .with(Context.Capabilities.ZOOKEEPER_CLIENT, () -> client)
             .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
             .with(Context.Capabilities.STELLAR_CONFIG, () -> global)
             .build();
-  }
-
-  /**
-   * Defines the frequency at which the bolt will receive tick tuples.
-   *
-   * <p>When operating under processing time, the bolt needs a regular 'tick' to ensure that
-   * profiles flush, even when they cease to receive telemetry messages.
-   */
-  @Override
-  public Map<String, Object> getComponentConfiguration() {
-    super.getComponentConfiguration();
-
-    // define how frequently we should receive tick tuples
-    Config conf = new Config();
-    conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, TimeUnit.MILLISECONDS.toSeconds(tickFrequencyMillis));
-
-    return conf;
   }
 
   /**
@@ -166,43 +138,29 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
    * <p>The timestamp that is attached to each outgoing tuple is what decides if
    * the Profiler is operating on processing time or event time.
    *
-   * @param tuple The tuple.
+   * @param input The tuple.
    */
   @Override
-  public void execute(Tuple tuple) {
-
+  public void execute(Tuple input) {
     try {
-
-      if(TupleUtils.isTick(tuple)) {
-        handleTick(tuple);
-
-      } else {
-        handleMessage(tuple);
-      }
+      doExecute(input);
 
     } catch (IllegalArgumentException | ParseException | UnsupportedEncodingException e) {
       LOG.error("Unexpected error", e);
       collector.reportError(e);
 
     } finally {
-      collector.ack(tuple);
+      collector.ack(input);
     }
   }
 
-  /**
-   * Handles processing of a message.
-   *
-   * @param input The tuple containing a telemetry message.
-   * @throws ParseException If the message contains invalid JSON.
-   * @throws UnsupportedEncodingException If the message is not UTF-8 encoded.
-   */
-  private void handleMessage(Tuple input) throws ParseException, UnsupportedEncodingException {
+  private void doExecute(Tuple input) throws ParseException, UnsupportedEncodingException {
 
     // retrieve the input message
     byte[] data = input.getBinary(0);
     JSONObject message = (JSONObject) parser.parse(new String(data, "UTF8"));
 
-    // is there a valid profiler configuration
+    // ensure there is a valid profiler configuration
     ProfilerConfig config = getProfilerConfig();
     if(config != null && config.getProfiles().size() > 0) {
 
@@ -211,7 +169,6 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
       Optional<Long> timestamp = clock.currentTimeMillis(message);
 
       // route the message.  if a message does not contain the timestamp field, it cannot be routed.
-      // when configured to run with event time, a tick tuple will not result in a timestamp and so will not be sent downstream
       timestamp.ifPresent(ts -> routeMessage(input, message, config, ts));
 
     } else {
@@ -220,48 +177,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
   }
 
   /**
-   * Handles processing of a tick tuple.
-   *
-   * A tick tuple is sent do all downstream bolts when the profiler is operating
-   * in 'processing time'.  This ensures that profiles will flush on time, even if
-   * they do not receive any additional messages.
-   *
-   * @param tick The tick tuple.
-   */
-  private void handleTick(Tuple tick) {
-
-    // a tick tuple is only needed when operating under processing time
-    ProfilerConfig config = getProfilerConfig();
-    if(config != null && config.getProfiles().size() > 0 && !config.isUsingEventTime()) {
-
-      // empty JSON message
-      JSONObject message = null;
-
-      // what time is it?
-      Clock clock = clockFactory.createClock(config);
-      Optional<Long> timestamp = clock.currentTimeMillis(message);
-
-      System.out.println("Sending a tick @ " + timestamp.get());
-
-      // route the message.  if a message does not contain the timestamp field, it cannot be routed.
-      // when configured to run with event time, a tick tuple will not result in a timestamp and so will not be sent downstream
-      timestamp.ifPresent(ts -> routeMessage(tick, message, config, ts));
-    }
-  }
-
-  private void routeTick(Tuple input, Long timestamp) {
-
-    // TODO a tick needs to be routed to all profiles!
-
-    // TODO how to get a tick to each bolt?  need separate "all" stream??  but thats defeats the purpose
-
-    router.route
-
-  }
-
-  /**
    * Route a message based on the Profiler configuration.
-   *
    * @param input The input tuple on which to anchor.
    * @param message The telemetry message.
    * @param config The Profiler configuration.
@@ -317,15 +233,5 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
 
   public void setClockFactory(ClockFactory clockFactory) {
     this.clockFactory = clockFactory;
-  }
-
-  public ProfileSplitterBolt withClockFactory(ClockFactory clockFactory) {
-    this.clockFactory = clockFactory;
-    return this;
-  }
-
-  public ProfileSplitterBolt withTickFrequencyMillis(long tickFrequency, TimeUnit units) {
-    this.tickFrequencyMillis = units.toMillis(tickFrequency);
-    return this;
   }
 }

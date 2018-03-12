@@ -76,13 +76,6 @@ public class ProfilerConfig implements Serializable {
     return this;
   }
 
-  /**
-   * @return True if the profiler is operating under event time.  False, if processing time.
-   */
-  public boolean isUsingEventTime() {
-    return getTimestampField().isPresent();
-  }
-
   @Override
   public String toString() {
     return "ProfilerConfig{" +
