@@ -119,9 +119,10 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final int saltDivisor = 10;
 
   private static final long eventTimeLagMillis = TimeUnit.SECONDS.toMillis(5);
-  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
-  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(15);
+  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(30);
   private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(60);
+  private static final long profileTickFrequencyMillis = TimeUnit.SECONDS.toMillis(10);
   private static final long maxRoutesPerBolt = 100000;
 
   /**
@@ -140,7 +141,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // verify - ensure the profile is being persisted
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0,
-            timeout(seconds(180)));
+            timeout(seconds(120)));
 
     // verify - only 10.0.0.2 sends 'HTTP', thus there should be only 1 value
     List<Double> actuals = read(profilerTable.getPutLog(), columnFamily,
@@ -401,6 +402,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.event.time.lag", Long.toString(eventTimeLagMillis));
       setProperty("profiler.event.time.lag.units", "MILLISECONDS");
       setProperty("profiler.max.routes.per.bolt", Long.toString(maxRoutesPerBolt));
+      setProperty("profiler.tick.frequency", Long.toString(profileTickFrequencyMillis));
+      setProperty("profiler.tick.frequency.units", "MILLISECONDS");
     }};
 
     // create the mock table

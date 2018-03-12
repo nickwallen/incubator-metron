@@ -23,6 +23,7 @@ config:
     topology.auto-credentials: ${topology.auto-credentials}
     topology.message.timeout.secs: ${topology.message.timeout.secs}
     topology.max.spout.pending: ${topology.max.spout.pending}
+    topology.debug: true
 
 components:
 
@@ -140,6 +141,9 @@ bolts:
         className: "org.apache.metron.profiler.bolt.ProfileSplitterBolt"
         constructorArgs:
             - "${kafka.zk}"
+        configMethods:
+            - name: "withTickFrequencyMillis"
+              args: [${profiler.tick.frequency}, "${profiler.tick.frequency.units}"]
 
     -   id: "builderBolt"
         className: "org.apache.metron.profiler.bolt.ProfileBuilderBolt"

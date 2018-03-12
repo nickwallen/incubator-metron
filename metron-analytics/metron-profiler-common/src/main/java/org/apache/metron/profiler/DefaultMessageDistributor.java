@@ -28,6 +28,7 @@ import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,7 @@ import static java.lang.String.format;
 /**
  * The default implementation of a {@link MessageDistributor}.
  */
-public class DefaultMessageDistributor implements MessageDistributor {
+public class DefaultMessageDistributor implements MessageDistributor, Serializable {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
