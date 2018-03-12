@@ -35,17 +35,20 @@ import org.apache.metron.common.zookeeper.configurations.ConfigurationsUpdater;
 import org.apache.metron.common.zookeeper.configurations.ProfilerUpdater;
 import org.apache.metron.common.zookeeper.configurations.Reloadable;
 import org.apache.metron.profiler.DefaultMessageDistributor;
+import org.apache.metron.profiler.MessageDistributor;
 import org.apache.metron.profiler.MessageRoute;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.zookeeper.SimpleEventListener;
 import org.apache.metron.zookeeper.ZKCache;
+import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.tuple.Tuple;
+import org.apache.storm.utils.TupleUtils;
 import org.apache.storm.windowing.TupleWindow;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -110,13 +113,14 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   private long windowDurationMillis;
 
   /**
-   * Counts down until the next flush event.
-   *
-   * <p>There will be at least 1 (most often many) Storm windows for each profile period.
-   * When a window of tuples is received from Storm, this counter is decremented.  Once
-   * the counter reaches zero, it is time to flush the profiles.
+   * The next time when the profiles should be flushed.
    */
-  private long flushCountdown;
+  private long flushTimestamp;
+
+  /**
+   * The latest known timestamp.
+   */
+  private long currentTimestamp;
 
   /**
    * If a message has not been applied to a Profile in this number of milliseconds,
@@ -185,7 +189,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.configurations = new ProfilerConfigurations();
     setupZookeeper();
-    reset();
+    resetTime();
   }
 
   @Override
@@ -202,9 +206,8 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
       }
       zookeeperClient.start();
 
-      //this is temporary to ensure that any validation passes.
-      //The individual bolt will reinitialize stellar to dynamically pull from
-      //zookeeper.
+      // this is temporary to ensure that any validation passes. the individual bolt
+      // will reinitialize stellar to dynamically pull from zookeeper.
       ConfigurationsUtils.setupStellarStatically(zookeeperClient);
       if (zookeeperCache == null) {
         ConfigurationsUpdater<ProfilerConfigurations> updater = createUpdater();
@@ -250,6 +253,18 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     emitters.forEach(emitter -> emitter.declareOutputFields(declarer));
   }
 
+  /**
+   * Defines the frequency at which the bolt will receive tick tuples.  Tick tuples are
+   * used to control how often a profile is flushed.
+   */
+  @Override
+  public Map<String, Object> getComponentConfiguration() {
+
+    Map<String, Object> conf = super.getComponentConfiguration();
+    conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, TimeUnit.MILLISECONDS.toSeconds(10000));
+    return conf;
+  }
+
   private Context getStellarContext() {
 
     Map<String, Object> global = getConfigurations().getGlobalConfig();
@@ -269,7 +284,26 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
             CollectionUtils.size(window.getNew()));
 
     try {
-      doExecute(window);
+
+      // handle each tuple in the window
+      for(Tuple tuple : window.get()) {
+
+        if(TupleUtils.isTick(tuple)) {
+          System.out.println("Got tick tuple!");
+          messageDistributor.cleanUp();
+
+          // TODO flushExpired() or some such thing??
+
+
+        } else {
+          handleTuple(tuple);
+        }
+      }
+
+      if(isTimeToFlush()) {
+        flush();
+        resetTime();
+      }
 
     } catch (Throwable e) {
       LOG.error("Unexpected error", e);
@@ -277,22 +311,25 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     }
   }
 
-  private void doExecute(TupleWindow window) {
+  /**
+   * Handles the processing of a single tuple.
+   *
+   * @param input The tuple containing a telemetry message.
+   */
+  private void handleTuple(Tuple input) {
 
-    // handle each tuple in the window
-    for(Tuple tuple : window.get()) {
-      handleTuple(tuple);
-    }
+    // crack open the tuple
+    JSONObject message = getField(MESSAGE_TUPLE_FIELD, input, JSONObject.class);
+    ProfileConfig definition = getField(PROFILE_TUPLE_FIELD, input, ProfileConfig.class);
+    String entity = getField(ENTITY_TUPLE_FIELD, input, String.class);
+    Long timestamp = getField(TIMESTAMP_TUPLE_FIELD, input, Long.class);
 
-    // is it time to flush?
-    if(flushCountdown == 0) {
-      flush();
-      reset();
+    // keep track of time
+    updateTime(timestamp);
 
-    } else {
-      // not time to flush yet
-      flushCountdown--;
-    }
+    // distribute the message
+    MessageRoute route = new MessageRoute(definition, entity);
+    messageDistributor.distribute(message, timestamp, route, getStellarContext());
   }
 
   /**
@@ -312,32 +349,36 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   /**
-   * Resets the flush count-down counter.
-   *
-   * <p>There must be at least 1 (most often many) Storm windows for each profile period.
-   * When a window of tuples is received from Storm, this counter is decremented.  Once
-   * the counter reaches zero, it is time to flush the profiles.
+   * Resets the state used to keep track of time.
    */
-  private void reset() {
-    flushCountdown = (periodDurationMillis / windowDurationMillis) - 1;
+  private void resetTime() {
+    flushTimestamp = 0;
+    currentTimestamp = 0;
   }
 
   /**
-   * Handles the processing of a single tuple.
+   * Update the internal state which tracks time.
    *
-   * @param input The tuple containing a telemetry message.
+   * @param timestamp The timestamp received within a tuple.
    */
-  private void handleTuple(Tuple input) {
+  private void updateTime(long timestamp) {
 
-    // crack open the tuple
-    JSONObject message = getField(MESSAGE_TUPLE_FIELD, input, JSONObject.class);
-    ProfileConfig definition = getField(PROFILE_TUPLE_FIELD, input, ProfileConfig.class);
-    String entity = getField(ENTITY_TUPLE_FIELD, input, String.class);
-    Long timestamp = getField(TIMESTAMP_TUPLE_FIELD, input, Long.class);
+    if(timestamp > currentTimestamp) {
+      currentTimestamp = timestamp;
+    }
 
-    // distribute the message
-    MessageRoute route = new MessageRoute(definition, entity);
-    messageDistributor.distribute(message, timestamp, route, getStellarContext());
+    if(flushTimestamp == 0) {
+      flushTimestamp = currentTimestamp + periodDurationMillis;
+    }
+  }
+
+  /**
+   * Returns true, if it is time to flush the profiles.
+   *
+   * @return True if time to flush profiles.  Otherwise, false.
+   */
+  private boolean isTimeToFlush() {
+    return currentTimestamp >= flushTimestamp;
   }
 
   /**
@@ -397,7 +438,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     return this;
   }
 
-  public DefaultMessageDistributor getMessageDistributor() {
+  public MessageDistributor getMessageDistributor() {
     return messageDistributor;
   }
 

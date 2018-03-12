@@ -121,7 +121,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final long eventTimeLagMillis = TimeUnit.SECONDS.toMillis(5);
   private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
   private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(15);
-  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(60);
+  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(20);
   private static final long maxRoutesPerBolt = 100000;
 
   /**

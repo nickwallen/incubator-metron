@@ -22,6 +22,8 @@ package org.apache.metron.profiler;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.stellar.dsl.Context;
 import org.json.simple.JSONObject;
@@ -75,7 +77,27 @@ public class DefaultMessageDistributor implements MessageDistributor {
             .newBuilder()
             .maximumSize(maxNumberOfRoutes)
             .expireAfterAccess(profileTimeToLiveMillis, TimeUnit.MILLISECONDS)
+            .removalListener(new ProfileRemovalListener())
             .build();
+  }
+
+  /**
+   * A listener that is notified when profiles expire from the cache.
+   *
+   * <p>When a profile expires, it needs to be flushed to ensure that any remaining state
+   * is persisted and not lost.
+   */
+  private class ProfileRemovalListener implements RemovalListener<String, ProfileBuilder> {
+    @Override
+    public void onRemoval(RemovalNotification<String, ProfileBuilder> notification) {
+
+      System.out.println("Profile expired: profile=" + notification.getKey());
+
+
+      // TODO the caller (the bolt) has to trigger the flush and decide what to do with the
+      LOG.debug("Profile expired: profile={}", notification.getKey());
+      notification.getValue().flush();
+    }
   }
 
   /**
@@ -121,6 +143,10 @@ public class DefaultMessageDistributor implements MessageDistributor {
 
     profileCache.cleanUp();
     return measurements;
+  }
+
+  public void cleanUp() {
+    profileCache.cleanUp();
   }
 
   /**

@@ -172,7 +172,7 @@ public class ProfileSplitterBolt extends ConfiguredProfilerBolt {
       timestamp.ifPresent(ts -> routeMessage(input, message, config, ts));
 
     } else {
-      LOG.warn("No Profiler configuration found.  Nothing to do.");
+      LOG.debug("No Profiler configuration found.  Nothing to do.");
     }
   }
 
