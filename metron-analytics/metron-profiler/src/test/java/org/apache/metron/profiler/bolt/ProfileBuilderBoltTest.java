@@ -20,13 +20,11 @@
 
 package org.apache.metron.profiler.bolt;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfigurations;
 import org.apache.metron.profiler.MessageDistributor;
 import org.apache.metron.profiler.MessageRoute;
 import org.apache.metron.profiler.ProfileMeasurement;
-import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.integration.MessageBuilder;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.storm.task.OutputCollector;
@@ -68,7 +66,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   private ProfileConfig profile1;
   private ProfileConfig profile2;
   private ProfileMeasurementEmitter emitter;
-  private FixedFlushSignal flushSignal;
+  private ManualFlushSignal flushSignal;
 
   @Before
   public void setup() throws Exception {
@@ -97,7 +95,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
             .withUpdate(Collections.singletonMap("x", "x + 1"))
             .withResult("x");
 
-    flushSignal = new FixedFlushSignal();
+    flushSignal = new ManualFlushSignal();
     flushSignal.setFlushNow(false);
   }
 

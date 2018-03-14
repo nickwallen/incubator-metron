@@ -19,11 +19,11 @@
 package org.apache.metron.profiler.bolt;
 
 /**
- * Signals a flush when set to do so; like a switch.
+ * Signals that a flush should occur.
  *
- * <p>The flush signal can be turned on or off as needed.  Most useful for testing.
+ * <p>The flush signal can be turned on or off like a switch as needed.  Most useful for testing.
  */
-public class FixedFlushSignal implements FlushSignal {
+public class ManualFlushSignal implements FlushSignal {
 
   private boolean flushNow = false;
 
