@@ -516,7 +516,11 @@ The units used to specify the `profiler.period.duration`.  This value should be 
 
 *Default*: 30
 
-The duration of each profile window.  Telemetry that arrives within a slice of time are processed within a window.  This value should be defined along with [`profiler.window.duration.units`](#profilerwindowdurationunits).
+The duration of each profile window.  Telemetry that arrives within a slice of time is processed within a single window.  
+
+Many windows of telemetry will be processed during a single profile period.  This does not change the output of the Profiler, it only changes how the Profiler processes data. The window defines how much data the Profiler processes in a single pass.
+
+This value should be defined along with [`profiler.window.duration.units`](#profilerwindowdurationunits).
 
 This value must be less than the period duration as defined by [`profiler.period.duration`](#profilerperiodduration) and [`profiler.period.duration.units`](#profilerperioddurationunits).
 
