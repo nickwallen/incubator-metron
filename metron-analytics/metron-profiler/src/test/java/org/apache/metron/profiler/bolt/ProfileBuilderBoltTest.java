@@ -23,6 +23,8 @@ package org.apache.metron.profiler.bolt;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfigurations;
+import org.apache.metron.profiler.MessageDistributor;
+import org.apache.metron.profiler.MessageRoute;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.integration.MessageBuilder;
@@ -66,6 +68,7 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
   private ProfileConfig profile1;
   private ProfileConfig profile2;
   private ProfileMeasurementEmitter emitter;
+  private FixedFlushSignal flushSignal;
 
   @Before
   public void setup() throws Exception {
@@ -93,177 +96,102 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
             .withInit(Collections.singletonMap("x", "0"))
             .withUpdate(Collections.singletonMap("x", "x + 1"))
             .withResult("x");
+
+    flushSignal = new FixedFlushSignal();
+    flushSignal.setFlushNow(false);
   }
 
   /**
-   * The ProfileBuilderBolt must emit a tuple containing the ProfileMeasurement generated
-   * when the profile is flushed.
+   * The bolt should extract a message and timestamp from a tuple and
+   * pass that to a {@code MessageDistributor}.
    */
   @Test
-  public void testEmitProfileMeasurement() throws Exception {
+  public void testExtractMessage() throws Exception {
 
     ProfileBuilderBolt bolt = createBolt();
-    testEmit(bolt);
-  }
 
-  /**
-   * Ensure that a ProfileMeasurement is emitted correctly when the window period is
-   * equal to the profile period.
-   */
-  @Test
-  public void testEmitWhenWindowPeriodEqualsProfilePeriod() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt(60, TimeUnit.SECONDS, 60, TimeUnit.SECONDS);
-    testEmit(bolt);
-  }
-
-  /**
-   * The window period cannot exceed the profile period.
-   */
-  @Test(expected = IllegalArgumentException.class)
-  public void testEmitWhenWindowPeriodGreaterThanProfilePeriod() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt(60, TimeUnit.SECONDS, 120, TimeUnit.SECONDS);
-    testEmit(bolt);
-  }
-
-  /**
-   * The window period cannot exceed the profile period.
-   */
-  @Test(expected = IllegalArgumentException.class)
-  public void testEmitWhenProfilePeriodIsNotMultipleOfWindowPeriod() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt(60, TimeUnit.SECONDS, 32, TimeUnit.SECONDS);
-    testEmit(bolt);
-  }
-
-  /**
-   * The ProfileBuilderBolt must emit a tuple containing the ProfileMeasurement for
-   * each [ profile, entity ] pair.
-   */
-  @Test
-  public void testEmitProfileMeasurementForEachEntity() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt();
+    // create a mock
+    MessageDistributor distributor = mock(MessageDistributor.class);
+    bolt.withMessageDistributor(distributor);
 
     // create a tuple
-    final Long timestamp1 = 100L;
-    final String entity1 = (String) message1.get("ip_src_addr");
-    Tuple tuple1 = createTuple(entity1, message1, profile1, timestamp1);
-
-    // create another tuple with a different 'entity' value
-    final Long timestamp2 = 100000000L;
-    final String entity2 = (String) message2.get("ip_src_addr");
-    Tuple tuple2 = createTuple(entity2, message2, profile1, timestamp2);
+    final long timestamp1 = 100000000L;
+    Tuple tuple1 = createTuple("entity1", message1, profile1, timestamp1);
 
     // execute the bolt
-    TupleWindow tupleWindow = createWindow(tuple1, tuple2);
-    int windows = executeBoltUntilFlush(bolt, tupleWindow);
+    TupleWindow tupleWindow = createWindow(tuple1);
+    bolt.execute(tupleWindow);
 
-    // two measurements should be emitted by the bolt; one for each entity
-    List<ProfileMeasurement> measurements = getProfileMeasurements(outputCollector, 2);
-    assertEquals(2, measurements.size());
-
-    // validate the profile measurements
-    ProfileMeasurement measurement = measurements.get(0);
-    if(StringUtils.equals(entity1, measurement.getEntity())) {
-
-      // validate the measurement for entity1
-      assertEquals(profile1, measurement.getDefinition());
-      assertEquals(entity1, measurement.getEntity());
-      assertEquals(windows, measurement.getProfileValue());
-      ProfilePeriod expected = new ProfilePeriod(timestamp1, bolt.getPeriodDurationMillis(), TimeUnit.MILLISECONDS);
-      assertEquals(expected, measurement.getPeriod());
-
-    } else if(StringUtils.equals(entity2, measurement.getEntity())) {
-
-      // validate the measurement for entity2
-      assertEquals(profile1, measurement.getDefinition());
-      assertEquals(entity2, measurement.getEntity());
-      assertEquals(windows, measurement.getProfileValue());
-      ProfilePeriod expected = new ProfilePeriod(timestamp2, bolt.getPeriodDurationMillis(), TimeUnit.MILLISECONDS);
-      assertEquals(expected, measurement.getPeriod());
-
-    } else {
-
-      fail("Unexpected measurement emitted; measurement=" + measurement);
-    }
+    // the message should have been extracted from the tuple and passed to the MessageDistributor
+    verify(distributor).distribute(eq(message1), eq(timestamp1), any(MessageRoute.class), any());
   }
 
+
   /**
-   * The ProfileBuilderBolt must emit a tuple containing the ProfileMeasurement for
-   * each [ profile, entity ] pair.
+   * If the {@code FlushSignal} tells the bolt to flush, it should flush the {@code MessageDistributor}
+   * and emit the {@code ProfileMeasurement} values.
    */
   @Test
-  public void testEmitProfileMeasurementForEachProfile() throws Exception {
+  public void testEmitWhenFlush() throws Exception {
 
     ProfileBuilderBolt bolt = createBolt();
 
-    // create a tuple
-    final Long timestamp1 = 100L;
-    final String entity1 = (String) message1.get("ip_src_addr");
-    Tuple tuple1 = createTuple(entity1, message1, profile1, timestamp1);
+    // create a profile measurement
+    ProfileMeasurement m = new ProfileMeasurement()
+            .withEntity("entity1")
+            .withProfileName("profile1")
+            .withPeriod(1000, 500, TimeUnit.MILLISECONDS)
+            .withProfileValue(22);
 
-    // create another tuple with a different profile, but same entity
-    final Long timestamp2 = 100000000L;
-    Tuple tuple2 = createTuple(entity1, message1, profile2, timestamp2);
+    // create a mock that returns the profile measurement above
+    MessageDistributor distributor = mock(MessageDistributor.class);
+    when(distributor.flush()).thenReturn(Collections.singletonList(m));
+    bolt.withMessageDistributor(distributor);
+
+    // signal the bolt to flush
+    flushSignal.setFlushNow(true);
 
     // execute the bolt
-    TupleWindow tupleWindow = createWindow(tuple1, tuple2);
-    int windows = executeBoltUntilFlush(bolt, tupleWindow);
+    Tuple tuple1 = createTuple("entity1", message1, profile1, 1000L);
+    TupleWindow tupleWindow = createWindow(tuple1);
+    bolt.execute(tupleWindow);
 
-    // two measurements should be emitted by the bolt; one for each profile
-    List<ProfileMeasurement> measurements = getProfileMeasurements(outputCollector, 2);
-    assertEquals(2, measurements.size());
-
-    // validate the profile measurement
-    ProfileMeasurement measurement = measurements.get(0);
-    if(StringUtils.equals(profile1.getProfile(), measurement.getProfileName())) {
-
-      // validate the measurement for profile1
-      assertEquals(profile1, measurement.getDefinition());
-      assertEquals(entity1, measurement.getEntity());
-      assertEquals(windows, measurement.getProfileValue());
-      ProfilePeriod expected = new ProfilePeriod(timestamp1, bolt.getPeriodDurationMillis(), TimeUnit.MILLISECONDS);
-      assertEquals(expected, measurement.getPeriod());
-
-    } else if(StringUtils.equals(profile2.getProfile(), measurement.getProfileName())) {
-
-      // validate the measurement for profile2
-      assertEquals(profile2, measurement.getDefinition());
-      assertEquals(entity1, measurement.getEntity());
-      assertEquals(windows, measurement.getProfileValue());
-      ProfilePeriod expected = new ProfilePeriod(timestamp2, bolt.getPeriodDurationMillis(), TimeUnit.MILLISECONDS);
-      assertEquals(expected, measurement.getPeriod());
-
-    } else {
-
-      fail("Unexpected measurement emitted; measurement=" + measurement);
-    }
+    // a profile measurement should be emitted by the bolt
+    List<ProfileMeasurement> measurements = getProfileMeasurements(outputCollector, 1);
+    assertEquals(1, measurements.size());
+    assertEquals(m, measurements.get(0));
   }
 
   /**
-   * Retrieves the ProfileMeasurement(s) (if any) that have been emitted.
-   *
-   * @param collector The Storm output collector.
-   * @param expected The number of measurements expected.
-   * @return A list of ProfileMeasurement(s).
+   * If the {@code FlushSignal} tells the bolt NOT to flush, nothing should be emitted.
    */
-  private List<ProfileMeasurement> getProfileMeasurements(OutputCollector collector, int expected) {
+  @Test
+  public void testDoNotEmitWhenNoFlush() throws Exception {
 
-    // the 'streamId' is defined by the DestinationHandler being used by the bolt
-    final String streamId = emitter.getStreamId();
+    ProfileBuilderBolt bolt = createBolt();
 
-    // capture the emitted tuple(s)
-    ArgumentCaptor<Values> argCaptor = ArgumentCaptor.forClass(Values.class);
-    verify(collector, times(expected))
-            .emit(eq(streamId), argCaptor.capture());
+    // create a profile measurement
+    ProfileMeasurement m = new ProfileMeasurement()
+            .withEntity("entity1")
+            .withProfileName("profile1")
+            .withPeriod(1000, 500, TimeUnit.MILLISECONDS)
+            .withProfileValue(22);
 
-    // return the profile measurements that were emitted
-    return argCaptor.getAllValues()
-            .stream()
-            .map(val -> (ProfileMeasurement) val.get(0))
-            .collect(Collectors.toList());
+    // create a mock that returns the profile measurement above
+    MessageDistributor distributor = mock(MessageDistributor.class);
+    when(distributor.flush()).thenReturn(Collections.singletonList(m));
+    bolt.withMessageDistributor(distributor);
+
+    // no flush signal
+    flushSignal.setFlushNow(false);
+
+    // execute the bolt
+    Tuple tuple1 = createTuple("entity1", message1, profile1, 1000L);
+    TupleWindow tupleWindow = createWindow(tuple1);
+    bolt.execute(tupleWindow);
+
+    // nothing should have been emitted
+    getProfileMeasurements(outputCollector, 0);
   }
 
   /**
@@ -291,11 +219,12 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
             .withTumblingWindow(new BaseWindowedBolt.Duration(10, TimeUnit.MINUTES));
     bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
 
-    // apply the message to the first profile
-    final String entity = (String) message1.get("ip_src_addr");
-    Tuple tuple1 = createTuple(entity, message1, profile1, System.currentTimeMillis());
+    // signal the bolt to flush
+    bolt.withFlushSignal(flushSignal);
+    flushSignal.setFlushNow(true);
 
     // execute the bolt
+    Tuple tuple1 = createTuple("entity", message1, profile1, System.currentTimeMillis());
     TupleWindow window = createWindow(tuple1);
     bolt.execute(window);
 
@@ -305,66 +234,83 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     verify(outputCollector, times(1)).emit(eq("destination3"), any());
   }
 
-  /**
-   * Ensures that a {@link ProfileMeasurement} is emitted correctly.
-   *
-   * @param bolt The {@link ProfileBuilderBolt} to test
-   */
-  private void testEmit(ProfileBuilderBolt bolt) {
+  @Test
+  public void testFlushExpiredWithTick() throws Exception {
 
-    // create a tuple
-    final Long timestamp1 = System.currentTimeMillis();
-    final String entity1 = (String) message1.get("ip_src_addr");
-    Tuple tuple1 = createTuple(entity1, message1, profile1, timestamp1);
+    ProfileBuilderBolt bolt = createBolt();
 
-    // execute the bolt
+    // create a mock
+    MessageDistributor distributor = mock(MessageDistributor.class);
+    bolt.withMessageDistributor(distributor);
+
+    // tell the bolt to flush on the first window
+    flushSignal.setFlushNow(true);
+
+    // execute the bolt; include a tick tuple in the window
+    Tuple tuple1 = createTuple("entity", message1, profile1, 100000000L);
+    TupleWindow tupleWindow = createWindow(tuple1, mockTickTuple());
+    bolt.execute(tupleWindow);
+
+    // ensure the expired profiles were flushed when the tick tuple was received
+    verify(distributor).flushExpired();
+  }
+
+  @Test
+  public void testFlushExpiredWithNoTick() throws Exception {
+
+    ProfileBuilderBolt bolt = createBolt();
+
+    // create a mock
+    MessageDistributor distributor = mock(MessageDistributor.class);
+    bolt.withMessageDistributor(distributor);
+
+    // tell the bolt to flush on the first window
+    flushSignal.setFlushNow(true);
+
+    // execute the bolt; NO tick tuple
+    Tuple tuple1 = createTuple("entity", message1, profile1, 100000000L);
     TupleWindow tupleWindow = createWindow(tuple1);
-    final int windows = executeBoltUntilFlush(bolt, tupleWindow);
+    bolt.execute(tupleWindow);
 
-    // a profile measurement should be emitted by the bolt
-    List<ProfileMeasurement> measurements = getProfileMeasurements(outputCollector, 1);
-    assertEquals(1, measurements.size());
-
-    // validate the profile measurement
-    ProfileMeasurement measurement = measurements.get(0);
-    assertEquals(profile1, measurement.getDefinition());
-    assertEquals(entity1, measurement.getEntity());
-    ProfilePeriod expected = new ProfilePeriod(timestamp1, bolt.getPeriodDurationMillis(), TimeUnit.MILLISECONDS);
-    assertEquals(expected, measurement.getPeriod());
-
-    // since the profile is a simple counter, the value will be the same as the number of windows; 1 message per window
-    assertEquals(windows, measurement.getProfileValue());
+    // there was no tick tuple; the expired profiles should NOT have been flushed
+    verify(distributor, times(0)).flushExpired();
   }
 
   /**
-   * Executes the bolt by passing in the given tuple, once per window period.  The bolt
-   * is executed until a flush event occurs.
-   *
-   * <p>If the window period is 30 seconds, and the period duration is 15 minutes, there will
-   * be 30 window periods until a flush occurs.
-   *
-   * @param bolt The bolt to exercise.
-   * @param tupleWindow The window containing the tuples to execute.
-   * @return The number of window periods that were executed.
+   * Creates a mock tick tuple to use for testing.
+   * @return A mock tick tuple.
    */
-  private int executeBoltUntilFlush(ProfileBuilderBolt bolt, TupleWindow tupleWindow) {
+  private Tuple mockTickTuple() {
 
-    // there are multiple event windows that occur before the profile period expires and a flush occurs
-    final int windows = howManyWindowsUntilFlush(bolt);
-    for(int i=0; i<(windows-1); i++) {
+    Tuple tuple = mock(Tuple.class);
+    when(tuple.getSourceComponent()).thenReturn("__system");
+    when(tuple.getSourceStreamId()).thenReturn("__tick");
 
-      // execute the bolt
-      bolt.execute(tupleWindow);
+    return tuple;
+  }
 
-      // not time to flush yet
-      int expected = 0;
-      List<ProfileMeasurement> m = getProfileMeasurements(outputCollector, expected);
-      assertEquals(0, m.size());
-    }
+  /**
+   * Retrieves the ProfileMeasurement(s) (if any) that have been emitted.
+   *
+   * @param collector The Storm output collector.
+   * @param expected The number of measurements expected.
+   * @return A list of ProfileMeasurement(s).
+   */
+  private List<ProfileMeasurement> getProfileMeasurements(OutputCollector collector, int expected) {
 
-    // execute the bolt; one last time.  expect a flush this time
-    bolt.execute(tupleWindow);
-    return windows;
+    // the 'streamId' is defined by the DestinationHandler being used by the bolt
+    final String streamId = emitter.getStreamId();
+
+    // capture the emitted tuple(s)
+    ArgumentCaptor<Values> argCaptor = ArgumentCaptor.forClass(Values.class);
+    verify(collector, times(expected))
+            .emit(eq(streamId), argCaptor.capture());
+
+    // return the profile measurements that were emitted
+    return argCaptor.getAllValues()
+            .stream()
+            .map(val -> (ProfileMeasurement) val.get(0))
+            .collect(Collectors.toList());
   }
 
   /**
@@ -390,19 +336,17 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
    */
   private ProfileBuilderBolt createBolt() throws IOException {
 
-    return createBolt(15, TimeUnit.MINUTES, 30, TimeUnit.SECONDS);
+    return createBolt(30, TimeUnit.SECONDS);
   }
 
   /**
    * Create a ProfileBuilderBolt to test.
    *
-   * @param profileDuration The profile period duration.
-   * @param profileDurationUnits The units of the profile period.
    * @param windowDuration The event window duration.
    * @param windowDurationUnits The units of the event window duration.
    * @return A {@link ProfileBuilderBolt} to test.
    */
-  private ProfileBuilderBolt createBolt(int profileDuration, TimeUnit profileDurationUnits, int windowDuration, TimeUnit windowDurationUnits) throws IOException {
+  private ProfileBuilderBolt createBolt(int windowDuration, TimeUnit windowDurationUnits) throws IOException {
 
     // defines the zk configurations accessible from the bolt
     ProfilerConfigurations configurations = new ProfilerConfigurations();
@@ -416,27 +360,14 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
             .withZookeeperCache(cache)
             .withEmitter(emitter)
             .withProfilerConfigurations(configurations)
-            .withPeriodDuration(profileDuration, profileDurationUnits)
+            .withPeriodDuration(1, TimeUnit.MINUTES)
             .withTumblingWindow(new BaseWindowedBolt.Duration(windowDuration, windowDurationUnits));
-
     bolt.prepare(new HashMap<>(), topologyContext, outputCollector);
+
+    // set the flush signal AFTER calling 'prepare'
+    bolt.withFlushSignal(flushSignal);
+
     return bolt;
-  }
-
-  /**
-   * Returns the number of event windows that will occur until the bolt should flush.
-   *
-   * <p>The number of event windows is equivalent to the number of times the bolt's execute method should
-   * be called before a flush is expected.
-   *
-   * @param bolt The {@link ProfileBuilderBolt} under test.
-   * @return The number of event windows that will occur before the bolt should flush.
-   */
-  private int howManyWindowsUntilFlush(ProfileBuilderBolt bolt) {
-
-    long periodDurationMillis = bolt.getPeriodDurationMillis();
-    long windowDurationMillis = bolt.getWindowDurationMillis();
-    return (int) (periodDurationMillis / windowDurationMillis);
   }
 
   /**

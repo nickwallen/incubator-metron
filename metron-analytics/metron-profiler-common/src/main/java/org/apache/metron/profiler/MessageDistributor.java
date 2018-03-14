@@ -51,11 +51,30 @@ public interface MessageDistributor {
   void distribute(JSONObject message, long timestamp, MessageRoute route, Context context);
 
   /**
-   * Flush all profiles.
+   * Flush all active profiles.
    *
-   * <p>Flushes all {@link ProfileBuilder} objects that this distributor is responsible for.
+   * <p>A profile will remain active as long as it continues to receive messages.  If a profile
+   * does not receive a message for an extended duration, it may be marked as expired.
+   *
+   * <p>Flushes all active {@link ProfileBuilder} objects that this distributor is responsible for.
    *
    * @return The {@link ProfileMeasurement} values; one for each (profile, entity) pair.
    */
   List<ProfileMeasurement> flush();
+
+  /**
+   * Flush all expired profiles.
+   *
+   * <p>If a profile has not received messages for an extended period of time, it will be marked as
+   * expired.  When a profile is expired, it can no longer receive new messages.  Expired profiles
+   * remain only to give the client a chance to flush them.
+   *
+   * <p>If the client does not flush the expired profiles periodically, any state maintained in the
+   * profile since the last flush may be lost.
+   *
+   * <p>Flushes all expired {@link ProfileBuilder} objects that this distributor is responsible for.
+   *
+   * @return The {@link ProfileMeasurement} values; one for each (profile, entity) pair.
+   */
+  List<ProfileMeasurement> flushExpired();
 }

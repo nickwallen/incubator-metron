@@ -76,4 +76,13 @@ public interface ProfileBuilder {
    * @return The value of the variable.
    */
   Object valueOf(String variable);
+
+  /**
+   * Returns the name of the entity.
+   *
+   * <p>Each {@code ProfileBuilder} instance is responsible for one (profile, entity) pair.
+   *
+   * @return The entity.
+   */
+  String getEntity();
 }

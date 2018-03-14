@@ -162,11 +162,17 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
 
     try {
       // execute the 'profile' expression
-      String profileExpression = definition.getResult().getProfileExpressions().getExpression();
+      String profileExpression = definition
+              .getResult()
+              .getProfileExpressions()
+              .getExpression();
       Object profileValue = execute(profileExpression, "result/profile");
 
       // execute the 'triage' expression(s)
-      Map<String, Object> triageValues = definition.getResult().getTriageExpressions().getExpressions()
+      Map<String, Object> triageValues = definition
+              .getResult()
+              .getTriageExpressions()
+              .getExpressions()
               .entrySet()
               .stream()
               .collect(Collectors.toMap(
@@ -321,6 +327,11 @@ public class DefaultProfileBuilder implements ProfileBuilder, Serializable {
     }
 
     return results;
+  }
+
+  @Override
+  public String getEntity() {
+    return entity;
   }
 
   /**
