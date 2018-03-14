@@ -19,7 +19,7 @@
 package org.apache.metron.profiler.bolt;
 
 /**
- * Signals a flush when set to do so.
+ * Signals a flush when set to do so; like a switch.
  *
  * <p>The flush signal can be turned on or off as needed.  Most useful for testing.
  */

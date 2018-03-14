@@ -124,8 +124,8 @@ components:
     -   id: "eventTimeLag"
         className: "org.apache.storm.topology.base.BaseWindowedBolt$Duration"
         constructorArgs:
-            - ${profiler.event.time.lag}
-            - "${profiler.event.time.lag.units}"
+            - ${profiler.window.lag}
+            - "${profiler.window.lag.units}"
 
 spouts:
 

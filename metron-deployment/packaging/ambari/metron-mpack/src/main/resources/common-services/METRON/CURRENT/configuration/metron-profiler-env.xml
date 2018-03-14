@@ -129,22 +129,19 @@
     </value-attributes>
   </property>
   <property>
-    <name>profiler_event_time_lag</name>
+    <name>profiler_window_lag</name>
     <value>1</value>
-    <description>The maximum time lag of event timestamps. Events cannot arrive out-of-order by more than this amount.</description>
-    <display-name>Event Time Lag</display-name>
+    <description>The maximum time lag for timestamps. Timestamps cannot arrive out-of-order by more than this amount.</description>
+    <display-name>Window Time Lag</display-name>
   </property>
   <property>
-    <name>profiler_event_time_lag_units</name>
+    <name>profiler_window_lag_units</name>
     <value>MINUTES</value>
     <description>The units used to specify the Event Time Lag.</description>
-    <display-name>Event Time Lag Units</display-name>
+    <display-name>Window Lag Units</display-name>
     <value-attributes>
       <type>value-list</type>
       <entries>
-        <entry>
-          <value>DAYS</value>
-        </entry>
         <entry>
           <value>HOURS</value>
         </entry>

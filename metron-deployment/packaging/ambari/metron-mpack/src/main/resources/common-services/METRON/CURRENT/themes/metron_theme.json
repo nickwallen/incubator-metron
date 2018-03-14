@@ -616,11 +616,11 @@
           "subsection-name": "subsection-profiler-setup"
         },
         {
-          "config": "metron-profiler-env/profiler_event_time_lag",
+          "config": "metron-profiler-env/profiler_window_lag",
           "subsection-name": "subsection-profiler-setup"
         },
         {
-          "config": "metron-profiler-env/profiler_event_time_lag_units",
+          "config": "metron-profiler-env/profiler_window_lag_units",
           "subsection-name": "subsection-profiler-setup"
         },
         {
@@ -1079,13 +1079,13 @@
         }
       },
       {
-        "config": "metron-profiler-env/profiler_event_time_lag",
+        "config": "metron-profiler-env/profiler_window_lag",
         "widget": {
           "type": "text-field"
         }
       },
       {
-        "config": "metron-profiler-env/profiler_event_time_lag_units",
+        "config": "metron-profiler-env/profiler_window_lag_units",
         "widget": {
           "type": "combo"
         }

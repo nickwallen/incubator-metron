@@ -305,8 +305,8 @@ if not len(profiler_topology_worker_childopts) == 0:
     profiler_topology_worker_childopts += ' '
 profiler_topology_worker_childopts += config['configurations']['metron-profiler-env']['profiler_topology_worker_childopts']
 profiler_max_routes_per_bolt=config['configurations']['metron-profiler-env']['profiler_max_routes_per_bolt']
-profiler_event_time_lag=config['configurations']['metron-profiler-env']['profiler_event_time_lag']
-profiler_event_time_lag_units=config['configurations']['metron-profiler-env']['profiler_event_time_lag_units']
+profiler_window_lag=config['configurations']['metron-profiler-env']['profiler_window_lag']
+profiler_window_lag_units=config['configurations']['metron-profiler-env']['profiler_window_lag_units']
 profiler_topology_message_timeout_secs=config['configurations']['metron-profiler-env']['profiler_topology_message_timeout_secs']
 profiler_topology_max_spout_pending=config['configurations']['metron-profiler-env']['profiler_topology_max_spout_pending']
 
