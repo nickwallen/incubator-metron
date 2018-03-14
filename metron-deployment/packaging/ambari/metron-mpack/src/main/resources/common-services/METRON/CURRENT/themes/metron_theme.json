@@ -600,6 +600,14 @@
           "subsection-name": "subsection-profiler-setup"
         },
         {
+          "config": "metron-profiler-env/profiler_window_duration",
+          "subsection-name": "subsection-profiler-setup"
+        },
+        {
+          "config": "metron-profiler-env/profiler_window_units",
+          "subsection-name": "subsection-profiler-setup"
+        },
+        {
           "config": "metron-profiler-env/profiler_ttl",
           "subsection-name": "subsection-profiler-setup"
         },
@@ -1036,6 +1044,18 @@
       },
       {
         "config": "metron-profiler-env/profiler_period_units",
+        "widget": {
+          "type": "combo"
+        }
+      },
+      {
+        "config": "metron-profiler-env/profiler_window_duration",
+        "widget": {
+          "type": "text-field"
+        }
+      },
+      {
+        "config": "metron-profiler-env/profiler_window_units",
         "widget": {
           "type": "combo"
         }

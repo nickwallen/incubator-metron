@@ -57,8 +57,32 @@
       <type>value-list</type>
       <entries>
         <entry>
-          <value>DAYS</value>
+          <value>HOURS</value>
         </entry>
+        <entry>
+          <value>MINUTES</value>
+        </entry>
+        <entry>
+          <value>SECONDS</value>
+        </entry>
+      </entries>
+      <selection-cardinality>1</selection-cardinality>
+    </value-attributes>
+  </property>
+  <property>
+    <name>profiler_window_duration</name>
+    <value>30</value>
+    <description>The duration of each profile window. This value should be defined along with profiler.window.duration.units</description>
+    <display-name>Window Duration</display-name>
+  </property>
+  <property>
+    <name>profiler_window_units</name>
+    <value>SECONDS</value>
+    <description>The units used to specify the profiler.window.duration. This value should be defined along with profiler.window.duration.</description>
+    <display-name>Window Units</display-name>
+    <value-attributes>
+      <type>value-list</type>
+      <entries>
         <entry>
           <value>HOURS</value>
         </entry>
