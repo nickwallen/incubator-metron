@@ -17,21 +17,23 @@
  *  limitations under the License.
  *
  */
-
 package org.apache.metron.profiler.hbase;
 
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.utils.SerDeUtils;
-import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.profiler.ProfileMeasurement;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A ColumnBuilder that writes only the value of a ProfileMeasurement.
+ * A {@code ColumnBuilder} that will many of the {@code ProfileMeasurement} fields.
+ *
+ * <p>This provides a much more detailed view into the measurements that are persisted
+ * in HBase.  This is useful for debugging and troubleshooting.
  */
-public class ValueOnlyColumnBuilder implements ColumnBuilder {
+public class DetailedColumnBuilder implements ColumnBuilder {
 
   /**
    * The column family storing the profile data.
@@ -47,13 +49,19 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
   static {
     columns = new HashMap<>();
     columns.put("value", Bytes.toBytes("value"));
+    columns.put("name", Bytes.toBytes("name"));
+    columns.put("entity", Bytes.toBytes("entity"));
+    columns.put("definition", Bytes.toBytes("definition"));
+    columns.put("start", Bytes.toBytes("start"));
+    columns.put("end", Bytes.toBytes("end"));
+    columns.put("period", Bytes.toBytes("period"));
   }
 
-  public ValueOnlyColumnBuilder() {
+  public DetailedColumnBuilder() {
     setColumnFamily("P");
   }
 
-  public ValueOnlyColumnBuilder(String columnFamily) {
+  public DetailedColumnBuilder(String columnFamily) {
     setColumnFamily(columnFamily);
   }
 
@@ -61,11 +69,15 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
   public ColumnList columns(ProfileMeasurement measurement) {
 
     ColumnList cols = new ColumnList();
-    cols.addColumn(columnFamilyBytes, getColumnQualifier("value"), SerDeUtils.toBytes(measurement.getProfileValue()));
-
+    addColumn(cols, "value", measurement.getProfileValue());
+    addColumn(cols, "name", measurement.getProfileName());
+    addColumn(cols, "entity", measurement.getEntity());
+    addColumn(cols, "definition", measurement.getDefinition());
+    addColumn(cols, "start", measurement.getPeriod().getStartTimeMillis());
+    addColumn(cols, "end", measurement.getPeriod().getEndTimeMillis());
+    addColumn(cols, "period", measurement.getPeriod().getPeriod());
     return cols;
   }
-
   @Override
   public String getColumnFamily() {
     return this.columnFamily;
@@ -90,4 +102,5 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
   private void addColumn(ColumnList cols, String name, Object value) {
     cols.addColumn(columnFamilyBytes, getColumnQualifier(name), SerDeUtils.toBytes(value));
   }
+
 }
