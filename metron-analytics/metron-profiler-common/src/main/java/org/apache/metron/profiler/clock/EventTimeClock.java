@@ -62,7 +62,7 @@ public class EventTimeClock implements Clock {
     } else {
 
       // the message does not contain the specified timestamp field
-      LOG.warn("message does not contain timestamp field '{}': message will be ignored: message='{}'",
+      LOG.debug("message does not contain timestamp field '{}': message will be ignored: message='{}'",
               timestampField, JSONObject.toJSONString(message));
       result = null;
     }
