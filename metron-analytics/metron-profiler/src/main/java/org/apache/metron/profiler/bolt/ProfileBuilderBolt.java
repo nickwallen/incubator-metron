@@ -149,6 +149,11 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    */
   private FlushSignal flushSignal;
 
+  /**
+   * A timer that will signal when it is time to flush any expired profiles.
+   */
+  private Timer expiredFlushTimer;
+
   public ProfileBuilderBolt() {
     this.emitters = new ArrayList<>();
   }
@@ -184,6 +189,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.configurations = new ProfilerConfigurations();
     this.flushSignal = new FixedFrequencyFlushSignal(periodDurationMillis);
+    this.expiredFlushTimer = new Timer().start(periodDurationMillis, TimeUnit.MILLISECONDS);
     setupZookeeper();
   }
 
@@ -191,6 +197,9 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   public void cleanup() {
     zookeeperCache.close();
     zookeeperClient.close();
+    if(expiredFlushTimer != null) {
+      expiredFlushTimer.shutdown();
+    }
   }
 
   private void setupZookeeper() {
@@ -248,18 +257,6 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     emitters.forEach(emitter -> emitter.declareOutputFields(declarer));
   }
 
-  /**
-   * Defines the frequency at which the bolt will receive tick tuples.  Tick tuples are
-   * used to control how often a profile is flushed.
-   */
-  @Override
-  public Map<String, Object> getComponentConfiguration() {
-
-    Map<String, Object> conf = super.getComponentConfiguration();
-    conf.put(Config.TOPOLOGY_TICK_TUPLE_FREQ_SECS, TimeUnit.MILLISECONDS.toSeconds(profileTimeToLiveMillis));
-    return conf;
-  }
-
   private Context getStellarContext() {
 
     Map<String, Object> global = getConfigurations().getGlobalConfig();
@@ -282,24 +279,18 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
       // handle each tuple in the window
       for(Tuple tuple : window.get()) {
-
-        if(TupleUtils.isTick(tuple)) {
-          handleTick();
-
-        } else {
-          handleMessage(tuple);
-        }
+        handleMessage(tuple);
       }
 
-      // time to flush?
+      // time to flush active profiles?
       if(flushSignal.isTimeToFlush()) {
-        flushSignal.reset();
+        flushActive();
+      }
 
-        // flush the active profiles
-        List<ProfileMeasurement> measurements = messageDistributor.flush();
-        emitMeasurements(measurements);
-
-        LOG.debug("Flushed active profiles and found {} measurement(s).", measurements.size());
+      // TODO this is not working as intended. has to occur in separate thread
+      // time to flush expired profiles?
+      if(expiredFlushTimer.isExpired()) {
+        flushExpired();
       }
 
     } catch (Throwable e) {
@@ -310,13 +301,26 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   /**
-   * Flush all expired profiles when a 'tick' is received.
+   * Flush all active profiles.
+   */
+  private void flushActive() {
+    flushSignal.reset();
+
+    // flush the active profiles
+    List<ProfileMeasurement> measurements = messageDistributor.flush();
+    emitMeasurements(measurements);
+
+    LOG.debug("Flushed active profiles and found {} measurement(s).", measurements.size());
+  }
+
+  /**
+   * Flushes all expired profiles.
    *
-   * If a profile has not received a message for an extended period of time then it is
+   * <p>If a profile has not received a message for an extended period of time then it is
    * marked as expired.  Periodically we need to flush these expired profiles to ensure
    * that their state is not lost.
    */
-  private void handleTick() {
+  private void flushExpired() {
 
     // flush the expired profiles
     List<ProfileMeasurement> measurements = messageDistributor.flushExpired();
