@@ -42,13 +42,13 @@ import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.zookeeper.SimpleEventListener;
 import org.apache.metron.zookeeper.ZKCache;
-import org.apache.storm.Config;
+import org.apache.storm.StormTimer;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.tuple.Tuple;
-import org.apache.storm.utils.TupleUtils;
+import org.apache.storm.utils.Utils;
 import org.apache.storm.windowing.TupleWindow;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -127,6 +127,9 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
 
   /**
    * Distributes messages to the profile builders.
+   *
+   * <p>Since expired profiles are flushed on a separate thread, all access to this
+   * {@code MessageDistributor} needs to be protected.
    */
   private MessageDistributor messageDistributor;
 
@@ -145,14 +148,22 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   private List<ProfileMeasurementEmitter> emitters;
 
   /**
-   * Signals when it is time to flush.
+   * Signals when it is time to flush the active profiles.
    */
-  private FlushSignal flushSignal;
+  private FlushSignal activeFlushSignal;
 
   /**
-   * A timer that will signal when it is time to flush any expired profiles.
+   * A timer that flushes expired profiles on a regular interval. The expired profiles
+   * are flushed on a separate thread.
+   *
+   * <p>Flushing expired profiles ensures that any profiles that stop receiving messages
+   * for an extended period of time will continue to be flushed.
+   *
+   * <p>This unfortunately introduces concurrency issues as the bolt is no longer single
+   * threaded.  Because of this, all access to the {@code MessageDistributor} needs to
+   * be protected.
    */
-  private Timer expiredFlushTimer;
+  private StormTimer expiredFlushTimer;
 
   public ProfileBuilderBolt() {
     this.emitters = new ArrayList<>();
@@ -188,20 +199,30 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.parser = new JSONParser();
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.configurations = new ProfilerConfigurations();
-    this.flushSignal = new FixedFrequencyFlushSignal(periodDurationMillis);
-    this.expiredFlushTimer = new Timer().start(periodDurationMillis, TimeUnit.MILLISECONDS);
+    this.activeFlushSignal = new FixedFrequencyFlushSignal(periodDurationMillis);
+
     setupZookeeper();
+
+    // attempt to flush expired profiles on a regular interval
+    this.expiredFlushTimer = createTimer("flush-expired-profiles-timer");
+    expiredFlushTimer.scheduleRecurring(0, toSeconds(profileTimeToLiveMillis), () -> flushExpired());
   }
 
   @Override
   public void cleanup() {
-    zookeeperCache.close();
-    zookeeperClient.close();
-    if(expiredFlushTimer != null) {
-      expiredFlushTimer.shutdown();
+    try {
+      zookeeperCache.close();
+      zookeeperClient.close();
+      expiredFlushTimer.close();
+
+    } catch(Throwable e) {
+      LOG.error("Exception when cleaning up", e);
     }
   }
 
+  /**
+   * Setup connectivity to Zookeeper which provides the necessary configuration for the bolt.
+   */
   private void setupZookeeper() {
     try {
       if (zookeeperClient == null) {
@@ -283,14 +304,8 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
       }
 
       // time to flush active profiles?
-      if(flushSignal.isTimeToFlush()) {
+      if(activeFlushSignal.isTimeToFlush()) {
         flushActive();
-      }
-
-      // TODO this is not working as intended. has to occur in separate thread
-      // time to flush expired profiles?
-      if(expiredFlushTimer.isExpired()) {
-        flushExpired();
       }
 
     } catch (Throwable e) {
@@ -304,13 +319,16 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * Flush all active profiles.
    */
   private void flushActive() {
-    flushSignal.reset();
+    activeFlushSignal.reset();
 
     // flush the active profiles
-    List<ProfileMeasurement> measurements = messageDistributor.flush();
-    emitMeasurements(measurements);
+    List<ProfileMeasurement> measurements;
+    synchronized(messageDistributor) {
+      measurements = messageDistributor.flush();
+    }
 
     LOG.debug("Flushed active profiles and found {} measurement(s).", measurements.size());
+    emitMeasurements(measurements);
   }
 
   /**
@@ -323,10 +341,13 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   private void flushExpired() {
 
     // flush the expired profiles
-    List<ProfileMeasurement> measurements = messageDistributor.flushExpired();
-    emitMeasurements(measurements);
+    List<ProfileMeasurement> measurements;
+    synchronized (messageDistributor) {
+      measurements = messageDistributor.flushExpired();
+    }
 
     LOG.debug("Flushed expired profiles and found {} measurement(s).", measurements.size());
+    emitMeasurements(measurements);
   }
 
   /**
@@ -343,11 +364,13 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     Long timestamp = getField(TIMESTAMP_TUPLE_FIELD, input, Long.class);
 
     // keep track of time
-    flushSignal.update(timestamp);
+    activeFlushSignal.update(timestamp);
     
     // distribute the message
     MessageRoute route = new MessageRoute(definition, entity);
-    messageDistributor.distribute(message, timestamp, route, getStellarContext());
+    synchronized (messageDistributor) {
+      messageDistributor.distribute(message, timestamp, route, getStellarContext());
+    }
 
     LOG.debug("Message distributed: profile={}, entity={}, timestamp={}", definition.getProfile(), entity, timestamp);
   }
@@ -397,6 +420,32 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     }
 
     return value;
+  }
+
+  /**
+   * Converts milliseconds to seconds and handles an ugly cast.
+   *
+   * @param millis Duration in milliseconds.
+   * @return Duration in seconds.
+   */
+  private int toSeconds(long millis) {
+    return (int) TimeUnit.MILLISECONDS.toSeconds(millis);
+  }
+
+  /**
+   * Creates a timer that can execute a task on a fixed interval.
+   *
+   * <p>If the timer encounters an exception, the entire process will be killed.
+   *
+   * @param name The name of the timer.
+   * @return The timer.
+   */
+  private StormTimer createTimer(String name) {
+    return new StormTimer(name, (thread, exception) -> {
+      String msg = String.format("Unexpected exception in timer task; timer=%s", name);
+      LOG.error(msg, exception);
+      Utils.exitProcess(1, msg);
+    });
   }
 
   @Override
@@ -468,7 +517,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   public ProfileBuilderBolt withFlushSignal(FlushSignal flushSignal) {
-    this.flushSignal = flushSignal;
+    this.activeFlushSignal = flushSignal;
     return this;
   }
 
