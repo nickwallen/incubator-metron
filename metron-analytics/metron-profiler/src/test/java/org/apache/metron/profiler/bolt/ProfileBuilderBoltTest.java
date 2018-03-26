@@ -48,7 +48,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
@@ -230,61 +229,6 @@ public class ProfileBuilderBoltTest extends BaseBoltTest {
     verify(outputCollector, times(1)).emit(eq("destination1"), any());
     verify(outputCollector, times(1)).emit(eq("destination2"), any());
     verify(outputCollector, times(1)).emit(eq("destination3"), any());
-  }
-
-  @Test
-  public void testFlushExpiredWithTick() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt();
-
-    // create a mock
-    MessageDistributor distributor = mock(MessageDistributor.class);
-    bolt.withMessageDistributor(distributor);
-
-    // tell the bolt to flush on the first window
-    flushSignal.setFlushNow(true);
-
-    // execute the bolt; include a tick tuple in the window
-    Tuple tuple1 = createTuple("entity", message1, profile1, 100000000L);
-    TupleWindow tupleWindow = createWindow(tuple1, mockTickTuple());
-    bolt.execute(tupleWindow);
-
-    // ensure the expired profiles were flushed when the tick tuple was received
-    verify(distributor).flushExpired();
-  }
-
-  @Test
-  public void testFlushExpiredWithNoTick() throws Exception {
-
-    ProfileBuilderBolt bolt = createBolt();
-
-    // create a mock
-    MessageDistributor distributor = mock(MessageDistributor.class);
-    bolt.withMessageDistributor(distributor);
-
-    // tell the bolt to flush on the first window
-    flushSignal.setFlushNow(true);
-
-    // execute the bolt; NO tick tuple
-    Tuple tuple1 = createTuple("entity", message1, profile1, 100000000L);
-    TupleWindow tupleWindow = createWindow(tuple1);
-    bolt.execute(tupleWindow);
-
-    // there was no tick tuple; the expired profiles should NOT have been flushed
-    verify(distributor, times(0)).flushExpired();
-  }
-
-  /**
-   * Creates a mock tick tuple to use for testing.
-   * @return A mock tick tuple.
-   */
-  private Tuple mockTickTuple() {
-
-    Tuple tuple = mock(Tuple.class);
-    when(tuple.getSourceComponent()).thenReturn("__system");
-    when(tuple.getSourceStreamId()).thenReturn("__tick");
-
-    return tuple;
   }
 
   /**
