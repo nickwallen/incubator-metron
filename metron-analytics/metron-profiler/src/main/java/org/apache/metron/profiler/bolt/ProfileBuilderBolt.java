@@ -159,9 +159,8 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * <p>Flushing expired profiles ensures that any profiles that stop receiving messages
    * for an extended period of time will continue to be flushed.
    *
-   * <p>This unfortunately introduces concurrency issues as the bolt is no longer single
-   * threaded.  Because of this, all access to the {@code MessageDistributor} needs to
-   * be protected.
+   * <p>This introduces concurrency issues as the bolt is no longer single threaded. Due
+   * to this, all access to the {@code MessageDistributor} needs to be protected.
    */
   private StormTimer expiredFlushTimer;
 
@@ -200,12 +199,8 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.messageDistributor = new DefaultMessageDistributor(periodDurationMillis, profileTimeToLiveMillis, maxNumberOfRoutes);
     this.configurations = new ProfilerConfigurations();
     this.activeFlushSignal = new FixedFrequencyFlushSignal(periodDurationMillis);
-
     setupZookeeper();
-
-    // attempt to flush expired profiles on a regular interval
-    this.expiredFlushTimer = createTimer("flush-expired-profiles-timer");
-    expiredFlushTimer.scheduleRecurring(0, toSeconds(profileTimeToLiveMillis), () -> flushExpired());
+    setupExpiredFlushTimer();
   }
 
   @Override
@@ -218,6 +213,15 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     } catch(Throwable e) {
       LOG.error("Exception when cleaning up", e);
     }
+  }
+
+  /**
+   * Creates a timer that flushes any expired profiles on a separate thread.
+   */
+  private void setupExpiredFlushTimer() {
+
+    this.expiredFlushTimer = createTimer("flush-expired-profiles-timer");
+    expiredFlushTimer.scheduleRecurring(0, toSeconds(profileTimeToLiveMillis), () -> flushExpired());
   }
 
   /**
