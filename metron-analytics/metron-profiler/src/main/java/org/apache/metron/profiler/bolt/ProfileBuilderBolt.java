@@ -60,6 +60,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static java.lang.String.format;
 import static org.apache.metron.profiler.bolt.ProfileSplitterBolt.ENTITY_TUPLE_FIELD;
@@ -200,7 +202,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     this.configurations = new ProfilerConfigurations();
     this.activeFlushSignal = new FixedFrequencyFlushSignal(periodDurationMillis);
     setupZookeeper();
-    setupExpiredFlushTimer();
+    startExpiredFlushTimer();
   }
 
   @Override
@@ -213,15 +215,6 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     } catch(Throwable e) {
       LOG.error("Exception when cleaning up", e);
     }
-  }
-
-  /**
-   * Creates a timer that flushes any expired profiles on a separate thread.
-   */
-  private void setupExpiredFlushTimer() {
-
-    this.expiredFlushTimer = createTimer("flush-expired-profiles-timer");
-    expiredFlushTimer.scheduleRecurring(0, toSeconds(profileTimeToLiveMillis), () -> flushExpired());
   }
 
   /**
@@ -322,17 +315,18 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   /**
    * Flush all active profiles.
    */
-  private void flushActive() {
+  protected void flushActive() {
     activeFlushSignal.reset();
 
     // flush the active profiles
     List<ProfileMeasurement> measurements;
     synchronized(messageDistributor) {
       measurements = messageDistributor.flush();
+      emitMeasurements(measurements);
     }
 
     LOG.debug("Flushed active profiles and found {} measurement(s).", measurements.size());
-    emitMeasurements(measurements);
+
   }
 
   /**
@@ -342,16 +336,16 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * marked as expired.  Periodically we need to flush these expired profiles to ensure
    * that their state is not lost.
    */
-  private void flushExpired() {
+  protected void flushExpired() {
 
     // flush the expired profiles
     List<ProfileMeasurement> measurements;
     synchronized (messageDistributor) {
       measurements = messageDistributor.flushExpired();
+      emitMeasurements(measurements);
     }
 
     LOG.debug("Flushed expired profiles and found {} measurement(s).", measurements.size());
-    emitMeasurements(measurements);
   }
 
   /**
@@ -437,6 +431,15 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   }
 
   /**
+   * Creates a timer that regularly flushes expired profiles on a separate thread.
+   */
+  private void startExpiredFlushTimer() {
+
+    expiredFlushTimer = createTimer("flush-expired-profiles-timer");
+    expiredFlushTimer.scheduleRecurring(0, toSeconds(profileTimeToLiveMillis), () -> flushExpired());
+  }
+
+  /**
    * Creates a timer that can execute a task on a fixed interval.
    *
    * <p>If the timer encounters an exception, the entire process will be killed.
@@ -445,6 +448,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
    * @return The timer.
    */
   private StormTimer createTimer(String name) {
+
     return new StormTimer(name, (thread, exception) -> {
       String msg = String.format("Unexpected exception in timer task; timer=%s", name);
       LOG.error(msg, exception);
@@ -455,7 +459,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
   @Override
   public BaseWindowedBolt withTumblingWindow(BaseWindowedBolt.Duration duration) {
 
-    // need to capture the window duration for setting the flush count down
+    // need to capture the window duration to validate it along with other profiler settings
     this.windowDurationMillis = duration.value;
     return super.withTumblingWindow(duration);
   }
