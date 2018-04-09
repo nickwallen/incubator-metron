@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,24 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.indexing.dao.search;
 
-public interface SearchDao {
+package org.apache.metron.indexing.dao.metaalert;
 
-  /**
-   * Return search response based on the search request
-   *
-   * @param searchRequest The request defining the search parameters.
-   * @return A response containing the results of the search.
-   * @throws InvalidSearchException If the search request is malformed.
-   */
-  SearchResponse search(SearchRequest searchRequest) throws InvalidSearchException;
+import org.apache.metron.common.Constants;
 
-  /**
-   * Return group response based on the group request
-   * @param groupRequest The request defining the grouping parameters.
-   * @return A response containing the results of the grouping operation.
-   * @throws InvalidSearchException If the grouping request is malformed.
-   */
-  GroupResponse group(GroupRequest groupRequest) throws InvalidSearchException;
+public class MetaAlertConstants {
+  public static String METAALERT_TYPE = "metaalert";
+  public static String METAALERT_FIELD = "metaalerts";
+  public static String METAALERT_DOC = METAALERT_TYPE + "_doc";
+  public static String THREAT_FIELD_DEFAULT = "threat:triage:score";
+  public static String THREAT_SORT_DEFAULT = "sum";
+  public static String ALERT_FIELD = "alert";
+  public static String STATUS_FIELD = "status";
+  public static String GROUPS_FIELD = "groups";
+  public static String SOURCE_TYPE = Constants.SENSOR_TYPE.replace('.', ':');
 }

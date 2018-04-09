@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
@@ -74,6 +74,13 @@ public class SolrSearchDao implements SearchDao {
 
   @Override
   public SearchResponse search(SearchRequest searchRequest) throws InvalidSearchException {
+    return search(searchRequest,null);
+  }
+
+  // Allow for the fieldList to be explicitly specified, letting things like metaalerts expand on them.
+  // If null, use whatever the searchRequest defines.
+  public SearchResponse search(SearchRequest searchRequest, String fieldList)
+      throws InvalidSearchException {
     if (searchRequest.getQuery() == null) {
       throw new InvalidSearchException("Search query is invalid: null");
     }
@@ -84,7 +91,7 @@ public class SolrSearchDao implements SearchDao {
       throw new InvalidSearchException(
           "Search result size must be less than " + accessConfig.getMaxSearchResults());
     }
-    SolrQuery query = buildSearchRequest(searchRequest);
+    SolrQuery query = buildSearchRequest(searchRequest, fieldList);
     try {
       QueryResponse response = client.query(query);
       return buildSearchResponse(searchRequest, response);
@@ -103,7 +110,9 @@ public class SolrSearchDao implements SearchDao {
         .setStart(0)
         .setRows(0)
         .setQuery(groupRequest.getQuery());
-    query.set("collection", "bro,snort");
+
+    String indices = StringUtils.join(groupRequest.getIndices(), ',');
+    query.set("collection", indices);
     Optional<String> scoreField = groupRequest.getScoreField();
     if (scoreField.isPresent()) {
       query.set("stats", true);
@@ -121,39 +130,12 @@ public class SolrSearchDao implements SearchDao {
     }
   }
 
-  @Override
-  public Document getLatest(String guid, String collection) throws IOException {
-    try {
-      SolrDocument solrDocument = client.getById(collection, guid);
-      return toDocument(solrDocument);
-    } catch (SolrServerException e) {
-      throw new IOException(e);
-    }
-  }
 
-  @Override
-  public Iterable<Document> getAllLatest(List<GetRequest> getRequests) throws IOException {
-    Map<String, Collection<String>> collectionIdMap = new HashMap<>();
-    for (GetRequest getRequest: getRequests) {
-      Collection<String> ids = collectionIdMap.getOrDefault(getRequest.getSensorType(), new HashSet<>());
-      ids.add(getRequest.getGuid());
-      collectionIdMap.put(getRequest.getSensorType(), ids);
-    }
-    try {
-      List<Document> documents = new ArrayList<>();
-      for (String collection: collectionIdMap.keySet()) {
-        SolrDocumentList solrDocumentList = client.getById(collectionIdMap.get(collection),
-            new SolrQuery().set("collection", collection));
-        documents.addAll(solrDocumentList.stream().map(this::toDocument).collect(Collectors.toList()));
-      }
-      return documents;
-    } catch (SolrServerException e) {
-      throw new IOException(e);
-    }
-  }
 
+  // An explicit, overriding fieldList can be provided.  This is useful for things like metaalerts,
+  // which may need to modify that parameter.
   private SolrQuery buildSearchRequest(
-      SearchRequest searchRequest) {
+      SearchRequest searchRequest, String fieldList) {
     SolrQuery query = new SolrQuery()
         .setStart(searchRequest.getFrom())
         .setRows(searchRequest.getSize())
@@ -166,9 +148,17 @@ public class SolrSearchDao implements SearchDao {
 
     // handle search fields
     Optional<List<String>> fields = searchRequest.getFields();
-    if (fields.isPresent()) {
-      fields.get().forEach(query::addField);
+    if (fieldList == null) {
+      fieldList = "*";
+      if (fields.isPresent()) {
+        fieldList = StringUtils.join(fields.get(), ",");
+      }
     }
+//     TODO figure out how to set this not here. Possibly pull into SolrUtils.
+//    String childClause = fieldList + ",[child parentFilter=" + MetaAlertDao.STATUS_FIELD + ":"
+//        + MetaAlertStatus.ACTIVE.getStatusString() + "]";
+//    query.set("fl", childClause);
+    query.set("fl", fieldList);
 
     //handle facet fields
     Optional<List<String>> facetFields = searchRequest.getFacetFields();
@@ -198,7 +188,7 @@ public class SolrSearchDao implements SearchDao {
 
     // search hits --> search results
     List<SearchResult> results = solrDocumentList.stream()
-        .map(solrDocument -> getSearchResult(solrDocument, searchRequest.getFields()))
+        .map(solrDocument -> SolrUtilities.getSearchResult(solrDocument, searchRequest.getFields()))
         .collect(Collectors.toList());
     searchResponse.setResults(results);
 
@@ -223,11 +213,12 @@ public class SolrSearchDao implements SearchDao {
   private SearchResult getSearchResult(SolrDocument solrDocument, Optional<List<String>> fields) {
     SearchResult searchResult = new SearchResult();
     searchResult.setId((String) solrDocument.getFieldValue(Constants.GUID));
-    final Map<String, Object> source = new HashMap<>();
+    Map<String, Object> source;
     if (fields.isPresent()) {
+      source = new HashMap<>();
       fields.get().forEach(field -> source.put(field, solrDocument.getFieldValue(field)));
     } else {
-      solrDocument.getFieldNames().forEach(field -> source.put(field, solrDocument.getFieldValue(field)));
+      source = solrDocument.getFieldValueMap();
     }
     searchResult.setSource(source);
     return searchResult;
@@ -265,7 +256,8 @@ public class SolrSearchDao implements SearchDao {
     return groupResponse;
   }
 
-  private List<GroupResult> getGroupResults(GroupRequest groupRequest, int index, List<PivotField> pivotFields) {
+  private List<GroupResult> getGroupResults(GroupRequest groupRequest, int index,
+      List<PivotField> pivotFields) {
     List<Group> groups = groupRequest.getGroups();
     List<GroupResult> searchResultGroups = new ArrayList<>();
     final GroupOrder groupOrder = groups.get(index).getOrder();
@@ -281,30 +273,22 @@ public class SolrSearchDao implements SearchDao {
       }
     });
 
-    for(PivotField pivotField: pivotFields) {
+    for (PivotField pivotField : pivotFields) {
       GroupResult groupResult = new GroupResult();
       groupResult.setKey(pivotField.getValue().toString());
       groupResult.setTotal(pivotField.getCount());
       Optional<String> scoreField = groupRequest.getScoreField();
       if (scoreField.isPresent()) {
-        groupResult.setScore((Double) pivotField.getFieldStatsInfo().get("score").getSum());
+        groupResult
+            .setScore((Double) pivotField.getFieldStatsInfo().get(scoreField.get()).getSum());
       }
       if (index < groups.size() - 1) {
         groupResult.setGroupedBy(groups.get(index + 1).getField());
-        groupResult.setGroupResults(getGroupResults(groupRequest, index + 1, pivotField.getPivot()));
+        groupResult
+            .setGroupResults(getGroupResults(groupRequest, index + 1, pivotField.getPivot()));
       }
       searchResultGroups.add(groupResult);
     }
     return searchResultGroups;
-  }
-
-  private Document toDocument(SolrDocument solrDocument) {
-    Map<String, Object> document = new HashMap<>();
-    solrDocument.getFieldNames().stream()
-        .filter(name -> !name.equals(SolrDao.VERSION_FIELD))
-        .forEach(name -> document.put(name, solrDocument.getFieldValue(name)));
-    return new Document(document,
-        (String) solrDocument.getFieldValue(Constants.GUID),
-        (String) solrDocument.getFieldValue("source:type"), 0L);
   }
 }

@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
 import org.apache.metron.indexing.dao.AccessConfig;
+import org.apache.metron.indexing.dao.search.GetRequest;
 import org.apache.metron.indexing.dao.update.Document;
 import org.apache.metron.indexing.dao.update.UpdateDao;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -126,5 +128,15 @@ public class ElasticsearchUpdateDao implements UpdateDao {
     }
 
     return indexRequest;
+  }
+
+  @Override
+  public Document getLatest(String guid, String sensorType) throws IOException {
+    return searchDao.getLatest(guid, sensorType);
+  }
+
+  @Override
+  public Iterable<Document> getAllLatest(List<GetRequest> getRequests) throws IOException {
+    return searchDao.getAllLatest(getRequests);
   }
 }

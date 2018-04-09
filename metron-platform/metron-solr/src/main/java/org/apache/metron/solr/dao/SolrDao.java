@@ -22,6 +22,9 @@ import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.metron.common.configuration.Configurations;
+import org.apache.metron.common.configuration.IndexingConfigurations;
+import org.apache.metron.common.zookeeper.ConfigurationsCache;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.ColumnMetadataDao;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -80,7 +83,7 @@ public class SolrDao implements IndexDao {
       this.client = new CloudSolrClient.Builder().withZkHost((String) globalConfig.get("solr.zookeeper")).build();
       this.accessConfig = config;
       this.solrSearchDao = new SolrSearchDao(this.client, this.accessConfig);
-      this.solrUpdateDao = new SolrUpdateDao(this.client);
+      this.solrUpdateDao = new SolrUpdateDao(this.client, this.accessConfig, solrSearchDao);
       this.solrColumnMetadataDao = new SolrColumnMetadataDao(zkHost);
     }
   }
@@ -118,5 +121,13 @@ public class SolrDao implements IndexDao {
   @Override
   public Map<String, FieldType> getColumnMetadata(List<String> indices) throws IOException {
     return this.solrColumnMetadataDao.getColumnMetadata(indices);
+  }
+
+  public SolrClient getClient() {
+    return client;
+  }
+
+  public SolrSearchDao getSolrSearchDao() {
+    return solrSearchDao;
   }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,24 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.indexing.dao.search;
 
-public interface SearchDao {
+package org.apache.metron.indexing.util;
 
-  /**
-   * Return search response based on the search request
-   *
-   * @param searchRequest The request defining the search parameters.
-   * @return A response containing the results of the search.
-   * @throws InvalidSearchException If the search request is malformed.
-   */
-  SearchResponse search(SearchRequest searchRequest) throws InvalidSearchException;
+import java.util.Map;
+import java.util.function.Function;
+import org.apache.metron.common.configuration.IndexingConfigurations;
+import org.apache.metron.common.zookeeper.ConfigurationsCache;
 
-  /**
-   * Return group response based on the group request
-   * @param groupRequest The request defining the grouping parameters.
-   * @return A response containing the results of the grouping operation.
-   * @throws InvalidSearchException If the grouping request is malformed.
-   */
-  GroupResponse group(GroupRequest groupRequest) throws InvalidSearchException;
+public class IndexingCacheUtil {
+  public static Function<String, String> getIndexLookupFunction(ConfigurationsCache cache) {
+    return sensorType -> {
+      IndexingConfigurations indexingConfigs = cache.get( IndexingConfigurations.class);
+      Map<String, Object> indexingSensorConfigs = indexingConfigs.getSensorIndexingConfig(sensorType);
+      String indexingTopic = (String) indexingSensorConfigs.get(IndexingConfigurations.INDEX_CONF);
+      return indexingTopic != null ? indexingTopic : sensorType;
+    };
+  }
 }

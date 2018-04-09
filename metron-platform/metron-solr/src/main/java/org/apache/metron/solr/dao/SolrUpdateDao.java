@@ -17,6 +17,20 @@
  */
 package org.apache.metron.solr.dao;
 
+import org.apache.metron.common.utils.JSONUtils;
+import org.apache.metron.indexing.dao.AccessConfig;
+import org.apache.metron.indexing.dao.RetrieveLatestDao;
+import org.apache.metron.indexing.dao.search.SearchDao;
+import org.apache.metron.indexing.dao.update.Document;
+import org.apache.metron.indexing.dao.update.OriginalNotFoundException;
+import org.apache.metron.indexing.dao.update.PatchRequest;
+import org.apache.metron.indexing.dao.update.UpdateDao;
+import org.apache.solr.client.solrj.SolrClient;
+import org.apache.solr.client.solrj.SolrServerException;
+import org.apache.solr.common.SolrInputDocument;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
@@ -25,28 +39,32 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import org.apache.metron.indexing.dao.update.Document;
-import org.apache.metron.indexing.dao.update.UpdateDao;
-import org.apache.solr.client.solrj.SolrClient;
-import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.common.SolrInputDocument;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class SolrUpdateDao implements UpdateDao {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   private transient SolrClient client;
+  // TODO I don't know of a way to avoid knowing the collection.  Which means that
+  private AccessConfig config;
+  private SearchDao searchDao;
+  private RetrieveLatestDao retrieveLatestDao;
 
-  public SolrUpdateDao(SolrClient client) {
+  public SolrUpdateDao(SolrClient client, AccessConfig config, SearchDao searchDao, RetrieveLatestDao retrieveLatestDao) {
     this.client = client;
+    this.config = config;
+    this.searchDao = searchDao;
+    this.retrieveLatestDao = retrieveLatestDao;
+  }
+
+  public SolrUpdateDao(SolrClient solrClient) {
+    this.retrieveLatestDao = new SolrRetrieveLatestDao(solrClient)
   }
 
   @Override
   public void update(Document update, Optional<String> index) throws IOException {
     try {
-      SolrInputDocument solrInputDocument = toSolrInputDocument(update);
+      SolrInputDocument solrInputDocument = SolrUtilities.toSolrInputDocument(update);
       if (index.isPresent()) {
         this.client.add(index.get(), solrInputDocument);
       } else {
@@ -62,39 +80,49 @@ public class SolrUpdateDao implements UpdateDao {
     // updates with a collection specified
     Map<String, Collection<SolrInputDocument>> solrCollectionUpdates = new HashMap<>();
 
-    // updates with no collection specified
-    Collection<SolrInputDocument> solrUpdates = new ArrayList<>();
-
-    for(Entry<Document, Optional<String>> entry: updates.entrySet()) {
-      SolrInputDocument solrInputDocument = toSolrInputDocument(entry.getKey());
+    for (Entry<Document, Optional<String>> entry : updates.entrySet()) {
+      SolrInputDocument solrInputDocument = SolrUtilities.toSolrInputDocument(entry.getKey());
       Optional<String> index = entry.getValue();
       if (index.isPresent()) {
-        Collection<SolrInputDocument> solrInputDocuments = solrCollectionUpdates.get(index.get());
-        if (solrInputDocuments == null) {
-          solrInputDocuments = new ArrayList<>();
-        }
+        Collection<SolrInputDocument> solrInputDocuments = solrCollectionUpdates
+            .getOrDefault(index.get(), new ArrayList<>());
         solrInputDocuments.add(solrInputDocument);
         solrCollectionUpdates.put(index.get(), solrInputDocuments);
       } else {
-        solrUpdates.add(solrInputDocument);
+        String lookupIndex = config.getIndexSupplier().apply(entry.getKey().getSensorType());
+        Collection<SolrInputDocument> solrInputDocuments = solrCollectionUpdates
+            .getOrDefault(lookupIndex, new ArrayList<>());
+        solrInputDocuments.add(solrInputDocument);
+        solrCollectionUpdates.put(lookupIndex, solrInputDocuments);
       }
     }
     try {
-      if (!solrCollectionUpdates.isEmpty()) {
-        for(Entry<String, Collection<SolrInputDocument>> entry: solrCollectionUpdates.entrySet()) {
-          this.client.add(entry.getKey(), entry.getValue());
-        }
-      } else {
-        this.client.add(solrUpdates);
+      for (Entry<String, Collection<SolrInputDocument>> entry : solrCollectionUpdates.entrySet()) {
+        this.client.add(entry.getKey(), entry.getValue());
       }
     } catch (SolrServerException e) {
       throw new IOException(e);
     }
   }
 
-  private SolrInputDocument toSolrInputDocument(Document document) {
-    SolrInputDocument solrInputDocument = new SolrInputDocument();
-    document.getDocument().forEach(solrInputDocument::addField);
-    return solrInputDocument;
+  @Override
+  public Document getPatchedDocument(PatchRequest request, Optional<Long> timestamp) throws OriginalNotFoundException, IOException {
+    Map<String, Object> latest = request.getSource();
+    if (latest == null) {
+      Document latestDoc = retrieveLatestDao.getLatest(request.getGuid(), request.getSensorType());
+      if (latestDoc != null && latestDoc.getDocument() != null) {
+        latest = latestDoc.getDocument();
+      } else {
+        throw new OriginalNotFoundException(
+            "Unable to patch an document that doesn't exist and isn't specified.");
+      }
+    }
+    Map<String, Object> updated = JSONUtils.INSTANCE.applyPatch(request.getPatch(), latest);
+    return new Document(
+        updated,
+        request.getGuid(),
+        request.getSensorType(),
+        timestamp.orElse(System.currentTimeMillis()));
   }
+
 }
