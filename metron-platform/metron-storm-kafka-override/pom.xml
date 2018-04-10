@@ -42,8 +42,8 @@
         </dependency>
         <dependency>
             <groupId>org.apache.storm</groupId>
-            <artifactId>metron-storm-core-override</artifactId>
-            <version>${project.parent.version}</version>
+            <artifactId>storm-core</artifactId>
+            <version>${global_storm_version}</version>
             <scope>provided</scope>
             <exclusions>
                 <exclusion>

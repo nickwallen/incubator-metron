@@ -17,12 +17,18 @@
  */
 package org.apache.storm;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
 import java.util.UUID;
 
 /**
  * These functions were backported from org.apache.storm.utils.Utils in v1.1.0 of Apache Storm.
  */
 public class StormTimerUtils {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * Checks if a throwable is an instance of a particular class
@@ -43,5 +49,11 @@ public class StormTimerUtils {
 
   public static String uuid() {
     return UUID.randomUUID().toString();
+  }
+
+  public static void exitProcess(int val, String msg) {
+    String combinedErrorMessage = "Halting process: " + msg;
+    LOG.error(combinedErrorMessage, new RuntimeException(combinedErrorMessage));
+    Runtime.getRuntime().exit(val);
   }
 }

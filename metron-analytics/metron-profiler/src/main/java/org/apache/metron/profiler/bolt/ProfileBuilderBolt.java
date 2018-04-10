@@ -43,12 +43,12 @@ import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.zookeeper.SimpleEventListener;
 import org.apache.metron.zookeeper.ZKCache;
 import org.apache.storm.StormTimer;
+import org.apache.storm.StormTimerUtils;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
 import org.apache.storm.topology.base.BaseWindowedBolt;
 import org.apache.storm.tuple.Tuple;
-import org.apache.storm.utils.Utils;
 import org.apache.storm.windowing.TupleWindow;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -450,7 +450,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     return new StormTimer(name, (thread, exception) -> {
       String msg = String.format("Unexpected exception in timer task; timer=%s", name);
       LOG.error(msg, exception);
-      Utils.exitProcess(1, msg);
+      StormTimerUtils.exitProcess(1, msg);
     });
   }
 
