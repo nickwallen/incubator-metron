@@ -19,6 +19,9 @@ package org.apache.storm;
 
 import java.util.UUID;
 
+/**
+ * These functions were backported from org.apache.storm.utils.Utils in v1.1.0 of Apache Storm.
+ */
 public class StormTimerUtils {
 
   /**

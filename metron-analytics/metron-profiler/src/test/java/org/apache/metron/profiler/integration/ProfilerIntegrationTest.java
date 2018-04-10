@@ -301,10 +301,10 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
             .withComponent("zk",zkComponent)
             .withComponent("kafka", kafkaComponent)
             .withComponent("config", configUploadComponent)
-            .withComponent("storm", fluxComponent)
+            .withComponent("org/apache/storm", fluxComponent)
             .withMillisecondsBetweenAttempts(15000)
             .withNumRetries(10)
-            .withCustomShutdownOrder(new String[] {"storm","config","kafka","zk"})
+            .withCustomShutdownOrder(new String[] {"org/apache/storm","config","kafka","zk"})
             .build();
     runner.start();
   }

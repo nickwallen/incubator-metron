@@ -18,10 +18,9 @@
 
 package org.apache.storm;
 
-import org.apache.storm.utils.Time;
-import org.apache.storm.utils.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.apache.storm.utils.Time;
 
 import java.util.Comparator;
 import java.util.Random;
@@ -31,9 +30,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * The timer defined in this file is very similar to java.util.Timer, except
  * it integrates with Storm's time simulation capabilities. This lets us test
- * code that does asynchronous work on the timer thread
+ * code that does asynchronous work on the timer thread.
+ *
+ * This class has been backported from v1.1.0 of Apache Storm.
  */
-
 public class StormTimer implements AutoCloseable {
   private static final Logger LOG = LoggerFactory.getLogger(StormTimer.class);
 
@@ -63,7 +63,7 @@ public class StormTimer implements AutoCloseable {
     private AtomicBoolean active = new AtomicBoolean(false);
 
     // function to call when timer is killed
-    private Thread.UncaughtExceptionHandler onKill;
+    private UncaughtExceptionHandler onKill;
 
     //random number generator
     private Random random = new Random();
@@ -100,7 +100,7 @@ public class StormTimer implements AutoCloseable {
             Time.sleep(1000);
           }
         } catch (Throwable e) {
-          if (!(Utils.exceptionCauseIsInstanceOf(InterruptedException.class, e))) {
+          if (!(StormTimerUtils.exceptionCauseIsInstanceOf(InterruptedException.class, e))) {
             this.onKill.uncaughtException(this, e);
             this.setActive(false);
           }
@@ -108,7 +108,7 @@ public class StormTimer implements AutoCloseable {
       }
     }
 
-    public void setOnKillFunc(Thread.UncaughtExceptionHandler onKill) {
+    public void setOnKillFunc(UncaughtExceptionHandler onKill) {
       this.onKill = onKill;
     }
 
