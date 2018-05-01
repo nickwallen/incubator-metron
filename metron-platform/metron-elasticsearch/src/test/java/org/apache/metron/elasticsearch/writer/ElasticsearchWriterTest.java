@@ -18,51 +18,103 @@
 
 package org.apache.metron.elasticsearch.writer;
 
+import com.google.common.collect.ImmutableList;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.metron.common.configuration.IndexingConfigurations;
+import org.apache.metron.common.configuration.writer.IndexingWriterConfiguration;
+import org.apache.metron.common.writer.BulkWriterResponse;
+import org.apache.storm.task.TopologyContext;
+import org.apache.storm.tuple.Tuple;
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.common.unit.TimeValue;
+import org.json.simple.JSONObject;
+import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.metron.common.writer.BulkWriterResponse;
-import org.apache.storm.tuple.Tuple;
-import org.elasticsearch.action.bulk.BulkItemResponse;
-import org.elasticsearch.action.bulk.BulkResponse;
-import org.junit.Test;
-
+/**
+ * Tests the ElasticsearchWriter.
+ */
 public class ElasticsearchWriterTest {
+
     @Test
-    public void testSingleSuccesses() throws Exception {
+    public void testSingleSuccess() throws Exception {
         Tuple tuple1 = mock(Tuple.class);
 
+        // the response has 1 success only
         BulkResponse response = mock(BulkResponse.class);
+        when(response.getItems()).thenReturn(new BulkItemResponse[1]);
         when(response.hasFailures()).thenReturn(false);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
+        // the expected response has 1 success only
         BulkWriterResponse expected = new BulkWriterResponse();
         expected.addSuccess(tuple1);
 
+        // execute
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1), response);
+        BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1), response);
 
+        // validate
         assertEquals("Response should have no errors and single success", expected, actual);
     }
 
     @Test
     public void testMultipleSuccesses() throws Exception {
+
+        JSONObject message1 = new JSONObject();
+        JSONObject message2 = new JSONObject();
+
         Tuple tuple1 = mock(Tuple.class);
         Tuple tuple2 = mock(Tuple.class);
 
+        // the response has 2 successes
         BulkResponse response = mock(BulkResponse.class);
         when(response.hasFailures()).thenReturn(false);
+        when(response.getItems()).thenReturn(new BulkItemResponse[2]);
+        when(response.hasFailures()).thenReturn(false);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
         BulkWriterResponse expected = new BulkWriterResponse();
         expected.addSuccess(tuple1);
         expected.addSuccess(tuple2);
 
+        Map<String, Object> globals = new HashMap<>();
+        globals.put("es.clustername", "metron");
+
+        IndexingConfigurations configsForSensor = new IndexingConfigurations();
+        configsForSensor.updateGlobalConfig(globals);
+
+        configsForSensor.updateSensorIndexingConfig("sensor", Collections.emptyMap());
+        IndexingWriterConfiguration writerConfigurations = new IndexingWriterConfiguration("elasticsearch", configsForSensor);
+
+        Map<String, Object> stormConf = new HashMap<>();
+        TopologyContext context = mock(TopologyContext.class);
+
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        esWriter.init(stormConf, context, writerConfigurations);
+
+        List<Tuple> tuples = new ArrayList<>();
+        tuples.add(tuple1);
+        tuples.add(tuple2);
+
+        List<JSONObject> messages = new ArrayList<>();
+        messages.add(message1);
+        messages.add(message2);
+
+        // TODO this is what we should be doing.
+        BulkWriterResponse actual = esWriter.write("sensor", writerConfigurations, tuples, messages);
+        //BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have no errors and two successes", expected, actual);
     }
@@ -71,8 +123,11 @@ public class ElasticsearchWriterTest {
     public void testSingleFailure() throws Exception {
         Tuple tuple1 = mock(Tuple.class);
 
+        // the response has 1 failure
         BulkResponse response = mock(BulkResponse.class);
         when(response.hasFailures()).thenReturn(true);
+        when(response.getItems()).thenReturn(new BulkItemResponse[1]);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
         Exception e = new IllegalStateException();
         BulkItemResponse itemResponse = buildBulkItemFailure(e);
@@ -82,7 +137,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e, tuple1);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1), response);
+        BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1), response);
 
         assertEquals("Response should have one error and zero successes", expected, actual);
     }
@@ -92,8 +147,11 @@ public class ElasticsearchWriterTest {
         Tuple tuple1 = mock(Tuple.class);
         Tuple tuple2 = mock(Tuple.class);
 
+        // the response has 2 failures
         BulkResponse response = mock(BulkResponse.class);
         when(response.hasFailures()).thenReturn(true);
+        when(response.getItems()).thenReturn(new BulkItemResponse[1]);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
         Exception e = new IllegalStateException();
 
@@ -107,7 +165,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e, tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have two errors and no successes", expected, actual);
 
@@ -123,8 +181,11 @@ public class ElasticsearchWriterTest {
         Tuple tuple1 = mock(Tuple.class);
         Tuple tuple2 = mock(Tuple.class);
 
+        // the response has 2 failures
         BulkResponse response = mock(BulkResponse.class);
         when(response.hasFailures()).thenReturn(true);
+        when(response.getItems()).thenReturn(new BulkItemResponse[2]);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
         Exception e = new IllegalStateException("Cause");
         Exception e2 = new IllegalStateException("Different Cause");
@@ -138,7 +199,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e2, tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have two errors and no successes", expected, actual);
 
@@ -155,8 +216,11 @@ public class ElasticsearchWriterTest {
         Tuple tuple1 = mock(Tuple.class);
         Tuple tuple2 = mock(Tuple.class);
 
+        // the response has 1 success and 1 failure
         BulkResponse response = mock(BulkResponse.class);
         when(response.hasFailures()).thenReturn(true);
+        when(response.getItems()).thenReturn(new BulkItemResponse[1]);
+        when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
 
         Exception e = new IllegalStateException("Cause");
         BulkItemResponse itemResponse = buildBulkItemFailure(e);
@@ -171,7 +235,7 @@ public class ElasticsearchWriterTest {
         expected.addSuccess(tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have one error and one success", expected, actual);
     }
