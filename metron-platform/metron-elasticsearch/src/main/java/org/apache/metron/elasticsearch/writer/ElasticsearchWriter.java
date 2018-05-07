@@ -17,12 +17,7 @@
  */
 package org.apache.metron.elasticsearch.writer;
 
-import java.io.Serializable;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import org.apache.commons.lang.StringUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.interfaces.FieldNameConverter;
@@ -40,51 +35,181 @@ import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
+import java.lang.invoke.MethodHandles;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+/**
+ * Writes messages to an Elasticsearch index.
+ */
 public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
+  /**
+   * The Elasticsearch client.
+   */
   private transient TransportClient client;
+
+  /**
+   * An optional field name converter.
+   */
+  private Optional<FieldNameConverter> fieldNameConverter;
+
+  /**
+   * Formats the date contained in the index name.
+   */
   private SimpleDateFormat dateFormat;
-  private static final Logger LOG = LoggerFactory.getLogger(ElasticsearchWriter.class);
-  private FieldNameConverter fieldNameConverter = new ElasticsearchFieldNameConverter();
 
   @Override
-  public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration configurations) {
-    Map<String, Object> globalConfiguration = configurations.getGlobalConfig();
-    client = ElasticsearchUtils.getClient(globalConfiguration);
-    dateFormat = ElasticsearchUtils.getIndexFormat(globalConfiguration);
+  public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration writerConfig) {
+    Map<String, Object> globalConfig = writerConfig.getGlobalConfig();
+    client = ElasticsearchUtils.getClient(globalConfig);
+    dateFormat = ElasticsearchUtils.getIndexFormat(globalConfig);
+
+    // TODO build class based on configured class name?
+    fieldNameConverter = Optional.of(new ElasticsearchFieldNameConverter());
   }
 
 
+  /**
+   * Writes messages to an Elasticsearch index.
+   *
+   * @param sensorType The type of sensor generating the messages.
+   * @param configurations Configurations that should be passed to the writer.
+   * @param tuples The Tuples that produced the message to be written.
+   * @param messages The messages that need written to an Elasticsearch index.
+   * @return The response received after indexing all of the messages.
+   * @throws Exception
+   */
   @Override
   public BulkWriterResponse write(String sensorType, WriterConfiguration configurations, Iterable<Tuple> tuples, List<JSONObject> messages) throws Exception {
-    final String indexPostfix = dateFormat.format(new Date());
+
+    // create the bulk index request
     BulkRequestBuilder bulkRequest = client.prepareBulk();
 
+    // create an index request for each message
     for(JSONObject message: messages) {
-
-      JSONObject esDoc = new JSONObject();
-      for(Object k : message.keySet()){
-        deDot(k.toString(), message, esDoc);
-      }
-
-      String indexName = ElasticsearchUtils.getIndexName(sensorType, indexPostfix, configurations);
-      IndexRequestBuilder indexRequestBuilder = client.prepareIndex(indexName, sensorType + "_doc");
-      indexRequestBuilder = indexRequestBuilder.setSource(esDoc.toJSONString());
-      String guid = (String)esDoc.get(Constants.GUID);
-      if(guid != null) {
-        indexRequestBuilder.setId(guid);
-      }
-
-      Object ts = esDoc.get("timestamp");
-      if(ts != null) {
-        indexRequestBuilder = indexRequestBuilder.setTimestamp(ts.toString());
-      }
-
-      bulkRequest.add(indexRequestBuilder);
+      IndexRequestBuilder request = createIndexRequest(sensorType, configurations, message);
+      bulkRequest.add(request);
     }
 
-    BulkResponse bulkResponse = bulkRequest.execute().actionGet();
-    return buildWriteReponse(tuples, bulkResponse);
+    // submit the bulk request
+    LOG.debug("Submitting bulk index request; sensorType={}, count={}", sensorType, messages.size());
+    BulkResponse bulkResponse = bulkRequest
+            .execute()
+            .actionGet();
+
+    // create the response
+    LOG.debug("Received response to bulk index request; took={} ms, ", bulkResponse.getTookInMillis());
+    BulkWriterResponse response = buildWriterResponse(tuples, bulkResponse);
+    return response;
+  }
+
+  /**
+   * Creates a request to index a message.
+   *
+   * @param sensorType The type of sensor which generated the message.
+   * @param writerConfig The user-defined configurations for this writer.
+   * @param message The message that needs written to an Elasticsearch index.
+   * @return The index request for the message.
+   */
+  private IndexRequestBuilder createIndexRequest(String sensorType, WriterConfiguration writerConfig, JSONObject message) {
+
+    // create the document that will be indexed based on the message
+    JSONObject document = createDocument(message);
+
+    String indexName = indexName(sensorType, writerConfig);
+    String docType = docType(sensorType);
+    IndexRequestBuilder requestBuilder = client
+            .prepareIndex(indexName, docType)
+            .setSource(document.toJSONString());
+
+    // set the document GUID
+    String guid = (String) document.get(Constants.GUID);
+    if(guid != null) {
+      requestBuilder.setId(guid);
+    }
+
+    // set the document timestamp
+    Object ts = document.get("timestamp");
+    if(ts != null) {
+      requestBuilder.setTimestamp(ts.toString());
+    }
+
+    return requestBuilder;
+  }
+
+  /**
+   * Returns the name of the index.
+   *
+   * @param sensorType The type of sensor that generated the message.
+   * @param writerConfig The user-defined indexing configuration.
+   * @return The name of the index that the message should be written to.
+   */
+  public String indexName(String sensorType, WriterConfiguration writerConfig) {
+
+    // use system time when generating the index name
+    long now = System.currentTimeMillis();
+    String postfix = dateFormat.format(new Date(now));
+    String indexName = ElasticsearchUtils.getIndexName(sensorType, postfix, writerConfig);
+
+    LOG.debug("Using index named '{}'; sensorType={}, timestamp={}", indexName, sensorType, now);
+    return indexName;
+  }
+
+  /**
+   * Returns the doc type.
+   *
+   * @param sensorType The type of sensor that generated the message.
+   * @return The doc type for the message.
+   */
+  public String docType(String sensorType) {
+
+    return sensorType + "_doc";
+  }
+
+  /**
+   * Creates a representation of the document that will be indexed
+   * based on a message.
+   *
+   * @param message The message that needs indexed.
+   * @return That document that will be indexed.
+   */
+  private JSONObject createDocument(JSONObject message) {
+
+    // make a deep copy of the message
+    JSONObject document = new JSONObject();
+    document.putAll(message);
+
+    if(fieldNameConverter.isPresent()) {
+
+      // allow the converter to rename any fields
+      FieldNameConverter converter = fieldNameConverter.get();
+      for (Object key : document.keySet()) {
+
+        String originalField = (String) key;
+        String newField = converter.convert(originalField);
+        if (!StringUtils.equals(originalField, newField)) {
+
+          // rename the field
+          Object value = document.remove(originalField);
+          document.put(newField, value);
+
+          LOG.debug("Field renamed; original={}, new={}", originalField, newField);
+        }
+      }
+
+    } else {
+      LOG.debug("No field name converter present");
+    }
+
+    return document;
   }
 
   @Override
@@ -92,18 +217,32 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
     return "elasticsearch";
   }
 
-  protected BulkWriterResponse buildWriteReponse(Iterable<Tuple> tuples, BulkResponse bulkResponse) throws Exception {
+  /**
+   * Builds the response based on the response recieved from Elasticsearch.
+   *
+   * @param tuples The tuples containing the messages that needed indexed.
+   * @param bulkResponse The Elasticsearch response to the bulk request
+   * @return The response.
+   * @throws Exception
+   */
+  protected BulkWriterResponse buildWriterResponse(Iterable<Tuple> tuples, BulkResponse bulkResponse) throws Exception {
+
     // Elasticsearch responses are in the same order as the request, giving us an implicit mapping with Tuples
     BulkWriterResponse writerResponse = new BulkWriterResponse();
     if (bulkResponse.hasFailures()) {
+
+      int failures = 0;
       Iterator<BulkItemResponse> respIter = bulkResponse.iterator();
       Iterator<Tuple> tupleIter = tuples.iterator();
       while (respIter.hasNext() && tupleIter.hasNext()) {
+
         BulkItemResponse item = respIter.next();
         Tuple tuple = tupleIter.next();
 
         if (item.isFailed()) {
           writerResponse.addError(item.getFailure().getCause(), tuple);
+          failures++;
+
         } else {
           writerResponse.addSuccess(tuple);
         }
@@ -113,31 +252,23 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
           throw new Exception(bulkResponse.buildFailureMessage());
         }
       }
+      LOG.debug("Response contains {} failure(s) out of {} request(s); error={}",
+              failures, bulkResponse.getItems().length, bulkResponse.buildFailureMessage());
+
     } else {
       writerResponse.addAllSuccesses(tuples);
     }
+
 
     return writerResponse;
   }
 
   @Override
   public void close() throws Exception {
-    client.close();
-  }
 
-  //JSONObject doesn't expose map generics
-  @SuppressWarnings("unchecked")
-  private void deDot(String field, JSONObject origMessage, JSONObject message){
-
-    if(field.contains(".")){
-
-      LOG.debug("Dotted field: {}", field);
-
+    if(client != null) {
+      client.close();
     }
-    String newkey = fieldNameConverter.convert(field);
-    message.put(newkey,origMessage.get(field));
-
   }
-
 }
 
