@@ -44,7 +44,7 @@ public class ElasticsearchWriterTest {
         expected.addSuccess(tuple1);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1), response);
 
         assertEquals("Response should have no errors and single success", expected, actual);
     }
@@ -62,7 +62,7 @@ public class ElasticsearchWriterTest {
         expected.addSuccess(tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have no errors and two successes", expected, actual);
     }
@@ -82,7 +82,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e, tuple1);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1), response);
 
         assertEquals("Response should have one error and zero successes", expected, actual);
     }
@@ -107,7 +107,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e, tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have two errors and no successes", expected, actual);
 
@@ -138,7 +138,7 @@ public class ElasticsearchWriterTest {
         expected.addError(e2, tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have two errors and no successes", expected, actual);
 
@@ -171,7 +171,7 @@ public class ElasticsearchWriterTest {
         expected.addSuccess(tuple2);
 
         ElasticsearchWriter esWriter = new ElasticsearchWriter();
-        BulkWriterResponse actual = esWriter.buildWriteReponse(ImmutableList.of(tuple1, tuple2), response);
+        BulkWriterResponse actual = esWriter.buildWriterResponse(ImmutableList.of(tuple1, tuple2), response);
 
         assertEquals("Response should have one error and one success", expected, actual);
     }
