@@ -17,34 +17,53 @@
  */
 package org.apache.metron.common.writer;
 
+import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.tuple.Tuple;
-import org.apache.metron.common.configuration.Configurations;
-import org.apache.metron.common.configuration.EnrichmentConfigurations;
-import org.apache.metron.common.configuration.writer.WriterConfiguration;
 
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Writes multiple messages in bulk to an endpoint.
+ *
+ * @param <MESSAGE_T> The message type.
+ */
 public interface BulkMessageWriter<MESSAGE_T> extends AutoCloseable, Serializable {
 
+  /**
+   * Initialize the writer.
+   *
+   * @param stormConf The storm configuration.
+   * @param topologyContext The topology context.
+   * @param config The writer configuration.
+   * @throws Exception
+   */
   void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) throws Exception;
 
   /**
-  * Writes the messages to a particular output (e.g. Elasticsearch). Exceptions trigger failure of the entire batch.
+  * Writes the messages to a particular output (e.g. Elasticsearch). Exceptions trigger failure of
+   * the entire batch.
+   *
   * @param sensorType The type of sensor being generating the messages
-  * @param configurations Configurations that should be passed to the writer (e.g. index and
+  * @param writerConfig The writer configuration.
   * @param tuples The Tuples that produced the message to be written
-  * @param messages  The message to be written
+  * @param messages The message to be written
   * @return A response containing successes and failures within the batch.
-  * @throws Exception If an unrecoverable error is made, an Exception is thrown which should be treated as a full-batch failure (e.g. target system is down).
+  * @throws Exception If an unrecoverable error is made, an Exception is thrown which should be treated
+  *                   as a full-batch failure (e.g. target system is down).
   */
-  BulkWriterResponse write(String sensorType
-            , WriterConfiguration configurations
-            , Iterable<Tuple> tuples
-            , List<MESSAGE_T> messages
-            ) throws Exception;
+  BulkWriterResponse write(
+          String sensorType,
+          WriterConfiguration writerConfig,
+          Iterable<Tuple> tuples,
+          List<MESSAGE_T> messages) throws Exception;
 
+  /**
+   * Returns the name of the writer.
+   *
+   * @return The name of the writer.
+   */
   String getName();
 }
