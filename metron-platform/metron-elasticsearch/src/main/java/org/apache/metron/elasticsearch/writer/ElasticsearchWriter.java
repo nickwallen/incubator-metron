@@ -17,7 +17,7 @@
  */
 package org.apache.metron.elasticsearch.writer;
 
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.interfaces.FieldNameConverter;
@@ -105,8 +105,9 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
             .execute()
             .actionGet();
 
-    // create the response
-    LOG.debug("Received response to bulk index request; took={} ms, ", bulkResponse.getTookInMillis());
+    // create the writer's response
+    LOG.debug("Received response to bulk index request; sensorType={}, count={}, took={} ms, ",
+            sensorType, ArrayUtils.getLength(bulkResponse.getItems()), bulkResponse.getTookInMillis());
     BulkWriterResponse response = buildWriterResponse(tuples, bulkResponse);
     return response;
   }
@@ -183,30 +184,19 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
    */
   private JSONObject createDocument(JSONObject message) {
 
-    // make a deep copy of the message
+    // the document is essentially a copy of the message
     JSONObject document = new JSONObject();
-    document.putAll(message);
+    for (Object key : message.keySet()) {
 
-    if(fieldNameConverter.isPresent()) {
+      String fieldName = (String) key;
+      Object fieldValue = message.get(fieldName);
 
-      // allow the converter to rename any fields
-      FieldNameConverter converter = fieldNameConverter.get();
-      for (Object key : document.keySet()) {
-
-        String originalField = (String) key;
-        String newField = converter.convert(originalField);
-        if (!StringUtils.equals(originalField, newField)) {
-
-          // rename the field
-          Object value = document.remove(originalField);
-          document.put(newField, value);
-
-          LOG.debug("Field renamed; original={}, new={}", originalField, newField);
-        }
+      // allow fields to be renamed in the document
+      if(fieldNameConverter.isPresent()) {
+        fieldName = fieldNameConverter.get().convert(fieldName);
       }
 
-    } else {
-      LOG.debug("No field name converter present");
+      document.put(fieldName, fieldValue);
     }
 
     return document;
@@ -228,37 +218,70 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
   protected BulkWriterResponse buildWriterResponse(Iterable<Tuple> tuples, BulkResponse bulkResponse) throws Exception {
 
     // Elasticsearch responses are in the same order as the request, giving us an implicit mapping with Tuples
-    BulkWriterResponse writerResponse = new BulkWriterResponse();
+    BulkWriterResponse writerResponse;
     if (bulkResponse.hasFailures()) {
-
-      int failures = 0;
-      Iterator<BulkItemResponse> respIter = bulkResponse.iterator();
-      Iterator<Tuple> tupleIter = tuples.iterator();
-      while (respIter.hasNext() && tupleIter.hasNext()) {
-
-        BulkItemResponse item = respIter.next();
-        Tuple tuple = tupleIter.next();
-
-        if (item.isFailed()) {
-          writerResponse.addError(item.getFailure().getCause(), tuple);
-          failures++;
-
-        } else {
-          writerResponse.addSuccess(tuple);
-        }
-
-        // Should never happen, so fail the entire batch if it does.
-        if (respIter.hasNext() != tupleIter.hasNext()) {
-          throw new Exception(bulkResponse.buildFailureMessage());
-        }
-      }
-      LOG.debug("Response contains {} failure(s) out of {} request(s); error={}",
-              failures, bulkResponse.getItems().length, bulkResponse.buildFailureMessage());
+      writerResponse = handleSomeFailures(tuples, bulkResponse);
 
     } else {
-      writerResponse.addAllSuccesses(tuples);
+      writerResponse = handleSuccess(tuples);
     }
 
+    if(writerResponse.numberOfErrors() > writerResponse.numberOfSuccesses()) {
+      LOG.warn("Writer response created; successes={}, errors={}, cause={}",
+              writerResponse.numberOfSuccesses(), writerResponse.numberOfErrors(), bulkResponse.buildFailureMessage());
+
+    } else {
+      LOG.debug("Writer response created; successes={}, errors={}, cause={}",
+              writerResponse.numberOfSuccesses(), writerResponse.numberOfErrors(), bulkResponse.buildFailureMessage());
+    }
+
+    return writerResponse;
+  }
+
+  /**
+   * Handles an Elasticsearch resposne that contains no failures.
+   *
+   * @param tuples The tuples whose messages were written.
+   * @return The {@link BulkWriterResponse}.
+   */
+  private BulkWriterResponse handleSuccess(Iterable<Tuple> tuples) {
+
+    BulkWriterResponse writerResponse = new BulkWriterResponse();
+    writerResponse.addAllSuccesses(tuples);
+    return writerResponse;
+  }
+
+  /**
+   * Handles an Elasticsearch response that contains some successes and some failures.
+   *
+   * @param tuples The tuples whose messages were written.
+   * @param bulkResponse The Elasticsearch response.
+   * @return The {@link BulkWriterResponse}.
+   */
+  private BulkWriterResponse handleSomeFailures(Iterable<Tuple> tuples, BulkResponse bulkResponse) {
+
+    BulkWriterResponse writerResponse = new BulkWriterResponse();
+
+    // iterate through each item to distinguish between successes and failures
+    Iterator<BulkItemResponse> respIter = bulkResponse.iterator();
+    Iterator<Tuple> tupleIter = tuples.iterator();
+    while (respIter.hasNext() && tupleIter.hasNext()) {
+
+      BulkItemResponse item = respIter.next();
+      Tuple tuple = tupleIter.next();
+
+      if (item.isFailed()) {
+        writerResponse.addError(item.getFailure().getCause(), tuple);
+
+      } else {
+        writerResponse.addSuccess(tuple);
+      }
+
+      // should never happen, so fail the entire batch if it does.
+      if (respIter.hasNext() != tupleIter.hasNext()) {
+        throw new IllegalStateException(bulkResponse.buildFailureMessage());
+      }
+    }
 
     return writerResponse;
   }
