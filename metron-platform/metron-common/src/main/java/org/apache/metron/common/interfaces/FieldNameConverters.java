@@ -15,26 +15,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.bolt;
+package org.apache.metron.common.interfaces;
 
-import org.apache.metron.common.configuration.IndexingConfigurations;
-import org.apache.metron.common.zookeeper.configurations.ConfigurationsUpdater;
-import org.apache.metron.common.zookeeper.configurations.IndexingUpdater;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+/**
+ * Provides a convenient way to specify and look-up {@link FieldNameConverter} implementations.
+ */
+public enum FieldNameConverters {
 
-import java.lang.invoke.MethodHandles;
+  /**
+   * Removes dots from all field names and replaces them with colons.
+   */
+  DEDOT_FIELD_NAMES(new DeDotFieldNameConverter());
 
-public abstract class ConfiguredIndexingBolt extends ConfiguredBolt<IndexingConfigurations> {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  /**
+   * The converter.
+   */
+  private FieldNameConverter converter;
 
-  public ConfiguredIndexingBolt(String zookeeperUrl) {
-    super(zookeeperUrl);
+  FieldNameConverters(FieldNameConverter converter) {
+    this.converter = converter;
   }
 
-  @Override
-  protected ConfigurationsUpdater<IndexingConfigurations> createUpdater() {
-    return new IndexingUpdater(this, this::getConfigurations);
+  /**
+   * Returns the {@link FieldNameConverter}.
+   *
+   * @return The {@link FieldNameConverter}.
+   */
+  public FieldNameConverter get() {
+    return converter;
   }
-
 }

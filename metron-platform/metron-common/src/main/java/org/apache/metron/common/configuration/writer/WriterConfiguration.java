@@ -22,13 +22,71 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Configures a writer which indexes messages.
+ *
+ * <p>Each index destination (HDFS, Elasticsearch, Solr) has a separate writer configuration.
+ * <p>Each writer allows separate configuration values for each sensor.
+ */
 public interface WriterConfiguration extends Serializable {
+
+  /**
+   * Returns the batch size for a given sensor.
+   *
+   * @param sensorName The name of the sensor.
+   * @return The batch size for a given sensor.
+   */
   int getBatchSize(String sensorName);
+
+  /**
+   * Returns the batch timeout for a given sensor.
+   *
+   * @param sensorName The name of the sensor.
+   * @return The batch timeout for a given sensor.
+   */
   int getBatchTimeout(String sensorName);
+
+  /**
+   * Returns the batch timeout for all configured sensors.
+   *
+   * @return All of the batch timeouts.
+   */
   List<Integer> getAllConfiguredTimeouts();
+
+  /**
+   * Returns the index name for a given sensor.
+   *
+   * @param sensorName The name of the sensor.
+   * @return The index name.
+   */
   String getIndex(String sensorName);
+
+  /**
+   * Returns if this writer is enabled for a given sensor.
+   *
+   * @param sensorName The name of the sensor.
+   * @return True, if this writer is enabled.  Otherwise, false.
+   */
   boolean isEnabled(String sensorName);
+
+  /**
+   * Returns the configuration for the sensor.
+   *
+   * @param sensorName The name of the sensor.
+   * @return
+   */
   Map<String, Object> getSensorConfig(String sensorName);
+
+  /**
+   * Returns the global config.
+   * @return The global configuration values.
+   */
   Map<String, Object> getGlobalConfig();
+
+  /**
+   * Is the configuration for a given sensor, set to all default values?
+   * @param sensorName The name of the sensor.
+   * @return True, if the configuration contains only the default values.  Otherwise, false.
+   */
   boolean isDefault(String sensorName);
 }

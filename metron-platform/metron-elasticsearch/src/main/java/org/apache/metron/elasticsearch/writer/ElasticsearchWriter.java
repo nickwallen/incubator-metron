@@ -18,9 +18,11 @@
 package org.apache.metron.elasticsearch.writer;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.interfaces.FieldNameConverter;
+import org.apache.metron.common.interfaces.FieldNameConverters;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.BulkWriterResponse;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;
@@ -52,6 +54,11 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
+   * Allows the user to specify the {@link FieldNameConverter} to use.
+   */
+  private static final String FIELD_NAME_CONVERTER_KEY = "indexing.writer.field.name.converter";
+
+  /**
    * The Elasticsearch client.
    */
   private transient TransportClient client;
@@ -71,31 +78,33 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
     Map<String, Object> globalConfig = writerConfig.getGlobalConfig();
     client = ElasticsearchUtils.getClient(globalConfig);
     dateFormat = ElasticsearchUtils.getIndexFormat(globalConfig);
-
-    // TODO build class based on configured class name?
-    fieldNameConverter = Optional.of(new ElasticsearchFieldNameConverter());
+    fieldNameConverter = null;
   }
-
 
   /**
    * Writes messages to an Elasticsearch index.
    *
    * @param sensorType The type of sensor generating the messages.
-   * @param configurations Configurations that should be passed to the writer.
+   * @param writerConfig Configurations that should be passed to the writer.
    * @param tuples The Tuples that produced the message to be written.
    * @param messages The messages that need written to an Elasticsearch index.
    * @return The response received after indexing all of the messages.
    * @throws Exception
    */
   @Override
-  public BulkWriterResponse write(String sensorType, WriterConfiguration configurations, Iterable<Tuple> tuples, List<JSONObject> messages) throws Exception {
+  public BulkWriterResponse write(String sensorType, WriterConfiguration writerConfig, Iterable<Tuple> tuples, List<JSONObject> messages) throws Exception {
+
+    // initialize the field name converter?
+    if(fieldNameConverter == null) {
+      fieldNameConverter = createFieldNameConverter(sensorType, writerConfig);
+    }
 
     // create the bulk index request
     BulkRequestBuilder bulkRequest = client.prepareBulk();
 
     // create an index request for each message
     for(JSONObject message: messages) {
-      IndexRequestBuilder request = createIndexRequest(sensorType, configurations, message);
+      IndexRequestBuilder request = createIndexRequest(sensorType, writerConfig, message);
       bulkRequest.add(request);
     }
 
@@ -110,6 +119,34 @@ public class ElasticsearchWriter implements BulkMessageWriter<JSONObject>, Seria
             sensorType, ArrayUtils.getLength(bulkResponse.getItems()), bulkResponse.getTookInMillis());
     BulkWriterResponse response = buildWriterResponse(tuples, bulkResponse);
     return response;
+  }
+
+  /**
+   * Creates a {@link FieldNameConverter} based on the writer's configuration.
+   *
+   * @param sensorType The sensor type.
+   * @param writerConfig The writer's configuration.
+   * @return An optional {@link FieldNameConverter}.
+   */
+  private Optional<FieldNameConverter> createFieldNameConverter(String sensorType, WriterConfiguration writerConfig) {
+    Optional<FieldNameConverter> converter = Optional.empty();
+
+    Map<String, Object> sensorConfig = writerConfig.getSensorConfig(sensorType);
+    if(sensorConfig.containsKey(FIELD_NAME_CONVERTER_KEY)) {
+
+      String converterValue = (String) sensorConfig.get(FIELD_NAME_CONVERTER_KEY);
+      if (StringUtils.isBlank(converterValue)) {
+
+        // this assumes that one writer instance is used for each sensor type
+        LOG.debug("Using field name converter '{}' for sensorType={}", converterValue, sensorType);
+        converter = Optional.of(FieldNameConverters.valueOf(converterValue).get());
+      }
+
+    } else {
+      LOG.debug("No field name converter defined; property={}", FIELD_NAME_CONVERTER_KEY);
+    }
+
+    return converter;
   }
 
   /**

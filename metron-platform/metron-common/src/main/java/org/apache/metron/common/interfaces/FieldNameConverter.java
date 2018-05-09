@@ -17,8 +17,15 @@
  */
 package org.apache.metron.common.interfaces;
 
+/**
+ * Allows message fields to be renamed before they are indexed.
+ */
 public interface FieldNameConverter {
 
+    /**
+     * Convert a field name.
+     * @param originalField The original field name.
+     * @return The new field name.
+     */
     String convert(String originalField);
-
 }

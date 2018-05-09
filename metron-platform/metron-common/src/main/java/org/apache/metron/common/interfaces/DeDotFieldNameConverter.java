@@ -15,26 +15,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.bolt;
+package org.apache.metron.common.interfaces;
 
-import org.apache.metron.common.configuration.IndexingConfigurations;
-import org.apache.metron.common.zookeeper.configurations.ConfigurationsUpdater;
-import org.apache.metron.common.zookeeper.configurations.IndexingUpdater;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.Serializable;
 
-import java.lang.invoke.MethodHandles;
+/**
+ * Removes dots from all field names and replaces them with colons.
+ */
+public class DeDotFieldNameConverter implements FieldNameConverter, Serializable {
 
-public abstract class ConfiguredIndexingBolt extends ConfiguredBolt<IndexingConfigurations> {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-
-  public ConfiguredIndexingBolt(String zookeeperUrl) {
-    super(zookeeperUrl);
-  }
+  private static final long serialVersionUID = -3126840090749760299L;
 
   @Override
-  protected ConfigurationsUpdater<IndexingConfigurations> createUpdater() {
-    return new IndexingUpdater(this, this::getConfigurations);
+  public String convert(String originalField) {
+    return originalField.replace(".", ":");
   }
-
 }
