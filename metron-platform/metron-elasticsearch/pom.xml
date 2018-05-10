@@ -26,7 +26,6 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <slf4j.version>1.7.7</slf4j.version>
     </properties>
     <dependencies>
         <dependency>
@@ -34,25 +33,29 @@
             <artifactId>elasticsearch-shaded</artifactId>
             <version>${project.parent.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.metron</groupId>
-            <artifactId>metron-enrichment</artifactId>
-            <version>${project.parent.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                    <artifactId>jackson-databind</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.fasterxml.jackson.core</groupId>
-                    <artifactId>jackson-annotations</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>org.apache.metron</groupId>-->
+            <!--<artifactId>metron-enrichment</artifactId>-->
+            <!--<version>${project.parent.version}</version>-->
+            <!--<exclusions>-->
+                <!--<exclusion>-->
+                    <!--<groupId>com.fasterxml.jackson.core</groupId>-->
+                    <!--<artifactId>jackson-databind</artifactId>-->
+                <!--</exclusion>-->
+                <!--<exclusion>-->
+                    <!--<groupId>com.fasterxml.jackson.core</groupId>-->
+                    <!--<artifactId>jackson-annotations</artifactId>-->
+                <!--</exclusion>-->
+                <!--<exclusion>-->
+                    <!--<groupId>org.slf4j</groupId>-->
+                    <!--<artifactId>slf4j-log4j12</artifactId>-->
+                <!--</exclusion>-->
+                <!--<exclusion>-->
+                    <!--<artifactId>log4j</artifactId>-->
+                    <!--<groupId>log4j</groupId>-->
+                <!--</exclusion>-->
+            <!--</exclusions>-->
+        <!--</dependency>-->
         <dependency>
             <groupId>org.apache.storm</groupId>
             <artifactId>storm-core</artifactId>
@@ -115,8 +118,8 @@
                     <groupId>javax.servlet</groupId>
                 </exclusion>
                 <exclusion>
-                    <groupId>log4j</groupId>
                     <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -134,10 +137,10 @@
                     <artifactId>slf4j-log4j12</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>log4j</groupId>
                     <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
                 </exclusion>
-             </exclusions>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
@@ -183,8 +186,8 @@
                     <artifactId>slf4j-log4j12</artifactId>
                 </exclusion>
                 <exclusion>
-                    <groupId>log4j</groupId>
                     <artifactId>log4j</artifactId>
+                    <groupId>log4j</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -212,33 +215,44 @@
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>org.apache.metron</groupId>
-            <artifactId>metron-enrichment</artifactId>
-            <version>${project.parent.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>org.apache.metron</groupId>-->
+            <!--<artifactId>metron-enrichment</artifactId>-->
+            <!--<version>${project.parent.version}</version>-->
+            <!--<type>test-jar</type>-->
+            <!--<scope>test</scope>-->
+            <!--<exclusions>-->
+                <!--<exclusion>-->
+                    <!--<artifactId>log4j</artifactId>-->
+                    <!--<groupId>log4j</groupId>-->
+                <!--</exclusion>-->
+            <!--</exclusions>-->
+        <!--</dependency>-->
         <!--<dependency>-->
             <!--<groupId>org.apache.logging.log4j</groupId>-->
-            <!--<artifactId>log4j-to-slf4j</artifactId>-->
+            <!--<artifactId>log4j-api</artifactId>-->
             <!--<version>${global_log4j_core_version}</version>-->
         <!--</dependency>-->
         <!--<dependency>-->
-            <!--<groupId>org.slf4j</groupId>-->
-            <!--<artifactId>slf4j-log4j12</artifactId>-->
-            <!--<version>${global_log4j_core_version}</version>-->
-        <!--</dependency>-->
-        <!--<dependency>-->
-            <!--<groupId>org.slf4j</groupId>-->
-            <!--<artifactId>slf4j-log4j12</artifactId>-->
-            <!--<version>${slf4j.version}</version>-->
-        <!--</dependency>-->
-        <!--&lt;!&ndash;<dependency>&ndash;&gt;-->
+            <!--<groupId>org.apache.logging.log4j</groupId>-->
             <!--<artifactId>log4j-core</artifactId>-->
-            <!--<groupId>org.apache.logging.log4j</groupId>-->
             <!--<version>${global_log4j_core_version}</version>-->
         <!--</dependency>-->
+
+        <!---->
+        <!--<dependency>-->
+            <!--<groupId>org.apache.logging.log4j</groupId>-->
+            <!--<artifactId>log4j-core</artifactId>-->
+            <!--<version>2.9.1</version>-->
+        <!--</dependency>-->
+        <!--<dependency>-->
+            <!--<groupId>org.apache.logging.log4j</groupId>-->
+            <!--<artifactId>log4j-api</artifactId>-->
+            <!--<version>2.9.1</version>-->
+        <!--</dependency>-->
+
+
+
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-to-slf4j</artifactId>
@@ -251,10 +265,11 @@
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-            <version>1.7.24</version>
+            <artifactId>slf4j-simple</artifactId>
+            <version>1.7.21</version>
         </dependency>
     </dependencies>
+
     <build>
         <plugins>
             <plugin>
