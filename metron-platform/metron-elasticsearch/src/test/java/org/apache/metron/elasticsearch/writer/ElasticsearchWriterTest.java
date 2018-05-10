@@ -49,30 +49,30 @@ import static org.mockito.Mockito.when;
 
 public class ElasticsearchWriterTest {
 
-  private ComponentRunner runner;
-
-  @Before
-  public void setup() throws Exception {
-    runner = new ComponentRunner.Builder()
-            .withComponent("search", getSearchComponent())
-            .build();
-    runner.start();
-  }
-
-  @After
-  public void tearDown() throws Exception {
-    if(runner != null) {
-      runner.stop();
-    }
-  }
-
-  public InMemoryComponent getSearchComponent() {
-    return new ElasticSearchComponent.Builder()
-        .withHttpPort(9211)
-        .withIndexDir(new File("target/elasticsearch"))
-        //.withMapping(index, "yaf_doc", mapping)
-        .build();
-  }
+//  private ComponentRunner runner;
+//
+//  @Before
+//  public void setup() throws Exception {
+//    runner = new ComponentRunner.Builder()
+//            .withComponent("search", getSearchComponent())
+//            .build();
+//    runner.start();
+//  }
+//
+//  @After
+//  public void tearDown() throws Exception {
+//    if(runner != null) {
+//      runner.stop();
+//    }
+//  }
+//
+//  public InMemoryComponent getSearchComponent() {
+//    return new ElasticSearchComponent.Builder()
+//        .withHttpPort(9211)
+//        .withIndexDir(new File("target/elasticsearch"))
+//        //.withMapping(index, "yaf_doc", mapping)
+//        .build();
+//  }
 
   @Test
   public void testSingleSuccesses() throws Exception {
@@ -90,60 +90,60 @@ public class ElasticsearchWriterTest {
     assertEquals("Response should have no errors and single success", expected, actual);
   }
 
-  @Test
-  public void testMultipleSuccessesNew() throws Exception {
-
-    JSONObject message1 = new JSONObject();
-    JSONObject message2 = new JSONObject();
-
-    Tuple tuple1 = mock(Tuple.class);
-    Tuple tuple2 = mock(Tuple.class);
-
-    // the response has 2 successes
-    BulkResponse response = mock(BulkResponse.class);
-    when(response.hasFailures()).thenReturn(false);
-    when(response.getItems()).thenReturn(new BulkItemResponse[2]);
-    when(response.hasFailures()).thenReturn(false);
-    when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
-
-    BulkWriterResponse expected = new BulkWriterResponse();
-    expected.addSuccess(tuple1);
-    expected.addSuccess(tuple2);
-
-    Map<String, Object> globals = new HashMap<>();
-    globals.put("es.clustername", "metron");
-    globals.put("es.date.format", "yyyy.MM.dd.HH");
-    globals.put("es.port", "9300");
-    globals.put("es.ip", "localhost");
-
-    IndexingConfigurations configsForSensor = new IndexingConfigurations();
-    configsForSensor.updateGlobalConfig(globals);
-
-    configsForSensor.updateSensorIndexingConfig("sensor", Collections.emptyMap());
-    IndexingWriterConfiguration writerConfigurations =
-        new IndexingWriterConfiguration("elasticsearch", configsForSensor);
-
-    Map<String, Object> stormConf = new HashMap<>();
-    TopologyContext context = mock(TopologyContext.class);
-
-    ElasticsearchWriter esWriter = new ElasticsearchWriter();
-    esWriter.init(stormConf, context, writerConfigurations);
-
-    List<Tuple> tuples = new ArrayList<>();
-    tuples.add(tuple1);
-    tuples.add(tuple2);
-
-    List<JSONObject> messages = new ArrayList<>();
-    messages.add(message1);
-    messages.add(message2);
-
-    // TODO this is what we should be doing.
-    BulkWriterResponse actual = esWriter.write("sensor", writerConfigurations, tuples, messages);
-    // BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2),
-    // response);
-
-    assertEquals("Response should have no errors and two successes", expected, actual);
-  }
+//  @Test
+//  public void testMultipleSuccessesNew() throws Exception {
+//
+//    JSONObject message1 = new JSONObject();
+//    JSONObject message2 = new JSONObject();
+//
+//    Tuple tuple1 = mock(Tuple.class);
+//    Tuple tuple2 = mock(Tuple.class);
+//
+//    // the response has 2 successes
+//    BulkResponse response = mock(BulkResponse.class);
+//    when(response.hasFailures()).thenReturn(false);
+//    when(response.getItems()).thenReturn(new BulkItemResponse[2]);
+//    when(response.hasFailures()).thenReturn(false);
+//    when(response.getTook()).thenReturn(TimeValue.timeValueMillis(22));
+//
+//    BulkWriterResponse expected = new BulkWriterResponse();
+//    expected.addSuccess(tuple1);
+//    expected.addSuccess(tuple2);
+//
+//    Map<String, Object> globals = new HashMap<>();
+//    globals.put("es.clustername", "metron");
+//    globals.put("es.date.format", "yyyy.MM.dd.HH");
+//    globals.put("es.port", "9300");
+//    globals.put("es.ip", "localhost");
+//
+//    IndexingConfigurations configsForSensor = new IndexingConfigurations();
+//    configsForSensor.updateGlobalConfig(globals);
+//
+//    configsForSensor.updateSensorIndexingConfig("sensor", Collections.emptyMap());
+//    IndexingWriterConfiguration writerConfigurations =
+//        new IndexingWriterConfiguration("elasticsearch", configsForSensor);
+//
+//    Map<String, Object> stormConf = new HashMap<>();
+//    TopologyContext context = mock(TopologyContext.class);
+//
+//    ElasticsearchWriter esWriter = new ElasticsearchWriter();
+//    esWriter.init(stormConf, context, writerConfigurations);
+//
+//    List<Tuple> tuples = new ArrayList<>();
+//    tuples.add(tuple1);
+//    tuples.add(tuple2);
+//
+//    List<JSONObject> messages = new ArrayList<>();
+//    messages.add(message1);
+//    messages.add(message2);
+//
+//    // TODO this is what we should be doing.
+//    BulkWriterResponse actual = esWriter.write("sensor", writerConfigurations, tuples, messages);
+//    // BulkWriterResponse actual = esWriter.buildWriteResponse(ImmutableList.of(tuple1, tuple2),
+//    // response);
+//
+//    assertEquals("Response should have no errors and two successes", expected, actual);
+//  }
 
   @Test
   public void testMultipleSuccesses() throws Exception {
