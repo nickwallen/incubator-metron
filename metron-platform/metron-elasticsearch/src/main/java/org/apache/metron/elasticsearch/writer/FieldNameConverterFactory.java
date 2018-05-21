@@ -15,18 +15,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.interfaces;
+package org.apache.metron.elasticsearch.writer;
+
+import org.apache.metron.common.configuration.writer.WriterConfiguration;
+import org.apache.metron.common.interfaces.FieldNameConverter;
 
 /**
- * Allows field names to be transformed before a message is written to an endpoint.
+ * A factory that creates {@link FieldNameConverter} objects.
  */
-public interface FieldNameConverter {
+public interface FieldNameConverterFactory {
 
   /**
-   * Convert the field name.
+   * Create a {@link FieldNameConverter} object.
    *
-   * @param originalField The original field name.
-   * @return The new field name.
+   * @param sensorType The type of sensor.
+   * @param config The writer configuration.
+   * @return A {@link FieldNameConverter} object.
    */
-  String convert(String originalField);
+  FieldNameConverter create(String sensorType, WriterConfiguration config);
 }

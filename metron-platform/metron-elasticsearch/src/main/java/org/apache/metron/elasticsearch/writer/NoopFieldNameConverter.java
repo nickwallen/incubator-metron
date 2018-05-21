@@ -15,18 +15,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.interfaces;
+package org.apache.metron.elasticsearch.writer;
+
+import org.apache.metron.common.interfaces.FieldNameConverter;
 
 /**
- * Allows field names to be transformed before a message is written to an endpoint.
+ * A {@link FieldNameConverter} that does not rename any fields.  All field
+ * names remain unchanged.
  */
-public interface FieldNameConverter {
+public class NoopFieldNameConverter implements FieldNameConverter {
 
-  /**
-   * Convert the field name.
-   *
-   * @param originalField The original field name.
-   * @return The new field name.
-   */
-  String convert(String originalField);
+  @Override
+  public String convert(String originalField) {
+
+    // no change to the field name
+    return originalField;
+  }
 }
