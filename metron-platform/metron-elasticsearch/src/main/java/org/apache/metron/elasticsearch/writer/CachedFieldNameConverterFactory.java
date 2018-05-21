@@ -20,6 +20,7 @@ package org.apache.metron.elasticsearch.writer;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.field.FieldNameConverter;
 import org.apache.metron.common.field.FieldNameConverters;
@@ -134,17 +135,17 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
     // which field name converter should be used?
     String converterName = config.getFieldNameConverter(sensorType);
     if(StringUtils.isNotBlank(converterName)) {
-
       try {
         result = FieldNameConverters.valueOf(converterName).get();
 
       } catch(IllegalArgumentException e) {
-        LOG.error("Unable to create field name converter, using default", e);
+        LOG.error("Unable to create field name converter, using default; value={}, error={}",
+                converterName, ExceptionUtils.getRootCauseMessage(e));
       }
 
     } else {
 
-      LOG.debug("Using default field name converter; sensor={}", sensorType);
+      LOG.debug("Field name converter undefined, using default; sensor={}", sensorType);
       result = new NoopFieldNameConverter();
     }
 

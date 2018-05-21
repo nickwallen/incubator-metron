@@ -42,12 +42,6 @@ import static org.junit.Assert.assertTrue;
  */
 public class CachedFieldNameConverterFactoryTest {
 
-
-
-
-
-
-
   private CachedFieldNameConverterFactory factory;
   private Cache<String, FieldNameConverter> cache;
   private FakeTicker ticker;
@@ -253,5 +247,4 @@ public class CachedFieldNameConverterFactoryTest {
     FieldNameConverter converter = factory.create(sensor, config);
     assertTrue(converter instanceof NoopFieldNameConverter);
   }
-
 }
