@@ -19,7 +19,7 @@ package org.apache.metron.elasticsearch.writer;
 
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
-import org.apache.metron.common.interfaces.FieldNameConverter;
+import org.apache.metron.common.field.FieldNameConverter;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.BulkWriterResponse;
 import org.apache.metron.elasticsearch.utils.ElasticsearchUtils;

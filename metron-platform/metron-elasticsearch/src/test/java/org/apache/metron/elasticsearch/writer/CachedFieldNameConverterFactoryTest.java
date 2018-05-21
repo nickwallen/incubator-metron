@@ -24,7 +24,9 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.common.configuration.IndexingConfigurations;
 import org.apache.metron.common.configuration.writer.IndexingWriterConfiguration;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
-import org.apache.metron.common.interfaces.FieldNameConverter;
+import org.apache.metron.common.field.DeDotFieldNameConverter;
+import org.apache.metron.common.field.FieldNameConverter;
+import org.apache.metron.common.field.NoopFieldNameConverter;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -40,34 +42,11 @@ import static org.junit.Assert.assertTrue;
  */
 public class CachedFieldNameConverterFactoryTest {
 
-  /**
-   * {
-   *  "elasticsearch": {
-   *
-   *    "index": "theIndex",
-   *    "batchSize": 100,
-   *    "batchTimeout": 1000,
-   *    "enabled": true,
-   *    "fieldNameConverter": "org.apache.metron.elasticsearch.writer.DeDotFieldNameConverter"
-   *  }
-   * }
-   */
-  @Multiline
-  private static String jsonWithDedot;
 
-  /**
-   * {
-   *  "elasticsearch": {
-   *
-   *    "index": "theIndex",
-   *    "batchSize": 100,
-   *    "batchTimeout": 1000,
-   *    "enabled": true
-   *  }
-   * }
-   */
-  @Multiline
-  private static String jsonWithNoConverter;
+
+
+
+
 
   private CachedFieldNameConverterFactory factory;
   private Cache<String, FieldNameConverter> cache;
@@ -99,11 +78,26 @@ public class CachedFieldNameConverterFactoryTest {
   }
 
   /**
+   * {
+   *  "elasticsearch": {
+   *
+   *    "index": "theIndex",
+   *    "batchSize": 100,
+   *    "batchTimeout": 1000,
+   *    "enabled": true,
+   *    "fieldNameConverter": "DEDOT"
+   *  }
+   * }
+   */
+  @Multiline
+  private static String jsonWithDedot;
+
+  /**
    * The factory should be able to create the {@link FieldNameConverter}
    * that has been defined by the user.
    */
   @Test
-  public void testCreate() throws Exception {
+  public void testCreateDedot() throws Exception {
 
     final String writer = "elasticsearch";
     final String sensor = "bro";
@@ -113,6 +107,51 @@ public class CachedFieldNameConverterFactoryTest {
     FieldNameConverter converter = factory.create(sensor, config);
     assertTrue(converter instanceof DeDotFieldNameConverter);
   }
+
+  /**
+   * {
+   *  "elasticsearch": {
+   *
+   *    "index": "theIndex",
+   *    "batchSize": 100,
+   *    "batchTimeout": 1000,
+   *    "enabled": true,
+   *    "fieldNameConverter": "NOOP"
+   *  }
+   * }
+   */
+  @Multiline
+  private static String jsonWithNoop;
+
+  /**
+   * The factory should be able to create the {@link FieldNameConverter}
+   * that has been defined by the user.
+   */
+  @Test
+  public void testCreateNoop() throws Exception {
+
+    final String writer = "elasticsearch";
+    final String sensor = "bro";
+    WriterConfiguration config = createConfig(writer, sensor, jsonWithNoop);
+
+    // validate the converter created for 'bro'
+    FieldNameConverter converter = factory.create(sensor, config);
+    assertTrue(converter instanceof NoopFieldNameConverter);
+  }
+
+  /**
+   * {
+   *  "elasticsearch": {
+   *
+   *    "index": "theIndex",
+   *    "batchSize": 100,
+   *    "batchTimeout": 1000,
+   *    "enabled": true
+   *  }
+   * }
+   */
+  @Multiline
+  private static String jsonWithNoConverter;
 
   /**
    * The factory should create a default {@link FieldNameConverter} if none has been defined
@@ -182,6 +221,37 @@ public class CachedFieldNameConverterFactoryTest {
 
     // now the 'dedot' converter should be used
     assertTrue(factory.create(sensor, newConfig) instanceof DeDotFieldNameConverter);
+  }
+
+  /**
+   * {
+   *  "elasticsearch": {
+   *
+   *    "index": "theIndex",
+   *    "batchSize": 100,
+   *    "batchTimeout": 1000,
+   *    "enabled": true,
+   *    "fieldNameConverter": "INVALID"
+   *  }
+   * }
+   */
+  @Multiline
+  private static String jsonWithInvalidConverter;
+
+  /**
+   * If an invalid field name converter is specified, it should fall-back to using the
+   * default, noop converter.
+   */
+  @Test
+  public void testCreateInvalid() throws Exception {
+
+    final String writer = "elasticsearch";
+    final String sensor = "bro";
+    WriterConfiguration config = createConfig(writer, sensor, jsonWithInvalidConverter);
+
+    // it should fall-back to using default noop
+    FieldNameConverter converter = factory.create(sensor, config);
+    assertTrue(converter instanceof NoopFieldNameConverter);
   }
 
 }

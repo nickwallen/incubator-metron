@@ -15,9 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.elasticsearch.writer;
+package org.apache.metron.common.field;
 
-import org.apache.metron.common.interfaces.FieldNameConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

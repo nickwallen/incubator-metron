@@ -18,6 +18,8 @@
 
 package org.apache.metron.common.configuration.writer;
 
+import org.apache.metron.common.field.FieldNameConverter;
+
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
@@ -91,7 +93,7 @@ public interface WriterConfiguration extends Serializable {
   boolean isDefault(String sensorName);
 
   /**
-   * Return the {@link org.apache.metron.common.interfaces.FieldNameConverter} to use
+   * Return the {@link FieldNameConverter} to use
    * when writing messages.
    *
    * @param sensorName The name of the sensor;

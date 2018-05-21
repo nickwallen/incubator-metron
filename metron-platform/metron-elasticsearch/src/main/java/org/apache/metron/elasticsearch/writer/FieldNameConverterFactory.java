@@ -18,7 +18,7 @@
 package org.apache.metron.elasticsearch.writer;
 
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
-import org.apache.metron.common.interfaces.FieldNameConverter;
+import org.apache.metron.common.field.FieldNameConverter;
 
 /**
  * A factory that creates {@link FieldNameConverter} objects.

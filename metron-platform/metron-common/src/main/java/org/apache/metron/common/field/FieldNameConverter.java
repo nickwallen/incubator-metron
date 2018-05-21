@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.interfaces;
+package org.apache.metron.common.field;
 
 /**
  * Allows field names to be transformed before a message is written to an endpoint.

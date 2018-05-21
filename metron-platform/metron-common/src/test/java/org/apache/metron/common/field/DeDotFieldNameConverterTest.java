@@ -15,20 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.elasticsearch.writer;
 
-import org.apache.metron.common.interfaces.FieldNameConverter;
+package org.apache.metron.common.field;
 
-/**
- * A {@link FieldNameConverter} that does not rename any fields.  All field
- * names remain unchanged.
- */
-public class NoopFieldNameConverter implements FieldNameConverter {
+import org.junit.Test;
 
-  @Override
-  public String convert(String originalField) {
+import static org.junit.Assert.assertEquals;
 
-    // no change to the field name
-    return originalField;
+public class DeDotFieldNameConverterTest {
+
+  @Test
+  public void testWithColons() throws Exception {
+    String actual = new DeDotFieldNameConverter().convert("testfield.with.colons");
+    assertEquals("testfield:with:colons", actual);
+  }
+
+  @Test
+  public void testNoColons() throws Exception {
+    String actual = new DeDotFieldNameConverter().convert("test-field-no-colons");
+    assertEquals("test-field-no-colons", actual);
   }
 }

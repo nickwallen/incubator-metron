@@ -20,10 +20,10 @@ package org.apache.metron.elasticsearch.writer;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
-import org.apache.metron.common.interfaces.FieldNameConverter;
-import org.apache.metron.common.utils.ReflectionUtils;
+import org.apache.metron.common.field.FieldNameConverter;
+import org.apache.metron.common.field.FieldNameConverters;
+import org.apache.metron.common.field.NoopFieldNameConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,23 +128,23 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
    */
   private FieldNameConverter createInstance(String sensorType, WriterConfiguration config) {
 
+    // default to the noop field name converter
+    FieldNameConverter result = new NoopFieldNameConverter();
+
     // which field name converter should be used?
-    FieldNameConverter result = null;
-    String clazzName = config.getFieldNameConverter(sensorType);
-    if(StringUtils.isNotBlank(clazzName)) {
+    String converterName = config.getFieldNameConverter(sensorType);
+    if(StringUtils.isNotBlank(converterName)) {
 
-      // instantiate the field name converter
       try {
-        result = ReflectionUtils.createInstance(clazzName);
+        result = FieldNameConverters.valueOf(converterName).get();
 
-      } catch(Throwable e) {
-
-        LOG.error("Unable to create field name converter, using default; error={}, value={}",
-                ExceptionUtils.getRootCauseMessage(e), clazzName);
+      } catch(IllegalArgumentException e) {
+        LOG.error("Unable to create field name converter, using default", e);
       }
+
     } else {
 
-      LOG.debug("Using the default FieldNameConverter; sensor={}", sensorType);
+      LOG.debug("Using default field name converter; sensor={}", sensorType);
       result = new NoopFieldNameConverter();
     }
 
