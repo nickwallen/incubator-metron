@@ -135,6 +135,7 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
     // which field name converter should be used?
     String converterName = config.getFieldNameConverter(sensorType);
     if(StringUtils.isNotBlank(converterName)) {
+
       try {
         result = FieldNameConverters.valueOf(converterName).get();
 
