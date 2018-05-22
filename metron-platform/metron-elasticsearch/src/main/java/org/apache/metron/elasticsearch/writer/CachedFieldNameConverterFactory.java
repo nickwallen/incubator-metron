@@ -19,9 +19,11 @@ package org.apache.metron.elasticsearch.writer;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.apache.commons.lang.ClassUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
+import org.apache.metron.common.field.DeDotFieldNameConverter;
 import org.apache.metron.common.field.FieldNameConverter;
 import org.apache.metron.common.field.FieldNameConverters;
 import org.apache.metron.common.field.NoopFieldNameConverter;
@@ -129,8 +131,8 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
    */
   private FieldNameConverter createInstance(String sensorType, WriterConfiguration config) {
 
-    // default to the noop field name converter
-    FieldNameConverter result = new NoopFieldNameConverter();
+    // default to the 'DEDOT' field name converter to maintain backwards compatibility
+    FieldNameConverter result = new DeDotFieldNameConverter();
 
     // which field name converter should be used?
     String converterName = config.getFieldNameConverter(sensorType);
@@ -149,6 +151,9 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
       LOG.debug("Field name converter undefined, using default; sensor={}", sensorType);
       result = new NoopFieldNameConverter();
     }
+
+    LOG.debug("Created field name converter; sensorType={}, name={}, class={}",
+            sensorType, converterName, ClassUtils.getShortClassName(result, "null"));
 
     return result;
   }
