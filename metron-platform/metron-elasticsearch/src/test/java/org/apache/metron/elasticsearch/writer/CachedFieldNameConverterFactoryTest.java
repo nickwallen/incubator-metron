@@ -158,9 +158,9 @@ public class CachedFieldNameConverterFactoryTest {
     final String sensor = "bro";
     WriterConfiguration config = createConfig(writer, sensor, jsonWithNoConverter);
 
-    // validate the converter created for 'bro'
+    // if none defined, should default to 'DEDOT'
     FieldNameConverter converter = factory.create(sensor, config);
-    assertTrue(converter instanceof NoopFieldNameConverter);
+    assertTrue(converter instanceof DeDotFieldNameConverter);
   }
 
   /**
@@ -200,21 +200,21 @@ public class CachedFieldNameConverterFactoryTest {
     final String writer = "elasticsearch";
     final String sensor = "bro";
 
-    // no converter defined in config, should use noop converter
+    // no converter defined in config, should use 'DEDOT' converter
     WriterConfiguration config = createConfig(writer, sensor, jsonWithNoConverter);
-    assertTrue(factory.create(sensor, config) instanceof NoopFieldNameConverter);
+    assertTrue(factory.create(sensor, config) instanceof DeDotFieldNameConverter);
 
-    // an 'updated' config uses the 'dedot' converter
-    WriterConfiguration newConfig = createConfig(writer, sensor, jsonWithDedot);
+    // an 'updated' config uses the 'NOOP' converter
+    WriterConfiguration newConfig = createConfig(writer, sensor, jsonWithNoop);
 
-    // even though config has changed, the cache has not expired yet, still using noop converter
-    assertTrue(factory.create(sensor, newConfig) instanceof NoopFieldNameConverter);
+    // even though config has changed, the cache has not expired yet, still using 'DEDOT'
+    assertTrue(factory.create(sensor, newConfig) instanceof DeDotFieldNameConverter);
 
     // advance 30 minutes
     ticker.advance(8, TimeUnit.MINUTES);
 
-    // now the 'dedot' converter should be used
-    assertTrue(factory.create(sensor, newConfig) instanceof DeDotFieldNameConverter);
+    // now the 'NOOP' converter should be used
+    assertTrue(factory.create(sensor, newConfig) instanceof NoopFieldNameConverter);
   }
 
   /**
@@ -243,8 +243,8 @@ public class CachedFieldNameConverterFactoryTest {
     final String sensor = "bro";
     WriterConfiguration config = createConfig(writer, sensor, jsonWithInvalidConverter);
 
-    // it should fall-back to using default noop
+    // if invalid value defined, it should fall-back to using default 'DEDOT'
     FieldNameConverter converter = factory.create(sensor, config);
-    assertTrue(converter instanceof NoopFieldNameConverter);
+    assertTrue(converter instanceof DeDotFieldNameConverter);
   }
 }

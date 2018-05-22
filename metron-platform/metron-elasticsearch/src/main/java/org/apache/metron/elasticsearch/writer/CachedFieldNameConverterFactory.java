@@ -145,14 +145,9 @@ public class CachedFieldNameConverterFactory implements FieldNameConverterFactor
         LOG.error("Unable to create field name converter, using default; value={}, error={}",
                 converterName, ExceptionUtils.getRootCauseMessage(e));
       }
-
-    } else {
-
-      LOG.debug("Field name converter undefined, using default; sensor={}", sensorType);
-      result = new NoopFieldNameConverter();
     }
 
-    LOG.debug("Created field name converter; sensorType={}, name={}, class={}",
+    LOG.debug("Created field name converter; sensorType={}, configuredName={}, class={}",
             sensorType, converterName, ClassUtils.getShortClassName(result, "null"));
 
     return result;
