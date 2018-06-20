@@ -26,7 +26,7 @@ import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 
 /**
- * A ColumnBuilder that writes only the value of a ProfileMeasurement.
+ * A {@link ColumnBuilder} that stores only the value of a {@link ProfileMeasurement} in Hbase.
  */
 public class ValueOnlyColumnBuilder implements ColumnBuilder {
 

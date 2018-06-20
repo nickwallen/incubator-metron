@@ -38,18 +38,13 @@ components:
             - name: "withPeriodDuration"
               args: [${profiler.period.duration}, "${profiler.period.duration.units}"]
 
-    -   id: "columnBuilder"
-        className: "org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder"
-        constructorArgs:
-            - "${profiler.hbase.column.family}"
-
     -   id: "hbaseMapper"
         className: "org.apache.metron.profiler.bolt.ProfileHBaseMapper"
         properties:
             - name: "rowKeyBuilder"
               ref: "rowKeyBuilder"
             - name: "columnBuilder"
-              ref: "columnBuilder"
+              args: ["${profiler.hbase.column.builder}", "${profiler.hbase.column.family}"]
 
     # Any kafka props for the producer go here.
     -   id: "kafkaProps"

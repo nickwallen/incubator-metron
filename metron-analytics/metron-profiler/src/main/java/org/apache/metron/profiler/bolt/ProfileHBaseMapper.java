@@ -21,10 +21,12 @@
 package org.apache.metron.profiler.bolt;
 
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
+import org.apache.metron.common.message.MessageGetters;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseMapper;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
+import org.apache.metron.profiler.hbase.ColumnBuilders;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
 import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
@@ -107,11 +109,39 @@ public class ProfileHBaseMapper implements HBaseMapper {
     return expiresMillis;
   }
 
+  public RowKeyBuilder getRowKeyBuilder() {
+    return rowKeyBuilder;
+  }
+
   public void setRowKeyBuilder(RowKeyBuilder rowKeyBuilder) {
     this.rowKeyBuilder = rowKeyBuilder;
   }
 
+  public ColumnBuilder getColumnBuilder() {
+    return columnBuilder;
+  }
+
   public void setColumnBuilder(ColumnBuilder columnBuilder) {
     this.columnBuilder = columnBuilder;
+  }
+
+  /**
+   * Allows the {@link ColumnBuilder} to be set using the {@link org.apache.metron.profiler.hbase.ColumnBuilders}
+   * enum.
+   *
+   * @param columnBuilder
+   */
+  public void setColumnBuilder(String columnBuilder) {
+    this.columnBuilder = ColumnBuilders.valueOf(columnBuilder).get();
+  }
+
+  /**
+   * Allows the {@link ColumnBuilder} to be set using the {@link org.apache.metron.profiler.hbase.ColumnBuilders}
+   * enum.
+   *
+   * @param columnBuilder
+   */
+  public void setColumnBuilder(String columnBuilder, String arg) {
+    this.columnBuilder = ColumnBuilders.valueOf(columnBuilder).get(arg);
   }
 }

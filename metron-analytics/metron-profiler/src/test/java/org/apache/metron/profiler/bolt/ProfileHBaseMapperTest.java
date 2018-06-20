@@ -23,7 +23,10 @@ package org.apache.metron.profiler.bolt;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfileResult;
 import org.apache.metron.profiler.ProfileMeasurement;
+import org.apache.metron.profiler.hbase.AllFieldsColumnBuilder;
+import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
+import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
 import org.apache.storm.tuple.Tuple;
 import org.junit.Assert;
 import org.junit.Before;
@@ -89,5 +92,39 @@ public class ProfileHBaseMapperTest {
     // the TTL should not be defined
     Optional<Long> actual = mapper.getTTL(tuple);
     Assert.assertFalse(actual.isPresent());
+  }
+
+  @Test
+  public void testSetValuesOnlyColumnBuilder() {
+    mapper.setColumnBuilder("VALUES_ONLY");
+    Assert.assertTrue(mapper.getColumnBuilder() instanceof ValueOnlyColumnBuilder);
+  }
+
+  @Test
+  public void testSetAllFieldsColumnBuilder() {
+    mapper.setColumnBuilder("ALL_FIELDS");
+    Assert.assertTrue(mapper.getColumnBuilder() instanceof AllFieldsColumnBuilder);
+  }
+
+  @Test
+  public void testSetValuesOnlyColumnBuilderWithColumnFamily() {
+    final String columnFamily = "X";
+    mapper.setColumnBuilder("VALUES_ONLY_WITH_CF", columnFamily);
+
+    // validate
+    ColumnBuilder columnBuilder = mapper.getColumnBuilder();
+    Assert.assertTrue(columnBuilder instanceof ValueOnlyColumnBuilder);
+    Assert.assertEquals(columnFamily, columnBuilder.getColumnFamily());
+  }
+
+  @Test
+  public void testSetAllFieldsColumnBuilderWithColumnFamily() {
+    final String columnFamily = "X";
+    mapper.setColumnBuilder("ALL_FIELDS_WITH_CF", columnFamily);
+
+    // validate
+    ColumnBuilder columnBuilder = mapper.getColumnBuilder();
+    Assert.assertTrue(columnBuilder instanceof AllFieldsColumnBuilder);
+    Assert.assertEquals(columnFamily, columnBuilder.getColumnFamily());
   }
 }
