@@ -36,6 +36,7 @@ import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
+import org.apache.metron.profiler.hbase.ColumnBuilders;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
 import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
@@ -333,6 +334,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       // hbase settings
       setProperty("profiler.hbase.salt.divisor", Integer.toString(saltDivisor));
       setProperty("profiler.hbase.table", tableName);
+      setProperty("profiler.hbase.column.builder", "VALUES_ONLY_WITH_CF");
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");

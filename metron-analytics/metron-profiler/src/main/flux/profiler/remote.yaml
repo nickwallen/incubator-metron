@@ -43,7 +43,8 @@ components:
         properties:
             - name: "rowKeyBuilder"
               ref: "rowKeyBuilder"
-            - name: "columnBuilder"
+        configMethods:
+            - name: "setColumnBuilder"
               args: ["${profiler.hbase.column.builder}", "${profiler.hbase.column.family}"]
 
     # Any kafka props for the producer go here.
