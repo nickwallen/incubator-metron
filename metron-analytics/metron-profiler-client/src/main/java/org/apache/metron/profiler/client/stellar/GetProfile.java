@@ -20,6 +20,7 @@
 
 package org.apache.metron.profiler.client.stellar;
 
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_BUILDER;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
@@ -39,6 +40,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.metron.profiler.hbase.ColumnBuilders;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -207,12 +209,13 @@ public class GetProfile implements StellarFunction {
    * @param global The global configuration.
    */
   private ColumnBuilder getColumnBuilder(Map<String, Object> global) {
-    ColumnBuilder columnBuilder;
-
     String columnFamily = PROFILER_COLUMN_FAMILY.get(global, String.class);
-    columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
+    String columnBuilder = PROFILER_COLUMN_BUILDER.get(global, String.class);
 
-    return columnBuilder;
+    LOG.debug("profiler client: {}={}", PROFILER_COLUMN_FAMILY, columnFamily);
+    LOG.debug("profiler client: {}={}", PROFILER_COLUMN_BUILDER, columnBuilder);
+
+    return ColumnBuilders.valueOf(columnBuilder).get(columnFamily);
   }
 
   /**
@@ -220,7 +223,6 @@ public class GetProfile implements StellarFunction {
    * @param global The global configuration.
    */
   private RowKeyBuilder getRowKeyBuilder(Map<String, Object> global) {
-
     // how long is the profile period?
     long duration = PROFILER_PERIOD.get(global, Long.class);
     LOG.debug("profiler client: {}={}", PROFILER_PERIOD, duration);
@@ -243,7 +245,6 @@ public class GetProfile implements StellarFunction {
    * @return
    */
   private HTableInterface getTable(Map<String, Object> global) {
-
     String tableName = PROFILER_HBASE_TABLE.get(global, String.class);
     TableProvider provider = getTableProvider(global);
 

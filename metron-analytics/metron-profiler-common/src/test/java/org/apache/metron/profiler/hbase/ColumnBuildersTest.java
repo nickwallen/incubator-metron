@@ -37,6 +37,16 @@ public class ColumnBuildersTest {
     assertThat(actual.getColumnFamily(), equalTo("P"));
   }
 
+  /**
+   * Using VALUES_ONLY should still work, even if an arg (column family) is provided.
+   */
+  @Test
+  public void testValuesOnlyWithArg() {
+    ColumnBuilder actual = ColumnBuilders.valueOf("VALUES_ONLY").get("X");
+    assertThat(actual, instanceOf(ValueOnlyColumnBuilder.class));
+    assertThat(actual.getColumnFamily(), equalTo("P"));
+  }
+
   @Test
   public void testValuesOnlyWithColumnFamily() {
     final String colFamily = "X";

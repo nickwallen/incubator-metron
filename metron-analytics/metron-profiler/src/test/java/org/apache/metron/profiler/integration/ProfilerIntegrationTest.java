@@ -334,7 +334,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       // hbase settings
       setProperty("profiler.hbase.salt.divisor", Integer.toString(saltDivisor));
       setProperty("profiler.hbase.table", tableName);
-      setProperty("profiler.hbase.column.builder", "VALUES_ONLY_WITH_CF");
+      setProperty("profiler.hbase.column.builder", ColumnBuilders.VALUES_ONLY_WITH_CF.name());
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");

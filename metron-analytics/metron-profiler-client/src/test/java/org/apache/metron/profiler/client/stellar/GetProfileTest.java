@@ -21,34 +21,39 @@
 package org.apache.metron.profiler.client.stellar;
 
 import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
-import org.apache.metron.profiler.client.ProfileWriter;
-import org.apache.metron.stellar.dsl.Context;
-import org.apache.metron.stellar.dsl.ParseException;
-import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
-import org.apache.metron.stellar.dsl.functions.resolver.SingletonFunctionResolver;
 import org.apache.metron.profiler.ProfileMeasurement;
-import org.apache.metron.profiler.client.stellar.FixedLookback;
-import org.apache.metron.profiler.client.stellar.GetProfile;
+import org.apache.metron.profiler.client.ProfileWriter;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
+import org.apache.metron.profiler.hbase.ColumnBuilders;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
 import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
 import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.stellar.common.StellarStatefulExecutor;
+import org.apache.metron.stellar.dsl.Context;
+import org.apache.metron.stellar.dsl.ParseException;
+import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
+import org.apache.metron.stellar.dsl.functions.resolver.SingletonFunctionResolver;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.concurrent.TimeUnit;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Collections;
-import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.*;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
 
 /**
  * Tests the GetProfile class.
@@ -67,6 +72,8 @@ public class GetProfileTest {
   private static final long periodDuration2 = 1;
   private static final TimeUnit periodUnits2 = TimeUnit.HOURS;
   private static final int saltDivisor2 = 2050;
+  private HTableInterface table;
+  private Map<String, Object> globals;
 
   private <T> T run(String expression, Class<T> clazz) {
     return executor.execute(expression, state, clazz);
@@ -86,7 +93,7 @@ public class GetProfileTest {
   @Before
   public void setup() {
     state = new HashMap<>();
-    final HTableInterface table = MockHBaseTableProvider.addToCache(tableName, columnFamily);
+    table = MockHBaseTableProvider.addToCache(tableName, columnFamily);
 
     // used to write values to be read during testing
     RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder();
@@ -94,7 +101,7 @@ public class GetProfileTest {
     profileWriter = new ProfileWriter(rowKeyBuilder, columnBuilder, table);
 
     // global properties
-    Map<String, Object> global = new HashMap<String, Object>() {{
+    globals = new HashMap<String, Object>() {{
       put(PROFILER_HBASE_TABLE.getKey(), tableName);
       put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
       put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
@@ -109,7 +116,7 @@ public class GetProfileTest {
                     .withClass(GetProfile.class)
                     .withClass(FixedLookback.class),
             new Context.Builder()
-                    .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
+                    .with(Context.Capabilities.GLOBAL_CONFIG, () -> globals)
                     .build());
   }
 
@@ -445,6 +452,41 @@ public class GetProfileTest {
 
     // validate - expect to fail to read any values
     Assert.assertEquals(0, result.size());
+  }
+
+  /**
+   * PROFILE_GET should work when an alternative {@link ColumnBuilder} is defined.  The default is
+   * VALUES_ONLY_WITH_CF, but here we attempt to use ALL_FIELDS.
+   *
+   * <p>This allows PROFILE_GET to read measurements where all of the fields, like name, entity, period
+   * have been written to HBase, instead of just the raw value.
+   */
+  @Test
+  public void testWithCustomColumnBuilder() {
+    final int periodsPerHour = 4;
+    final int expectedValue = 2302;
+    final int hours = 2;
+    final long startTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(hours);
+    final List<Object> group = Collections.emptyList();
+    final int count = hours * periodsPerHour;
+
+    // each measurement that is written will look-like this prototype
+    ProfileMeasurement prototype = new ProfileMeasurement()
+            .withProfileName("profile1")
+            .withEntity("entity1")
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withDefinition(new ProfileConfig());
+
+    // write some measurements using the ALL_FIELDS column builder
+    profileWriter = new ProfileWriter(new SaltyRowKeyBuilder(), ColumnBuilders.ALL_FIELDS.get(), table);
+    profileWriter.write(prototype, count, group, val -> expectedValue);
+
+    // configure the client to use ALL_FIELDS
+    globals.put("profiler.client.hbase.column.builder", ColumnBuilders.ALL_FIELDS.name());
+
+    // expect to read all values from the past 4 hours
+    List<Integer> result = run("PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'))", List.class);
+    Assert.assertEquals(count, result.size());
   }
 
 }

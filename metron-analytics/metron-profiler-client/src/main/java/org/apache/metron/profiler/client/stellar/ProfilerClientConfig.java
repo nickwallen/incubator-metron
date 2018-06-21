@@ -20,6 +20,7 @@
 
 package org.apache.metron.profiler.client.stellar;
 
+import org.apache.metron.profiler.hbase.ColumnBuilders;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.hbase.HTableProvider;
 
@@ -61,7 +62,14 @@ public enum ProfilerClientConfig {
   /**
    * The default value to be returned if a profile is not written for a given period for a profile and entity.
    */
-  PROFILER_DEFAULT_VALUE("profiler.default.value", null, Object.class);
+  PROFILER_DEFAULT_VALUE("profiler.default.value", null, Object.class),
+
+  /**
+   * Defines which {@link org.apache.metron.profiler.hbase.ColumnBuilder} to use when reading
+   * {@link org.apache.metron.profiler.ProfileMeasurement} values from HBase.
+   */
+  PROFILER_COLUMN_BUILDER("profiler.client.hbase.column.builder", ColumnBuilders.VALUES_ONLY_WITH_CF.name(), String.class);
+
   String key;
   Object defaultValue;
   Class<?> valueType;
