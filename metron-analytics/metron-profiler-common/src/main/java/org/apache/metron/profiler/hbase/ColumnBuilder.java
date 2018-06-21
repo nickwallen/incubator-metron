@@ -24,6 +24,7 @@ import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.profiler.ProfileMeasurement;
 
 import java.io.Serializable;
+import java.util.Collection;
 
 /**
  * Defines how fields in a ProfileMeasurement will be mapped to columns in HBase.
@@ -46,5 +47,11 @@ public interface ColumnBuilder extends Serializable {
    * Returns the column qualifiers for the given field of a ProfileMeasurement.
    * @return The column qualifier used to store a ProfileMeasurement's field in HBase.
    */
-  byte[] getColumnQualifier(String fieldName);
+  byte[] getColumnQualifier(String columnName);
+
+  /**
+   * Returns the name of all supported columns.
+   * @return A collection of supported column names.
+   */
+  Collection<String> getColumns();
 }

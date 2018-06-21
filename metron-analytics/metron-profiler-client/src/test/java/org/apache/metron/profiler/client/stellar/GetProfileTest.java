@@ -485,8 +485,10 @@ public class GetProfileTest {
     globals.put("profiler.client.hbase.column.builder", ColumnBuilders.ALL_FIELDS.name());
 
     // expect to read all values from the past 4 hours
-    List<Integer> result = run("PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'))", List.class);
+    List<Map> result = run("PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'))", List.class);
     Assert.assertEquals(count, result.size());
+
+
   }
 
 }

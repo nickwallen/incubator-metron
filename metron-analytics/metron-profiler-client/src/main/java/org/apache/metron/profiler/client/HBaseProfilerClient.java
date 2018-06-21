@@ -23,16 +23,21 @@ package org.apache.metron.profiler.client;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.util.ArrayUtils;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
-import org.apache.metron.common.utils.SerDeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -41,6 +46,8 @@ import java.util.stream.Collectors;
  * The default implementation of a ProfilerClient that fetches profile data persisted in HBase.
  */
 public class HBaseProfilerClient implements ProfilerClient {
+
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * Used to access the profile data stored in HBase.
@@ -98,20 +105,8 @@ public class HBaseProfilerClient implements ProfilerClient {
    */
   @Override
   public <T> List<T> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, long start, long end, Optional<T> defaultValue) {
-    byte[] columnFamily = Bytes.toBytes(columnBuilder.getColumnFamily());
-    byte[] columnQualifier = columnBuilder.getColumnQualifier("value");
-
-    // find all the row keys that satisfy this fetch
-    List<byte[]> keysToFetch = rowKeyBuilder.rowKeys(profile, entity, groups, start, end);
-
-    // create a Get for each of the row keys
-    List<Get> gets = keysToFetch
-            .stream()
-            .map(k -> new Get(k).addColumn(columnFamily, columnQualifier))
-            .collect(Collectors.toList());
-
-    // get the 'gets'
-    return get(gets, columnQualifier, columnFamily, clazz, defaultValue);
+    List<byte[]> rowKeysToFetch = rowKeyBuilder.rowKeys(profile, entity, groups, start, end);
+    return fetchByRowKey(rowKeysToFetch, clazz, defaultValue);
   }
 
   /**
@@ -127,53 +122,114 @@ public class HBaseProfilerClient implements ProfilerClient {
    */
   @Override
   public <T> List<T> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, Iterable<ProfilePeriod> periods, Optional<T> defaultValue) {
+    List<byte[]> rowKeysToFetch = rowKeyBuilder.rowKeys(profile, entity, groups, periods);
+    return fetchByRowKey(rowKeysToFetch, clazz, defaultValue);
+  }
+
+  /**
+   * Fetches the values stored in a profile by the row key.
+   *
+   * @param rowKeysToFetch The row keys to fetch.
+   * @param clazz The type of values stored by the profile.
+   * @param defaultValue The default value to specify.  If empty, the result will be sparse.
+   * @param <T> The type of values stored by the profile.
+   * @return A list of values.
+   */
+  private <T> List<T> fetchByRowKey(List<byte[]> rowKeysToFetch, Class<T> clazz, Optional<T> defaultValue) {
+    // create a get for each row key
+    List<Get> gets = new ArrayList<>();
+    for(byte[] rowKey: rowKeysToFetch) {
+      gets.add(createGet(rowKey, columnBuilder));
+    }
+
+    Result[] results = submit(gets);
+    return extractValues(results, clazz, defaultValue);
+  }
+
+  /**
+   * Create a Get request.
+   *
+   * @param rowKey The row key.
+   * @param columnBuilder Defines which columns to get.
+   * @return A get request.
+   */
+  private Get createGet(byte[] rowKey, ColumnBuilder columnBuilder) {
     byte[] columnFamily = Bytes.toBytes(columnBuilder.getColumnFamily());
-    byte[] columnQualifier = columnBuilder.getColumnQualifier("value");
+    Get get = new Get(rowKey);
 
-    // find all the row keys that satisfy this fetch
-    List<byte[]> keysToFetch = rowKeyBuilder.rowKeys(profile, entity, groups, periods);
+    for(String column: columnBuilder.getColumns()) {
+      byte[] columnQualifier = columnBuilder.getColumnQualifier(column);
+      get.addColumn(columnFamily, columnQualifier);
+    }
 
-    // create a Get for each of the row keys
-    List<Get> gets = keysToFetch
-            .stream()
-            .map(k -> new Get(k).addColumn(columnFamily, columnQualifier))
-            .collect(Collectors.toList());
+    LOG.debug("Created HBase Get expecting {} column(s)", columnBuilder.getColumns().size());
+    return get;
+  }
 
-    // get the 'gets'
-    return get(gets, columnQualifier, columnFamily, clazz, defaultValue);
+  /**
+   * Submit a set of requests to HBase.
+   *
+   * @param gets The requests to submit.
+   * @return The results returned by HBase.
+   */
+  private Result[] submit(List<Get> gets) {
+    LOG.debug("Submitting {} get(s) to HBase", gets.size());
+    Result[] results;
+    try {
+      results = table.get(gets);
+
+    } catch(IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    LOG.debug("Received {} result(s) from HBase", ArrayUtils.length(results));
+    return results;
   }
 
   /**
    * Submits multiple Gets to HBase and deserialize the results.
    *
-   * @param gets            The gets to submit to HBase.
-   * @param columnQualifier The column qualifier.
-   * @param columnFamily    The column family.
+   * @param results         The HBase results.
    * @param clazz           The type expected in return.
-   * @param defaultValue The default value to specify.  If empty, the result will be sparse.
+   * @param defaultValue    The default value to specify.  If empty, the result will be sparse.
    * @param <T>             The type expected in return.
    * @return
    */
-  private <T> List<T> get(List<Get> gets, byte[] columnQualifier, byte[] columnFamily, Class<T> clazz, Optional<T> defaultValue) {
-    List<T> values = new ArrayList<>();
+  private <T> List<T> extractValues(Result[] results, Class<T> clazz, Optional<T> defaultValue) {
+    List<Map<String, Object>> values = new ArrayList<>();
+    byte[] columnFamily = Bytes.toBytes(columnBuilder.getColumnFamily());
 
-    try {
-      Result[] results = table.get(gets);
-      for(int i = 0;i < results.length;++i) {
-        Result result = results[i];
+    // for each result...
+    for(int i = 0;i < results.length;++i) {
+      Result result = results[i];
+      Map<String, Object> value = new HashMap<>();
+
+      // for each column...
+      for(String column: columnBuilder.getColumns()) {
+        byte[] columnQualifier = columnBuilder.getColumnQualifier(column);
+
         boolean exists = result.containsColumn(columnFamily, columnQualifier);
         if(!exists && defaultValue.isPresent()) {
-          values.add(defaultValue.get());
-        }
-        else if(exists) {
+
+          // TODO this should ONLY be for the value field, I believe
+
+          value.put(column, defaultValue.get());
+          LOG.trace("Using default value; column={}", column);
+
+        } else if(exists) {
+
+          // TODO does the ColumnBuilder have to tell us the type of each field?
+
           byte[] val = result.getValue(columnFamily, columnQualifier);
-          values.add(SerDeUtils.fromBytes(val, clazz));
+          value.put(column, SerDeUtils.fromBytes(val, clazz));
+          LOG.trace("Found value; column={}", column);
         }
       }
-    } catch(IOException e) {
-      throw new RuntimeException(e);
+
+      values.add(value);
     }
 
+    LOG.debug("Extracted {} value(s) from HBase", values.size());
     return values;
   }
 

@@ -24,6 +24,8 @@ import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.profiler.ProfileMeasurement;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,6 +82,11 @@ public class AllFieldsColumnBuilder implements ColumnBuilder {
   @Override
   public String getColumnFamily() {
     return this.columnFamily;
+  }
+
+  @Override
+  public Collection<String> getColumns() {
+    return new ArrayList<>(columns.keySet());
   }
 
   public void setColumnFamily(String columnFamily) {

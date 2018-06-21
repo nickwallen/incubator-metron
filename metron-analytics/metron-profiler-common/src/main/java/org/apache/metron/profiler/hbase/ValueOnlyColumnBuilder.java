@@ -25,10 +25,16 @@ import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 
+import java.util.Collection;
+import java.util.Collections;
+
 /**
- * A {@link ColumnBuilder} that stores only the value of a {@link ProfileMeasurement} in Hbase.
+ * A {@link ColumnBuilder} that stores only the value of a {@link ProfileMeasurement} in HBase.
  */
 public class ValueOnlyColumnBuilder implements ColumnBuilder {
+
+  public static final String VALUE_FIELD = "value";
+  public static final byte[] VALUE_FIELD_COLUMN_QUALIFIER = Bytes.toBytes(VALUE_FIELD);
 
   /**
    * The column family storing the profile data.
@@ -48,7 +54,7 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
   @Override
   public ColumnList columns(ProfileMeasurement measurement) {
     ColumnList cols = new ColumnList();
-    cols.addColumn(columnFamilyBytes, getColumnQualifier("value"), SerDeUtils.toBytes(measurement.getProfileValue()));
+    cols.addColumn(columnFamilyBytes, VALUE_FIELD_COLUMN_QUALIFIER, SerDeUtils.toBytes(measurement.getProfileValue()));
 
     return cols;
   }
@@ -58,6 +64,11 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
     return this.columnFamily;
   }
 
+  @Override
+  public Collection<String> getColumns() {
+    return Collections.singleton(VALUE_FIELD);
+  }
+
   public void setColumnFamily(String columnFamily) {
     this.columnFamily = columnFamily;
     this.columnFamilyBytes = Bytes.toBytes(columnFamily);
@@ -65,8 +76,8 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
 
   @Override
   public byte[] getColumnQualifier(String fieldName) {
-    if("value".equals(fieldName)) {
-      return Bytes.toBytes("value");
+    if(VALUE_FIELD.equals(fieldName)) {
+      return VALUE_FIELD_COLUMN_QUALIFIER;
     }
 
     throw new IllegalArgumentException(("unexpected field name: " + fieldName));
