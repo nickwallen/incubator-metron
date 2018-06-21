@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A {@code ColumnBuilder} that stores all of the {@code ProfileMeasurement} fields to Hbase.
+ * A {@code ColumnBuilder} that stores all of the {@code ProfileMeasurement} fields to HBase.
  *
  * <p>This provides a much more detailed view into the measurements that are persisted in HBase.
  */
@@ -66,7 +66,6 @@ public class AllFieldsColumnBuilder implements ColumnBuilder {
 
   @Override
   public ColumnList columns(ProfileMeasurement measurement) {
-
     ColumnList cols = new ColumnList();
     addColumn(cols, "value", measurement.getProfileValue());
     addColumn(cols, "name", measurement.getProfileName());
@@ -77,6 +76,7 @@ public class AllFieldsColumnBuilder implements ColumnBuilder {
     addColumn(cols, "period", measurement.getPeriod().getPeriod());
     return cols;
   }
+
   @Override
   public String getColumnFamily() {
     return this.columnFamily;
@@ -87,13 +87,17 @@ public class AllFieldsColumnBuilder implements ColumnBuilder {
     this.columnFamilyBytes = Bytes.toBytes(columnFamily);
   }
 
+  public byte[] getColumnFamilyBytes() {
+    return columnFamilyBytes;
+  }
+
   @Override
   public byte[] getColumnQualifier(String fieldName) {
     if(columns.containsKey(fieldName)) {
       return columns.get(fieldName);
 
     } else {
-      throw new IllegalArgumentException(("unexpected field name: " + fieldName));
+      throw new IllegalArgumentException(("Unexpected field name: " + fieldName));
     }
   }
 

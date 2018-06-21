@@ -47,7 +47,6 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
 
   @Override
   public ColumnList columns(ProfileMeasurement measurement) {
-
     ColumnList cols = new ColumnList();
     cols.addColumn(columnFamilyBytes, getColumnQualifier("value"), SerDeUtils.toBytes(measurement.getProfileValue()));
 
@@ -66,7 +65,6 @@ public class ValueOnlyColumnBuilder implements ColumnBuilder {
 
   @Override
   public byte[] getColumnQualifier(String fieldName) {
-
     if("value".equals(fieldName)) {
       return Bytes.toBytes("value");
     }
