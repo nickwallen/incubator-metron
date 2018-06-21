@@ -66,12 +66,26 @@ public enum ColumnBuilders {
     this.createFn = createFn;
   }
 
+  /**
+   * Get a new {@link ColumnBuilder}.
+   *
+   * @return A newly created {@link ColumnBuilder}.
+   */
   public ColumnBuilder get() {
     // the arg is not needed in this case
     String arg = null;
     return get(arg);
   }
 
+  /**
+   * Get a new {@link ColumnBuilder}. Allows an argument to be passed to the
+   * {@link ColumnBuilder} that is created.
+   *
+   * <p>For example, used to provide the column family for VALUES_ONLY_WITH_CF.
+   *
+   * @param arg The argument passed to the {@link ColumnBuilder} that is created.
+   * @return A newly created {@link ColumnBuilder}.
+   */
   public ColumnBuilder get(String arg) {
     return createFn.apply(arg);
   }

@@ -21,7 +21,6 @@
 package org.apache.metron.profiler.bolt;
 
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.common.message.MessageGetters;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseMapper;
 import org.apache.metron.profiler.ProfileMeasurement;
