@@ -21,7 +21,6 @@ package org.apache.metron.profiler.hbase;
 
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
@@ -32,8 +31,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.Assert.assertTrue;
 import static org.apache.metron.common.utils.SerDeUtils.toBytes;
+import static org.junit.Assert.assertTrue;
 
 public class AllFieldsColumnBuilderTest {
 
@@ -78,20 +77,24 @@ public class AllFieldsColumnBuilderTest {
 
   @Test
   public void testColumns() {
-    ColumnList columnList = columnBuilder.columns(measurement);
-    List<ColumnList.Column> columns = columnList.getColumns();
+    // the columns that are expected
+    byte[] cf = columnBuilder.getColumnFamilyBytes();
+    ColumnList expected = new ColumnList();
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("value"), toBytes(measurement.getProfileValue()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("name"), toBytes(measurement.getProfileName()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("entity"), toBytes(measurement.getEntity()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("definition"), toBytes(measurement.getDefinition()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("start"), toBytes(measurement.getPeriod().getStartTimeMillis()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("end"), toBytes(measurement.getPeriod().getEndTimeMillis()));
+    expected.addColumn(cf, columnBuilder.getColumnQualifier("period"), toBytes(measurement.getPeriod().getPeriod()));
 
-    ColumnList cols = new ColumnList();
-//    addColumn(cols, "value", measurement.getProfileValue());
-//    addColumn(cols, "name", measurement.getProfileName());
-//    addColumn(cols, "entity", measurement.getEntity());
-//    addColumn(cols, "definition", measurement.getDefinition());
-//    addColumn(cols, "start", measurement.getPeriod().getStartTimeMillis());
-//    addColumn(cols, "end", measurement.getPeriod().getEndTimeMillis());
-//    addColumn(cols, "period", measurement.getPeriod().getPeriod());
-//
-    cols.addColumn(columnBuilder.getColumnFamilyBytes(), columnBuilder.getColumnQualifier("value"), toBytes(measurement.getProfileValue()));
-    // TODO check rest of columns
+    // retrieve the columns
+    ColumnList columnList = columnBuilder.columns(measurement);
+    List<ColumnList.Column> actual = columnList.getColumns();
+
+    for(ColumnList.Column col: actual) {
+      assertTrue(expected.getColumns().contains(col));
+    }
   }
 
 }

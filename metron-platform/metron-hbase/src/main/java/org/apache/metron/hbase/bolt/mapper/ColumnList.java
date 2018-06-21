@@ -20,6 +20,10 @@
 
 package org.apache.metron.hbase.bolt.mapper;
 
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -57,6 +61,37 @@ public class ColumnList {
     public byte[] getQualifier() {
       return qualifier;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      AbstractColumn that = (AbstractColumn) o;
+      return new EqualsBuilder()
+              .append(family, that.family)
+              .append(qualifier, that.qualifier)
+              .isEquals();
+    }
+
+    @Override
+    public int hashCode() {
+      return new HashCodeBuilder(17, 37)
+              .append(family)
+              .append(qualifier)
+              .toHashCode();
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+              .append("family", family)
+              .append("qualifier", qualifier)
+              .toString();
+    }
   }
 
   public static class Column extends AbstractColumn {
@@ -76,10 +111,47 @@ public class ColumnList {
     public long getTs() {
       return ts;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      Column column = (Column) o;
+      return new EqualsBuilder()
+              .appendSuper(super.equals(o))
+              .append(ts, column.ts)
+              .append(value, column.value)
+              .isEquals();
+    }
+
+    @Override
+    public int hashCode() {
+      return new HashCodeBuilder(17, 37)
+              .appendSuper(super.hashCode())
+              .append(value)
+              .append(ts)
+              .toHashCode();
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+              .append("family", family)
+              .append("qualifier", qualifier)
+              .append("value", value)
+              .append("ts", ts)
+              .toString();
+    }
   }
 
   public static class Counter extends AbstractColumn {
     long incr = 0;
+
     Counter(byte[] family, byte[] qualifier, long incr){
       super(family, qualifier);
       this.incr = incr;
@@ -87,6 +159,38 @@ public class ColumnList {
 
     public long getIncrement() {
       return incr;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+      Counter counter = (Counter) o;
+      return new EqualsBuilder()
+              .appendSuper(super.equals(o))
+              .append(incr, counter.incr)
+              .isEquals();
+    }
+
+    @Override
+    public int hashCode() {
+      return new HashCodeBuilder(17, 37)
+              .appendSuper(super.hashCode())
+              .append(incr)
+              .toHashCode();
+    }
+
+    @Override
+    public String toString() {
+      return new ToStringBuilder(this)
+              .append("family", family)
+              .append("qualifier", qualifier)
+              .append("incr", incr)
+              .toString();
     }
   }
 
@@ -174,5 +278,36 @@ public class ColumnList {
    */
   public List<Counter> getCounters(){
     return this.counters;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ColumnList that = (ColumnList) o;
+    return new EqualsBuilder()
+            .append(columns, that.columns)
+            .append(counters, that.counters)
+            .isEquals();
+  }
+
+  @Override
+  public int hashCode() {
+    return new HashCodeBuilder(17, 37)
+            .append(columns)
+            .append(counters)
+            .toHashCode();
+  }
+
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this)
+            .append("columns", columns)
+            .append("counters", counters)
+            .toString();
   }
 }
