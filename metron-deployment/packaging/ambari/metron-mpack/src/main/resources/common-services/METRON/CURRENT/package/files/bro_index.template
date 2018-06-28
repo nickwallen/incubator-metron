@@ -1,5 +1,9 @@
 {
   "template": "bro_index*",
+  "settings": {
+    "number_of_replicas": {{index_number_of_replicas}},
+    "number_of_shards": {{index_number_of_shards}}
+  },
   "mappings": {
     "bro_doc": {
       "dynamic_templates": [
