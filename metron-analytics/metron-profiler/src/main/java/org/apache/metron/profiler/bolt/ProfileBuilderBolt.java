@@ -363,7 +363,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     activeFlushSignal.update(timestamp);
     
     // distribute the message
-    MessageRoute route = new MessageRoute(definition, entity);
+    MessageRoute route = new MessageRoute(definition, entity, message, timestamp);
     synchronized (messageDistributor) {
       messageDistributor.distribute(message, timestamp, route, getStellarContext());
     }
