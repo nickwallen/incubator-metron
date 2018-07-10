@@ -365,7 +365,7 @@ public class ProfileBuilderBolt extends BaseWindowedBolt implements Reloadable {
     // distribute the message
     MessageRoute route = new MessageRoute(definition, entity, message, timestamp);
     synchronized (messageDistributor) {
-      messageDistributor.distribute(message, timestamp, route, getStellarContext());
+      messageDistributor.distribute(route, getStellarContext());
     }
 
     LOG.debug("Message distributed: profile={}, entity={}, timestamp={}", definition.getProfile(), entity, timestamp);

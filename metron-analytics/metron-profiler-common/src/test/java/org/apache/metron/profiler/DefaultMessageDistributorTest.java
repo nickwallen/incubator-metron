@@ -126,7 +126,7 @@ public class DefaultMessageDistributorTest {
     MessageRoute route = new MessageRoute(definition, entity, messageOne, timestamp);
 
     // distribute one message and flush
-    distributor.distribute(messageOne, timestamp, route, context);
+    distributor.distribute(route, context);
     List<ProfileMeasurement> measurements = distributor.flush();
 
     // expect one measurement coming from one profile
@@ -145,11 +145,11 @@ public class DefaultMessageDistributorTest {
 
     // distribute one message to the first profile
     MessageRoute routeOne = new MessageRoute(createDefinition(profileOne), entity, messageOne, timestamp);
-    distributor.distribute(messageOne, timestamp, routeOne, context);
+    distributor.distribute(routeOne, context);
 
     // distribute another message to the second profile, but same entity
     MessageRoute routeTwo = new MessageRoute(createDefinition(profileTwo), entity, messageOne, timestamp);
-    distributor.distribute(messageOne, timestamp, routeTwo, context);
+    distributor.distribute(routeTwo, context);
 
     // expect 2 measurements; 1 for each profile
     List<ProfileMeasurement> measurements = distributor.flush();
@@ -165,12 +165,12 @@ public class DefaultMessageDistributorTest {
     // distribute one message
     String entityOne = (String) messageOne.get("ip_src_addr");
     MessageRoute routeOne = new MessageRoute(createDefinition(profileOne), entityOne, messageOne, timestamp);
-    distributor.distribute(messageOne, timestamp, routeOne, context);
+    distributor.distribute(routeOne, context);
 
     // distribute another message with a different entity
     String entityTwo = (String) messageTwo.get("ip_src_addr");
     MessageRoute routeTwo =  new MessageRoute(createDefinition(profileTwo), entityTwo, messageTwo, timestamp);
-    distributor.distribute(messageTwo, timestamp, routeTwo, context);
+    distributor.distribute(routeTwo, context);
 
     // expect 2 measurements; 1 for each entity
     List<ProfileMeasurement> measurements = distributor.flush();
@@ -198,7 +198,7 @@ public class DefaultMessageDistributorTest {
             ticker);
 
     // distribute one message
-    distributor.distribute(messageOne, 1000000, route, context);
+    distributor.distribute(route, context);
 
     // advance time to just shy of the profile TTL
     ticker.advanceTime(profileTimeToLiveMillis - 1000, MILLISECONDS);
@@ -228,7 +228,7 @@ public class DefaultMessageDistributorTest {
             ticker);
 
     // distribute one message
-    distributor.distribute(messageOne, 100000, route, context);
+    distributor.distribute(route, context);
 
     // advance time to just beyond the period duration
     ticker.advanceTime(profileTimeToLiveMillis + 1000, MILLISECONDS);
@@ -259,7 +259,7 @@ public class DefaultMessageDistributorTest {
             ticker);
 
     // distribute one message
-    distributor.distribute(messageOne, 1000000, route, context);
+    distributor.distribute(route, context);
 
     // advance time a couple of hours
     ticker.advanceTime(2, HOURS);
