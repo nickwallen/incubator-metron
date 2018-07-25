@@ -1,0 +1,8 @@
+{
+  "table": { "namespace": "default", "name": "profiler", "tableCoder":"PrimitiveType" },
+  "rowkey": "key",
+  "columns": {
+    "rowKey": { "cf": "rowkey", "col": "key", "type": "binary"},
+    "profileValue": { "cf": "P", "col": "value", "type": "binary" }
+  }
+}
