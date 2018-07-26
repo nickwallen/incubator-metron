@@ -19,15 +19,15 @@
  */
 package org.apache.metron.profiler.spark;
 
-import org.apache.commons.collections4.IteratorUtils;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.DefaultMessageDistributor;
 import org.apache.metron.profiler.DefaultMessageRouter;
@@ -47,7 +47,6 @@ import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.ForeachPartitionFunction;
 import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.api.java.function.MapGroupsFunction;
-import org.apache.spark.api.java.function.MapPartitionsFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
@@ -57,21 +56,35 @@ import org.json.simple.parser.ParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Comparator.comparing;
+import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.PROPERTIES_FILE;
+import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.parse;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_SALT_DIVISOR;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.MAX_ROUTES;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.PROFILE_TTL;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.PROFILE_TTL_UNITS;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_FORMAT;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_PATH;
 
 /**
  * The main program which launches the Batch Profiler in Spark.
@@ -172,7 +185,10 @@ public class BatchProfiler {
     return route.getProfileName() + "-" + route.getEntity() + "-" + period.getPeriod();
   }
 
-  public static ProfileMeasurementAdapter buildProfile(Iterator<MessageRouteAdapter> routes, long periodDurationMillis, long profileTTLMillis, int maxRoutes) {
+  public static ProfileMeasurementAdapter buildProfile(Iterator<MessageRouteAdapter> routes,
+                                                       long periodDurationMillis,
+                                                       long profileTTLMillis,
+                                                       int maxRoutes) {
     MessageDistributor distributor = new DefaultMessageDistributor(periodDurationMillis, profileTTLMillis, maxRoutes);
     Context context = getContext();
 
@@ -192,8 +208,12 @@ public class BatchProfiler {
     return new ProfileMeasurementAdapter(measurements.get(0));
   }
 
-  public static void writeToHBase(Iterator<ProfileMeasurementAdapter> iterator, String tableName, String columnFamily, long periodDurationMillis, int saltDivisor, Durability durability) {
-
+  public static void writeToHBase(Iterator<ProfileMeasurementAdapter> iterator,
+                                  String tableName,
+                                  String columnFamily,
+                                  long periodDurationMillis,
+                                  int saltDivisor,
+                                  Durability durability) {
     // setup hbase client
     Configuration config = HBaseConfiguration.create();
     config.set("hbase.master.hostname", "localhost");
@@ -216,7 +236,50 @@ public class BatchProfiler {
     }
   }
 
-  public static void main(String[] args) throws IOException {
+  private static CommandLine parseCommandLine(String[] args) throws org.apache.commons.cli.ParseException {
+    /*
+     * The general gist is that in order to pass additional args to Spark,
+     * we have to disregard options that we don't know about in the CLI.
+     * Storm will ignore our args, we have to do the same.
+     */
+    CommandLineParser parser = new PosixParser() {
+      @Override
+      protected void processOption(String arg, ListIterator iter) throws org.apache.commons.cli.ParseException {
+
+        // TODO is this needed?  do we need to allow user to pass additional options to spark or anything?
+        if(getOptions().hasOption(arg)) {
+          super.processOption(arg, iter);
+        }
+      }
+    };
+    return parse(parser, args);
+  }
+
+  public static void main(String[] args) throws IOException, org.apache.commons.cli.ParseException {
+    CommandLine commandLine = parseCommandLine(args);
+
+    // load config from a properties file, if one is defined
+    Properties config = new Properties();
+    if(PROPERTIES_FILE.has(commandLine)) {
+      String propertiesPath = PROPERTIES_FILE.get(commandLine);
+
+      LOG.debug("Loading profiler properties from '{}'", propertiesPath);
+      config.load(new FileInputStream(propertiesPath));
+    }
+
+    // required configuration values
+    TimeUnit periodDurationUnits = TimeUnit.valueOf(PERIOD_DURATION_UNITS.get(config, String.class));
+    int periodDuration = PERIOD_DURATION.get(config, Integer.class);
+    long periodDurationMillis = periodDurationUnits.toMillis(periodDuration);
+    TimeUnit profileTTLUnits = TimeUnit.valueOf(PROFILE_TTL_UNITS.get(config, String.class));
+    int profileTTL = PROFILE_TTL.get(config, Integer.class);
+    long profileTTLMillis = profileTTLUnits.toMillis(profileTTL);
+    int maxRoutes = MAX_ROUTES.get(config, Integer.class);
+    int saltDivisor = HBASE_SALT_DIVISOR.get(config, Integer.class);
+    String tableName = HBASE_TABLE_NAME.get(config, String.class);
+    String columnFamily = HBASE_COLUMN_FAMILY.get(config, String.class);
+    String inputFormat = TELEMETRY_INPUT_FORMAT.get(config, String.class);
+    String inputPath = TELEMETRY_INPUT_PATH.get(config, String.class);
 
     SparkSession spark = SparkSession
             .builder()
@@ -224,61 +287,39 @@ public class BatchProfiler {
             .master("local") // TODO remove this
             .getOrCreate();
 
-    // TODO remove me
-    spark.sparkContext().setLogLevel("WARN");
-
-    // TODO allow the user to configure these
-    String pathToMessages = "/Users/nallen/tmp/indexed/bro/";
-    String inputFormat = "text";
     ProfilerConfig profilerConfig = getProfilerConfig();
-    long periodDuration = 15;
-    TimeUnit periodDurationUnits = TimeUnit.MINUTES;
-    long profileTTL = 30;
-    TimeUnit profileTTLUnits = TimeUnit.MINUTES;
-    int saltDivisor = 1000;
-    String tableName = "profiler";
-    String columnFamily = "P";
-    long periodDurationMillis = periodDurationUnits.toMillis(periodDuration);
-    long profileTTLMillis = profileTTLUnits.toMillis(profileTTL);
-    int maxRoutes = 100000;
+    LOG.debug("Building {} profile(s)", profilerConfig.getProfiles().size());
 
     // fetch the archived telemetry
+    LOG.debug("Loading telemetry from '{}'", inputPath);
     Dataset<String> telemetry = spark
             .read()
             .format(inputFormat)
-            .load(pathToMessages)
+            .load(inputPath)
             .as(Encoders.STRING());
-
-    // TODO remove me
-    System.out.println("Telemetry Record(s): " + telemetry.count());
-    telemetry.printSchema();
+    LOG.debug("Found {} telemetry record(s)", telemetry.count());
 
     // find all routes for each message
-    FlatMapFunction<String, MessageRouteAdapter> findRoutes = msg -> findRoutes(msg, profilerConfig).iterator();
-    Dataset<MessageRouteAdapter> allRoutes = telemetry.flatMap(findRoutes, Encoders.bean(MessageRouteAdapter.class));
-
-    // TODO remove me
-    System.out.println("Message Route(s): " + allRoutes.count());
-    allRoutes.printSchema();
+    FlatMapFunction<String, MessageRouteAdapter> findRoutesFn = msg -> findRoutes(msg, profilerConfig).iterator();
+    Dataset<MessageRouteAdapter> allRoutes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRouteAdapter.class));
+    LOG.debug("Generated {} message route(s)", allRoutes.count());
 
     // build the profiles
     MapFunction<MessageRouteAdapter, String> groupByPeriodFn =
             route -> groupByPeriod(route, periodDuration, periodDurationUnits);
     MapGroupsFunction<String, MessageRouteAdapter, ProfileMeasurementAdapter> buildProfilesFn =
             (grp, routes) -> buildProfile(routes, periodDurationMillis, profileTTLMillis, maxRoutes);
-
     Dataset<ProfileMeasurementAdapter> measurements = allRoutes
             .groupByKey(groupByPeriodFn, Encoders.STRING())
             .mapGroups(buildProfilesFn, Encoders.bean(ProfileMeasurementAdapter.class));
-
-    // TODO remove me
-    System.out.println("Measurement(s): " + measurements.count());
-    measurements.printSchema();
-//    measurements.explain(true);
+    LOG.debug("Produced {} profile measurement(s)", measurements.count());
 
     // write the values to HBase
     ForeachPartitionFunction<ProfileMeasurementAdapter> writeToHBaseFn = iter ->
             writeToHBase(iter, tableName, columnFamily, periodDurationMillis, saltDivisor, Durability.USE_DEFAULT);
     measurements.foreachPartition(writeToHBaseFn);
+    LOG.debug("All profile measurement(s) written to HBase");
   }
+
+
 }
