@@ -89,21 +89,68 @@ public class BatchProfiler implements Serializable {
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
-   * Parses the raw JSON of a message.
+   * Execute the Batch Profiler.
    *
-   * @param json The raw JSON to parse.
-   * @param parser The parser to use.
-   * @return The parsed telemetry message.
+   * @param properties
+   * @param profilerConfig
+   * @return The number of profile measurements produced.
    */
-  private static Optional<JSONObject> toMessage(String json, JSONParser parser) {
-    try {
-      JSONObject message = (JSONObject) parser.parse(json);
-      return Optional.of(message);
+  public long execute(Properties properties, ProfilerConfig profilerConfig) {
+    LOG.debug("Building {} profile(s)", profilerConfig.getProfiles().size());
 
-    } catch(ParseException e) {
-      LOG.warn(String.format("Unable to parse message, message will be ignored; message='%s'", json), e);
-      return Optional.empty();
-    }
+    // declarations that only exist here to make the code more readable below
+    FlatMapFunction<String, MessageRoute> findRoutesFn;
+    MapGroupsFunction<String, MessageRoute, ProfileMeasurementAdapter> buildProfilesFn;
+    MapFunction<MessageRoute, String> groupByPeriodFn;
+    MapPartitionsFunction<ProfileMeasurementAdapter, Integer> writeToHBaseFn;
+
+    // required configuration values
+    TimeUnit periodDurationUnits = TimeUnit.valueOf(PERIOD_DURATION_UNITS.get(properties, String.class));
+    int periodDuration = PERIOD_DURATION.get(properties, Integer.class);
+    long periodDurationMillis = periodDurationUnits.toMillis(periodDuration);
+    int saltDivisor = HBASE_SALT_DIVISOR.get(properties, Integer.class);
+    String tableName = HBASE_TABLE_NAME.get(properties, String.class);
+    String columnFamily = HBASE_COLUMN_FAMILY.get(properties, String.class);
+    String inputFormat = TELEMETRY_INPUT_FORMAT.get(properties, String.class);
+    String inputPath = TELEMETRY_INPUT_PATH.get(properties, String.class);
+    Durability durability = HBASE_WRITE_DURABILITY.get(properties, Durability.class);
+
+    SparkSession spark = SparkSession
+            .builder()
+            .config(new SparkConf())
+            .getOrCreate();
+
+    // fetch the archived telemetry
+    LOG.debug("Loading telemetry from '{}'", inputPath);
+    Dataset<String> telemetry = spark
+            .read()
+            .format(inputFormat)
+            .load(inputPath)
+            .as(Encoders.STRING());
+    LOG.debug("Found {} telemetry record(s)", telemetry.cache().count());
+
+    // find all routes for each message
+    findRoutesFn = msg -> findRoutes(msg, profilerConfig).iterator();
+    Dataset<MessageRoute> routes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRoute.class));
+    LOG.debug("Generated {} message route(s)", routes.cache().count());
+
+    // build the profiles
+    groupByPeriodFn = route -> groupByKey(route, periodDuration, periodDurationUnits);
+    buildProfilesFn = (grp, routesInGroup) -> buildProfile(routesInGroup, periodDurationMillis);
+    Dataset<ProfileMeasurementAdapter> measurements = routes
+            .groupByKey(groupByPeriodFn, Encoders.STRING())
+            .mapGroups(buildProfilesFn, Encoders.bean(ProfileMeasurementAdapter.class));
+    LOG.debug("Produced {} profile measurement(s)", measurements.cache().count());
+
+    // write the profile measurements to HBase
+    writeToHBaseFn = iter -> writeToHBase(iter, tableName, columnFamily, periodDurationMillis, saltDivisor, durability);
+    long count = measurements
+            .mapPartitions(writeToHBaseFn, Encoders.INT())
+            .agg(sum("value"))
+            .head()
+            .getLong(0);
+    LOG.debug("{} profile measurement(s) written to HBase", count);
+    return count;
   }
 
   /**
@@ -138,6 +185,24 @@ public class BatchProfiler implements Serializable {
     return routes;
   }
 
+  /**
+   * Parses the raw JSON of a message.
+   *
+   * @param json The raw JSON to parse.
+   * @param parser The parser to use.
+   * @return The parsed telemetry message.
+   */
+  private static Optional<JSONObject> toMessage(String json, JSONParser parser) {
+    try {
+      JSONObject message = (JSONObject) parser.parse(json);
+      return Optional.of(message);
+
+    } catch(ParseException e) {
+      LOG.warn(String.format("Unable to parse message, message will be ignored; message='%s'", json), e);
+      return Optional.empty();
+    }
+  }
+
   private static <T> Stream<T> toStream(Iterator<T> iterator) {
     Iterable<T> iterable = () -> iterator;
     return StreamSupport.stream(iterable.spliterator(), false);
@@ -151,7 +216,7 @@ public class BatchProfiler implements Serializable {
    * @param periodDurationUnits The units of the period duration.
    * @return The key to use when grouping.
    */
-  private static String groupByPeriod(MessageRoute route, long periodDuration, TimeUnit periodDurationUnits) {
+  private static String groupByKey(MessageRoute route, long periodDuration, TimeUnit periodDurationUnits) {
     ProfilePeriod period = ProfilePeriod.fromTimestamp(route.getTimestamp(), periodDuration, periodDurationUnits);
     return route.getProfileDefinition().getProfile() + "-" + route.getEntity() + "-" + period.getPeriod();
   }
@@ -249,70 +314,5 @@ public class BatchProfiler implements Serializable {
             .build();
     StellarFunctions.initialize(context);
     return context;
-  }
-
-  /**
-   * Execute the Batch Profiler.
-   *
-   * @param config
-   * @param profilerConfig
-   * @return The number of profile measurements produced.
-   */
-  public long execute(Properties config, ProfilerConfig profilerConfig) {
-    LOG.debug("Building {} profile(s)", profilerConfig.getProfiles().size());
-
-    // declarations that only exist here to make the code more readable below
-    FlatMapFunction<String, MessageRoute> findRoutesFn;
-    MapGroupsFunction<String, MessageRoute, ProfileMeasurementAdapter> buildProfilesFn;
-    MapFunction<MessageRoute, String> groupByPeriodFn;
-    MapPartitionsFunction<ProfileMeasurementAdapter, Integer> writeToHBaseFn;
-
-    // required configuration values
-    TimeUnit periodDurationUnits = TimeUnit.valueOf(PERIOD_DURATION_UNITS.get(config, String.class));
-    int periodDuration = PERIOD_DURATION.get(config, Integer.class);
-    long periodDurationMillis = periodDurationUnits.toMillis(periodDuration);
-    int saltDivisor = HBASE_SALT_DIVISOR.get(config, Integer.class);
-    String tableName = HBASE_TABLE_NAME.get(config, String.class);
-    String columnFamily = HBASE_COLUMN_FAMILY.get(config, String.class);
-    String inputFormat = TELEMETRY_INPUT_FORMAT.get(config, String.class);
-    String inputPath = TELEMETRY_INPUT_PATH.get(config, String.class);
-    Durability durability = HBASE_WRITE_DURABILITY.get(config, Durability.class);
-
-    SparkSession spark = SparkSession
-            .builder()
-            .config(new SparkConf())
-            .getOrCreate();
-
-    // fetch the archived telemetry
-    LOG.debug("Loading telemetry from '{}'", inputPath);
-    Dataset<String> telemetry = spark
-            .read()
-            .format(inputFormat)
-            .load(inputPath)
-            .as(Encoders.STRING());
-    LOG.debug("Found {} telemetry record(s)", telemetry.cache().count());
-
-    // find all routes for each message
-    findRoutesFn = msg -> findRoutes(msg, profilerConfig).iterator();
-    Dataset<MessageRoute> routes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRoute.class));
-    LOG.debug("Generated {} message route(s)", routes.cache().count());
-
-    // build the profiles
-    groupByPeriodFn = route -> groupByPeriod(route, periodDuration, periodDurationUnits);
-    buildProfilesFn = (grp, routesInGroup) -> buildProfile(routesInGroup, periodDurationMillis);
-    Dataset<ProfileMeasurementAdapter> measurements = routes
-            .groupByKey(groupByPeriodFn, Encoders.STRING())
-            .mapGroups(buildProfilesFn, Encoders.bean(ProfileMeasurementAdapter.class));
-    LOG.debug("Produced {} profile measurement(s)", measurements.cache().count());
-
-    // write the measurements to HBase
-    writeToHBaseFn = iter -> writeToHBase(iter, tableName, columnFamily, periodDurationMillis, saltDivisor, durability);
-    long count = measurements
-            .mapPartitions(writeToHBaseFn, Encoders.INT())
-            .agg(sum("value"))
-            .head()
-            .getLong(0);
-    LOG.debug("{} profile measurement(s) written to HBase", count);
-    return count;
   }
 }

@@ -88,18 +88,18 @@ public class BatchProfilerCLI implements Serializable {
     CommandLine commandLine = parseCommandLine(args);
 
     // load configuration from a properties file, if one is defined
-    Properties config = new Properties();
+    Properties properties = new Properties();
     if(PROPERTIES_FILE.has(commandLine)) {
       String propertiesPath = PROPERTIES_FILE.get(commandLine);
 
       LOG.info("Loading profiler properties from '{}'", propertiesPath);
-      config.load(new FileInputStream(propertiesPath));
+      properties.load(new FileInputStream(propertiesPath));
 
-      LOG.info(config.toString());
+      LOG.info(properties.toString());
     }
 
     BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(config, getProfilerConfig());
+    long count = profiler.execute(properties, getProfilerConfig());
 
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
