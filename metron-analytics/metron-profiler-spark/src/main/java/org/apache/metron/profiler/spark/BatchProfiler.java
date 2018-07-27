@@ -116,8 +116,8 @@ public class BatchProfiler implements Serializable {
    * @param profilerConfig The profile definitions.
    * @return A list of message routes.
    */
-  private static List<MessageRouteAdapter> findRoutes(String json, ProfilerConfig profilerConfig) {
-    List<MessageRouteAdapter> routes;
+  private static List<MessageRoute> findRoutes(String json, ProfilerConfig profilerConfig) {
+    List<MessageRoute> routes;
     Context context = getContext();
 
     // parse the raw message
@@ -127,14 +127,8 @@ public class BatchProfiler implements Serializable {
 
       // find all routes
       MessageRouter router = new DefaultMessageRouter(context);
-      List<MessageRoute> originalRoutes = router.route(message.get(), profilerConfig, context);
-      LOG.trace("Found {} route(s) for a message", originalRoutes.size());
-
-      // return the adapter so they can be serialized by Spark more simply
-      routes = originalRoutes
-              .stream()
-              .map(route -> new MessageRouteAdapter(route))
-              .collect(Collectors.toList());
+      routes = router.route(message.get(), profilerConfig, context);
+      LOG.trace("Found {} route(s) for a message", routes.size());
 
     } else {
       // the message is not valid and must be ignored
@@ -157,9 +151,9 @@ public class BatchProfiler implements Serializable {
    * @param periodDurationUnits The units of the period duration.
    * @return The key to use when grouping.
    */
-  private static String groupByPeriod(MessageRouteAdapter route, long periodDuration, TimeUnit periodDurationUnits) {
+  private static String groupByPeriod(MessageRoute route, long periodDuration, TimeUnit periodDurationUnits) {
     ProfilePeriod period = ProfilePeriod.fromTimestamp(route.getTimestamp(), periodDuration, periodDurationUnits);
-    return route.getProfileName() + "-" + route.getEntity() + "-" + period.getPeriod();
+    return route.getProfileDefinition().getProfile() + "-" + route.getEntity() + "-" + period.getPeriod();
   }
 
   /**
@@ -171,7 +165,7 @@ public class BatchProfiler implements Serializable {
    * @param periodDurationMillis The period duration in milliseconds.
    * @return
    */
-  private static ProfileMeasurementAdapter buildProfile(Iterator<MessageRouteAdapter> routesIter, long periodDurationMillis) {
+  private static ProfileMeasurementAdapter buildProfile(Iterator<MessageRoute> routesIter, long periodDurationMillis) {
     // create the distributor
     // some settings are unnecessary as the distributor is cleaned-up immediately after processing the batch
     int maxRoutes = Integer.MAX_VALUE;
@@ -182,7 +176,6 @@ public class BatchProfiler implements Serializable {
     // sort the messages/routes
     List<MessageRoute> routes = toStream(routesIter)
             .sorted(comparing(rt -> rt.getTimestamp()))
-            .map(adapter -> adapter.toMessageRoute())
             .collect(Collectors.toList());
     LOG.debug("Building a profile from {} message(s)", routes.size());
 
@@ -269,9 +262,9 @@ public class BatchProfiler implements Serializable {
     LOG.debug("Building {} profile(s)", profilerConfig.getProfiles().size());
 
     // declarations that only exist here to make the code more readable below
-    FlatMapFunction<String, MessageRouteAdapter> findRoutesFn;
-    MapGroupsFunction<String, MessageRouteAdapter, ProfileMeasurementAdapter> buildProfilesFn;
-    MapFunction<MessageRouteAdapter, String> groupByPeriodFn;
+    FlatMapFunction<String, MessageRoute> findRoutesFn;
+    MapGroupsFunction<String, MessageRoute, ProfileMeasurementAdapter> buildProfilesFn;
+    MapFunction<MessageRoute, String> groupByPeriodFn;
     MapPartitionsFunction<ProfileMeasurementAdapter, Integer> writeToHBaseFn;
 
     // required configuration values
@@ -301,7 +294,7 @@ public class BatchProfiler implements Serializable {
 
     // find all routes for each message
     findRoutesFn = msg -> findRoutes(msg, profilerConfig).iterator();
-    Dataset<MessageRouteAdapter> routes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRouteAdapter.class));
+    Dataset<MessageRoute> routes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRoute.class));
     LOG.debug("Generated {} message route(s)", routes.cache().count());
 
     // build the profiles
