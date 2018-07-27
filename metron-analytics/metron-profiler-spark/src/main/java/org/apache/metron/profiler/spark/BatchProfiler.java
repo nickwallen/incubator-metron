@@ -19,6 +19,7 @@
  */
 package org.apache.metron.profiler.spark;
 
+import com.google.common.collect.Maps;
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -57,7 +58,6 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +95,7 @@ public class BatchProfiler implements Serializable {
    * @param profilerConfig
    * @return The number of profile measurements produced.
    */
-  public long execute(Properties properties, ProfilerConfig profilerConfig) {
+  public long execute(Properties properties, Properties globalProperties, ProfilerConfig profilerConfig) {
     LOG.debug("Building {} profile(s)", profilerConfig.getProfiles().size());
 
     // declarations that only exist here to make the code more readable below
@@ -114,6 +114,7 @@ public class BatchProfiler implements Serializable {
     String inputFormat = TELEMETRY_INPUT_FORMAT.get(properties, String.class);
     String inputPath = TELEMETRY_INPUT_PATH.get(properties, String.class);
     Durability durability = HBASE_WRITE_DURABILITY.get(properties, Durability.class);
+    Map<String, String> globals = Maps.fromProperties(globalProperties);
 
     SparkSession spark = SparkSession
             .builder()
@@ -130,13 +131,13 @@ public class BatchProfiler implements Serializable {
     LOG.debug("Found {} telemetry record(s)", telemetry.cache().count());
 
     // find all routes for each message
-    findRoutesFn = msg -> findRoutes(msg, profilerConfig).iterator();
+    findRoutesFn = msg -> findRoutes(msg, profilerConfig, globals).iterator();
     Dataset<MessageRoute> routes = telemetry.flatMap(findRoutesFn, Encoders.bean(MessageRoute.class));
     LOG.debug("Generated {} message route(s)", routes.cache().count());
 
     // build the profiles
     groupByPeriodFn = route -> groupByKey(route, periodDuration, periodDurationUnits);
-    buildProfilesFn = (grp, routesInGroup) -> buildProfile(routesInGroup, periodDurationMillis);
+    buildProfilesFn = (grp, routesInGroup) -> buildProfile(routesInGroup, periodDurationMillis, globals);
     Dataset<ProfileMeasurementAdapter> measurements = routes
             .groupByKey(groupByPeriodFn, Encoders.STRING())
             .mapGroups(buildProfilesFn, Encoders.bean(ProfileMeasurementAdapter.class));
@@ -161,11 +162,11 @@ public class BatchProfiler implements Serializable {
    *
    * @param json The raw JSON message.
    * @param profilerConfig The profile definitions.
+   * @param globals The global properties used during Stellar execution.
    * @return A list of message routes.
    */
-  private static List<MessageRoute> findRoutes(String json, ProfilerConfig profilerConfig) {
+  private static List<MessageRoute> findRoutes(String json, ProfilerConfig profilerConfig, Map<String, String> globals) {
     List<MessageRoute> routes;
-    Context context = getContext();
 
     // parse the raw message
     JSONParser parser = new JSONParser();
@@ -173,6 +174,7 @@ public class BatchProfiler implements Serializable {
     if(message.isPresent()) {
 
       // find all routes
+      Context context = getContext(globals);
       MessageRouter router = new DefaultMessageRouter(context);
       routes = router.route(message.get(), profilerConfig, context);
       LOG.trace("Found {} route(s) for a message", routes.size());
@@ -228,15 +230,18 @@ public class BatchProfiler implements Serializable {
    *
    * @param routesIter The message routes.
    * @param periodDurationMillis The period duration in milliseconds.
+   * @param globals The global properties used during Stellar execution.
    * @return
    */
-  private static ProfileMeasurementAdapter buildProfile(Iterator<MessageRoute> routesIter, long periodDurationMillis) {
+  private static ProfileMeasurementAdapter buildProfile(Iterator<MessageRoute> routesIter,
+                                                        long periodDurationMillis,
+                                                        Map<String, String> globals) {
     // create the distributor
     // some settings are unnecessary as the distributor is cleaned-up immediately after processing the batch
     int maxRoutes = Integer.MAX_VALUE;
     long profileTTLMillis = Long.MAX_VALUE;
     MessageDistributor distributor = new DefaultMessageDistributor(periodDurationMillis, profileTTLMillis, maxRoutes);
-    Context context = getContext();
+    Context context = getContext(globals);
 
     // sort the messages/routes
     List<MessageRoute> routes = toStream(routesIter)
@@ -256,8 +261,8 @@ public class BatchProfiler implements Serializable {
     }
 
     ProfileMeasurement m = measurements.get(0);
-    LOG.debug("Profile measurement created; profile={}, entity={}, period={}",
-            m.getProfileName(), m.getEntity(), m.getPeriod().getPeriod());
+    LOG.debug("Profile measurement created; profile={}, entity={}, period={}, value={}",
+            m.getProfileName(), m.getEntity(), m.getPeriod().getPeriod(), m.getProfileValue());
     return new ProfileMeasurementAdapter(m);
   }
 
@@ -303,14 +308,12 @@ public class BatchProfiler implements Serializable {
   }
 
   /**
-   * TODO replace this with something configurable by the user
-   * TODO user should be able to get global config from Zookeeper
+   * Create the execution context for running Stellar.
    */
-  private static Context getContext() {
-    Map<String, Object> global = new HashMap<>();
+  private static Context getContext(Map<String, String> globals) {
     Context context = new Context.Builder()
-            .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
-            .with(Context.Capabilities.STELLAR_CONFIG, () -> global)
+            .with(Context.Capabilities.GLOBAL_CONFIG, () -> globals)
+            .with(Context.Capabilities.STELLAR_CONFIG, () -> globals)
             .build();
     StellarFunctions.initialize(context);
     return context;

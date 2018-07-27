@@ -36,13 +36,19 @@ import java.util.function.Supplier;
 public enum BatchProfilerCLIOptions {
 
   HELP(() -> {
-    Option o = new Option("h", "help", false, "This screen");
+    Option o = new Option("h", "help", false, "Usage instructions.");
     o.setRequired(false);
     return o;
   }),
 
   PROPERTIES_FILE(() -> {
-    Option o = new Option("p", "properties", true, "A file containing properties for the Batch Profiler");
+    Option o = new Option("p", "properties", true, "A file containing properties for either the Profiler or Spark.");
+    o.setRequired(false);
+    return o;
+  }),
+
+  GLOBALS_FILE(() -> {
+    Option o = new Option("g", "globals", true, "A properties file containing the global configuration.");
     o.setRequired(false);
     return o;
   });

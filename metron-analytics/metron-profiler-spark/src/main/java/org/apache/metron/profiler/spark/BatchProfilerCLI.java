@@ -34,6 +34,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Optional;
 import java.util.Properties;
 
+import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.GLOBALS_FILE;
 import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.PROPERTIES_FILE;
 import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.parse;
 
@@ -87,7 +88,7 @@ public class BatchProfilerCLI implements Serializable {
   public static void main(String[] args) throws IOException, org.apache.commons.cli.ParseException {
     CommandLine commandLine = parseCommandLine(args);
 
-    // load configuration from a properties file, if one is defined
+    // load the profiler properties from a file, if one exists
     Properties properties = new Properties();
     if(PROPERTIES_FILE.has(commandLine)) {
       String propertiesPath = PROPERTIES_FILE.get(commandLine);
@@ -95,11 +96,22 @@ public class BatchProfilerCLI implements Serializable {
       LOG.info("Loading profiler properties from '{}'", propertiesPath);
       properties.load(new FileInputStream(propertiesPath));
 
-      LOG.info(properties.toString());
+      LOG.info("Properties = {}", properties.toString());
+    }
+
+    // load the global properties for Stellar execution from a file, if one exists
+    Properties globals = new Properties();
+    if(GLOBALS_FILE.has(commandLine)) {
+      String globalsPath = GLOBALS_FILE.get(commandLine);
+
+      LOG.info("Loading global properties from '{}'", globalsPath);
+      globals.load(new FileInputStream(globalsPath));
+
+      LOG.info("Globals = {}", globals);
     }
 
     BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(properties, getProfilerConfig());
+    long count = profiler.execute(properties, globals, getProfilerConfig());
 
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
