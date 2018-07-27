@@ -22,6 +22,7 @@ package org.apache.metron.profiler.spark;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.PosixParser;
+import org.apache.commons.io.IOUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.slf4j.Logger;
@@ -35,7 +36,8 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.GLOBALS_FILE;
-import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.PROPERTIES_FILE;
+import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.PROFILE_DEFN_FILE;
+import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.CONFIGURATION_FILE;
 import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.parse;
 
 /**
@@ -47,56 +49,49 @@ import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.parse;
  *    --class org.apache.metron.profiler.spark.BatchProfilerCLI \
  *     --properties-file profiler.properties \
  *     metron-profiler-spark-<version>.jar \
- *     -p profiler.properties
+ *     -c profiler.properties \
+ *     -g global.properties \
+ *     -p profiles.json
  * }</pre>
  */
 public class BatchProfilerCLI implements Serializable {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  /**
-   * TODO replace this stub with something sensible
-   * TODO allow user to either provide profile definitions in file or in zookeeper
-   */
-  public static ProfilerConfig getProfilerConfig() {
 
-    ProfileConfig counterOne = new ProfileConfig()
-            .withProfile("counter-1")
-            .withForeach("ip_src_addr")
-            .withInit("count", "0")
-            .withUpdate("count", "count + 1")
-            .withResult("count");
-
-    ProfileConfig counterTwo = new ProfileConfig()
-            .withProfile("counter-2")
-            .withForeach("ip_src_addr")
-            .withInit("count", "0")
-            .withUpdate("count", "count + 1")
-            .withResult("count");
-
-    return new ProfilerConfig()
-            .withTimestampField(Optional.of("timestamp"))
-            .withProfile(counterOne)
-            .withProfile(counterTwo);
-  }
-
-  private static CommandLine parseCommandLine(String[] args) throws org.apache.commons.cli.ParseException {
-    CommandLineParser parser = new PosixParser();
-    return parse(parser, args);
-  }
 
   public static void main(String[] args) throws IOException, org.apache.commons.cli.ParseException {
     CommandLine commandLine = parseCommandLine(args);
 
+    // load the profile definition from a file
+    ProfilerConfig profiles;
+    if(PROFILE_DEFN_FILE.has(commandLine)) {
+      String profilePath = PROFILE_DEFN_FILE.get(commandLine);
+
+      LOG.info("Loading profiles from '{}'", profilePath);
+      String contents = IOUtils.toString(new FileInputStream(profilePath));
+
+      profiles = ProfilerConfig.fromJSON(contents);
+      LOG.info("Loaded {} profile(s)", profiles.getProfiles().size());
+
+    } else {
+      throw new IllegalArgumentException("No profile(s) defined");
+    }
+
+    // the batch profiler requires an event timestamp field
+    if(!profiles.getTimestampField().isPresent()) {
+      throw new IllegalArgumentException("The 'timestampField' must be defined.");
+    }
+
     // load the profiler properties from a file, if one exists
-    Properties properties = new Properties();
-    if(PROPERTIES_FILE.has(commandLine)) {
-      String propertiesPath = PROPERTIES_FILE.get(commandLine);
+    Properties config = new Properties();
+    if(CONFIGURATION_FILE.has(commandLine)) {
+      String propertiesPath = CONFIGURATION_FILE.get(commandLine);
 
-      LOG.info("Loading profiler properties from '{}'", propertiesPath);
-      properties.load(new FileInputStream(propertiesPath));
+      LOG.info("Loading profiler configuration from '{}'", propertiesPath);
+      config.load(new FileInputStream(propertiesPath));
 
-      LOG.info("Properties = {}", properties.toString());
+      LOG.info("Properties = {}", config.toString());
     }
 
     // load the global properties for Stellar execution from a file, if one exists
@@ -111,10 +106,18 @@ public class BatchProfilerCLI implements Serializable {
     }
 
     BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(properties, globals, getProfilerConfig());
+    long count = profiler.execute(config, globals, profiles);
 
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
 
-
+  /**
+   * Parse the command line arguments submitted by the user.
+   * @param args The command line arguments to parse.
+   * @throws org.apache.commons.cli.ParseException
+   */
+  private static CommandLine parseCommandLine(String[] args) throws org.apache.commons.cli.ParseException {
+    CommandLineParser parser = new PosixParser();
+    return parse(parser, args);
+  }
 }

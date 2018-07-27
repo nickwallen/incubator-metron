@@ -41,8 +41,14 @@ public enum BatchProfilerCLIOptions {
     return o;
   }),
 
-  PROPERTIES_FILE(() -> {
-    Option o = new Option("p", "properties", true, "A file containing properties for either the Profiler or Spark.");
+  PROFILE_DEFN_FILE(() -> {
+    Option o = new Option("p", "profiles", true, "A file containing the Profile definition.");
+    o.setRequired(true);
+    return o;
+  }),
+
+  CONFIGURATION_FILE(() -> {
+    Option o = new Option("c", "configuration", true, "A file containing the Profiler configuration.");
     o.setRequired(false);
     return o;
   }),
