@@ -17,32 +17,16 @@
 # limitations under the License.
 #
 METRON_VERSION=${project.version}
-METRON_HOME=/usr/metron/$METRON_VERSION
+METRON_HOME=/usr/metron/${METRON_VERSION}
+PROFILER_JAR=${METRON_HOME}/lib/${project.artifactId}-${METRON_VERSION}.jar
+PROFILER_PROPS=${METRON_HOME}/config/batch-profiler.properties
+MAIN_CLASS=org.apache.metron.profiler.spark.BatchProfiler
+
 #TODO how to correctly set SPARK_HOME?
 SPARK_HOME=/usr/hdp/current/spark
-SPARK_PROFILER_JAR=${project.artifactId}-$METRON_VERSION.jar
 
-# spark-submit settings
-APP_NAME="Apache Metron Batch Profiler"
-MAIN_CLASS=org.apache.metron.profiler.spark.BatchProfiler
-MASTER_URL=local
-DEPLOY_MODE=client
-
-# yarn settings
-#TODO how to handle YARN-specific settings like --queue QUEUE
-DRIVER_MEM=1G
-EXECUTOR_MEM=1G
-EXECUTOR_CORES=1
-DRIVER_CORES=1
-
-# launch the batch profiler
-$SPARK_HOME/bin/spark-submit \
-  --name $APP_NAME \
-  --class $MAIN_CLASS \
-  --master $MASTER_URL \
-  --deploy-mode $DEPLOY_MODE \
-#  --driver-memory $DRIVER_MEM \
-#  --executor-memory $EXECUTOR_MEM \
-#  --executor-cores $EXECUTOR_CORES \
-#  --driver-cores $DRIVER_CORES \
-  $METRON_HOME/lib/$SPARK_PROFILER_JAR
+${SPARK_HOME}/bin/spark-submit \
+    --class ${MAIN_CLASS} \
+    --properties-file ${PROFILER_PROPS} \
+    ${PROFILER_JAR}
+    -p ${PROFILER_PROPS}

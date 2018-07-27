@@ -19,6 +19,7 @@
  */
 package org.apache.metron.profiler.spark;
 
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 
 import java.util.Map;
@@ -33,17 +34,13 @@ public enum BatchProfilerConfig {
 
   PERIOD_DURATION("profiler.period.duration", 15, Integer.class),
 
-  PROFILE_TTL_UNITS("profiler.ttl.units", "MINUTES", String.class),
-
-  PROFILE_TTL("profiler.ttl", 30, Integer.class),
-
-  MAX_ROUTES("profiler.max.routes.per.bolt", 10000, Integer.class),
-
   HBASE_SALT_DIVISOR("profiler.hbase.salt.divisor", 1000, Integer.class),
 
   HBASE_TABLE_NAME("profiler.hbase.table", "profiler", String.class),
 
   HBASE_COLUMN_FAMILY("profiler.hbase.column.family", "P", String.class),
+
+  HBASE_WRITE_DURABILITY("profiler.hbase.durability", Durability.USE_DEFAULT, Durability.class),
 
   TELEMETRY_INPUT_FORMAT("profiler.batch.input.format", "text", String.class),
 

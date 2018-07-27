@@ -41,7 +41,7 @@ public class MessageRouteAdapter implements Serializable {
   private Long timestamp;
 
   public MessageRouteAdapter() {
-    // default constructor required for serialization in Spark
+    // default constructor required for encoders and serialization in Spark
   }
 
   public MessageRouteAdapter(MessageRoute route) {
@@ -110,12 +110,14 @@ public class MessageRouteAdapter implements Serializable {
 
   @Override
   public boolean equals(Object o) {
-    if (this == o) return true;
-
-    if (o == null || getClass() != o.getClass()) return false;
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
 
     MessageRouteAdapter that = (MessageRouteAdapter) o;
-
     return new EqualsBuilder()
             .append(entity, that.entity)
             .append(message, that.message)
