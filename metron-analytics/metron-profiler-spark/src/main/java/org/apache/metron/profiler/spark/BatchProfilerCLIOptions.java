@@ -26,6 +26,7 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.lang3.ClassUtils;
 
 import java.util.function.Supplier;
 
@@ -35,26 +36,26 @@ import java.util.function.Supplier;
  */
 public enum BatchProfilerCLIOptions {
 
-  HELP(() -> {
-    Option o = new Option("h", "help", false, "Usage instructions.");
-    o.setRequired(false);
-    return o;
-  }),
-
   PROFILE_DEFN_FILE(() -> {
-    Option o = new Option("p", "profiles", true, "A file containing the Profile definition.");
+    Option o = new Option("p", "profiles", true, "Path to a file containing profile definitions.");
     o.setRequired(true);
     return o;
   }),
 
   CONFIGURATION_FILE(() -> {
-    Option o = new Option("c", "configuration", true, "A file containing the Profiler configuration.");
+    Option o = new Option("c", "config", true, "Path to the profiler properties file.");
     o.setRequired(false);
     return o;
   }),
 
   GLOBALS_FILE(() -> {
-    Option o = new Option("g", "globals", true, "A properties file containing the global configuration.");
+    Option o = new Option("g", "globals", true, "Path to the Stellar global config file.");
+    o.setRequired(false);
+    return o;
+  }),
+
+  HELP(() -> {
+    Option o = new Option("h", "help", false, "Usage instructions.");
     o.setRequired(false);
     return o;
   });
@@ -124,7 +125,11 @@ public enum BatchProfilerCLIOptions {
    */
   public static void printHelp() {
     HelpFormatter formatter = new HelpFormatter();
-    formatter.printHelp("Batch Profiler", getOptions());
+    String header = "options:";
+    String footer = "";
+    String cmd = String.format("spark-submit --class %s --properties-file [spark.properties] [jar] [options]",
+            BatchProfilerCLI.class.getCanonicalName());
+    formatter.printHelp(cmd, header, getOptions(), footer);
   }
 
   /**
