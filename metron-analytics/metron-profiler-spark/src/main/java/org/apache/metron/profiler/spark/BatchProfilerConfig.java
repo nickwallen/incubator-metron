@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 
 /**
- * Defines the configuration values needed by the Batch Profiler.
+ * Defines the configuration values recognized by the Batch Profiler.
  */
 public enum BatchProfilerConfig {
 

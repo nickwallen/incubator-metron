@@ -26,6 +26,13 @@ import org.apache.metron.profiler.ProfilePeriod;
 import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * An adapter for the {@link ProfileMeasurement} class so that the data
+ * can be serialized as required by Spark.
+ *
+ * <p>The `Encoders.bean(Class<T>)` encoder does not handle serialization of type `Object` well. This
+ * adapter encodes the profile's result as byte[] rather than an Object to work around this.
+ */
 public class ProfileMeasurementAdapter implements Serializable {
 
   /**
@@ -52,7 +59,8 @@ public class ProfileMeasurementAdapter implements Serializable {
   /**
    * The result of evaluating the profile expression.
    *
-   * The value is stored serialized TODO
+   * The `Encoders.bean(Class<T>)` encoder does not handle serialization of type `Object`. This
+   * adapter encodes the profile's result as `byte[]` rather than an `Object` to work around this.
    */
   private byte[] profileValue;
 
