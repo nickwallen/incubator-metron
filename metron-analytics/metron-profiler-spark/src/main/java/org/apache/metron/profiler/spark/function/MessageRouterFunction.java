@@ -38,13 +38,20 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Responsible for finding routes for a given message.
+ * The function responsible for finding routes for a given message in Spark.
  */
 public class MessageRouterFunction implements FlatMapFunction<String, MessageRoute> {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  /**
+   * The global configuration used for the execution of Stellar.
+   */
   private Map<String, String> globals;
+
+  /**
+   * The profile definitions.
+   */
   private ProfilerConfig profilerConfig;
 
   public MessageRouterFunction(ProfilerConfig profilerConfig, Map<String, String> globals) {

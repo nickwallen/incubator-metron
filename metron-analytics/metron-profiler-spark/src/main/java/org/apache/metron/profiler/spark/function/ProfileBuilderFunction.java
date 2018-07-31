@@ -43,6 +43,9 @@ import static java.util.Comparator.comparing;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
 
+/**
+ * The function responsible for building profiles in Spark.
+ */
 public class ProfileBuilderFunction implements MapGroupsFunction<String, MessageRoute, ProfileMeasurementAdapter>  {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -68,8 +71,7 @@ public class ProfileBuilderFunction implements MapGroupsFunction<String, Message
    */
   @Override
   public ProfileMeasurementAdapter call(String group, Iterator<MessageRoute> iterator) throws Exception {
-    // create the distributor
-    // some settings are unnecessary as the distributor is cleaned-up immediately after processing the batch
+    // create the distributor; some settings are unnecessary because it is cleaned-up immediately after processing the batch
     int maxRoutes = Integer.MAX_VALUE;
     long profileTTLMillis = Long.MAX_VALUE;
     MessageDistributor distributor = new DefaultMessageDistributor(periodDurationMillis, profileTTLMillis, maxRoutes);
@@ -79,7 +81,7 @@ public class ProfileBuilderFunction implements MapGroupsFunction<String, Message
     List<MessageRoute> routes = toStream(iterator)
             .sorted(comparing(rt -> rt.getTimestamp()))
             .collect(Collectors.toList());
-    LOG.debug("Group {} building a profile from {} message(s)", group, routes.size());
+    LOG.debug("Building a profile for group '{}' from {} message(s)", group, routes.size());
 
     // apply each message/route to build the profile
     for(MessageRoute route: routes) {
