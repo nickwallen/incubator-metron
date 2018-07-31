@@ -28,7 +28,6 @@ import com.google.common.cache.RemovalNotification;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.stellar.dsl.Context;
-import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -150,7 +149,6 @@ public class DefaultMessageDistributor implements MessageDistributor, Serializab
    *
    * @param route The message route.
    * @param context The Stellar execution context.
-   * @throws ExecutionException
    */
   @Override
   public void distribute(MessageRoute route, Context context) {
