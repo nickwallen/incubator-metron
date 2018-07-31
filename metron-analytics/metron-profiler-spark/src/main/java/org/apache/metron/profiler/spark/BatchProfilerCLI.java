@@ -25,6 +25,8 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.commons.io.IOUtils;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,9 +71,13 @@ public class BatchProfilerCLI implements Serializable {
       throw new IllegalArgumentException("The Batch Profiler must use event time. The 'timestampField' must be defined.");
     }
 
-    BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(config, globals, profiles);
+    SparkSession spark = SparkSession
+            .builder()
+            .config(new SparkConf())
+            .getOrCreate();
 
+    BatchProfiler profiler = new BatchProfiler();
+    long count = profiler.execute(spark, config, globals, profiles);
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
 

@@ -36,6 +36,8 @@ public enum BatchProfilerConfig {
 
   HBASE_SALT_DIVISOR("profiler.hbase.salt.divisor", 1000, Integer.class),
 
+  HBASE_TABLE_PROVIDER("profiler.hbase.table.provider", "org.apache.metron.hbase.HTableProvider", String.class),
+
   HBASE_TABLE_NAME("profiler.hbase.table", "profiler", String.class),
 
   HBASE_COLUMN_FAMILY("profiler.hbase.column.family", "P", String.class),

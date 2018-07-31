@@ -26,7 +26,6 @@ import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.spark.function.HBaseWriterFunction;
 import org.apache.metron.profiler.spark.function.MessageRouterFunction;
 import org.apache.metron.profiler.spark.function.ProfileBuilderFunction;
-import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
@@ -59,20 +58,18 @@ public class BatchProfiler implements Serializable {
   /**
    * Execute the Batch Profiler.
    *
+   * @param spark The spark session.
    * @param properties The profiler configuration properties.
    * @param profiles The profile definitions.
    * @return The number of profile measurements produced.
    */
-  public long execute(Properties properties,
+  public long execute(SparkSession spark,
+                      Properties properties,
                       Properties globalProperties,
                       ProfilerConfig profiles) {
     LOG.debug("Building {} profile(s)", profiles.getProfiles().size());
 
     Map<String, String> globals = Maps.fromProperties(globalProperties);
-    SparkSession spark = SparkSession
-            .builder()
-            .config(new SparkConf())
-            .getOrCreate();
 
     // fetch the archived telemetry
     Dataset<String> telemetry = readTelemetry(spark, properties);
