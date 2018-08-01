@@ -17,7 +17,7 @@
  *  limitations under the License.
  *
  */
-package org.apache.metron.profiler.spark;
+package org.apache.metron.profiler.spark.cli;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -25,6 +25,7 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.PosixParser;
 import org.apache.commons.io.IOUtils;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.metron.profiler.spark.BatchProfiler;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -36,10 +37,10 @@ import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
 import java.util.Properties;
 
-import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.CONFIGURATION_FILE;
-import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.GLOBALS_FILE;
-import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.PROFILE_DEFN_FILE;
-import static org.apache.metron.profiler.spark.BatchProfilerCLIOptions.parse;
+import static org.apache.metron.profiler.spark.cli.BatchProfilerCLIOptions.CONFIGURATION_FILE;
+import static org.apache.metron.profiler.spark.cli.BatchProfilerCLIOptions.GLOBALS_FILE;
+import static org.apache.metron.profiler.spark.cli.BatchProfilerCLIOptions.PROFILE_DEFN_FILE;
+import static org.apache.metron.profiler.spark.cli.BatchProfilerCLIOptions.parse;
 
 /**
  * The main entry point which launches the Batch Profiler in Spark.
@@ -59,16 +60,25 @@ public class BatchProfilerCLI implements Serializable {
 
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
+  public static Properties globals;
+  public static Properties profilerProps;
+  public static ProfilerConfig profiles;
+
   public static void main(String[] args) throws IOException, org.apache.commons.cli.ParseException {
     // parse the command line
     CommandLine commandLine = parseCommandLine(args);
-    Properties config = getConfiguration(commandLine);
-    Properties globals = getGlobals(commandLine);
-    ProfilerConfig profiles = getProfileDefinitions(commandLine);
+    profilerProps = handleProfilerProperties(commandLine);
+    globals = handleGlobals(commandLine);
+    profiles = handleProfileDefinitions(commandLine);
 
     // the batch profiler must run in 'event time' mode
     if(!profiles.getTimestampField().isPresent()) {
       throw new IllegalArgumentException("The Batch Profiler must use event time. The 'timestampField' must be defined.");
+    }
+
+    // one or more profiles must be defined
+    if(profiles.getProfiles().size() == 0) {
+      throw new IllegalArgumentException("No profile definitions found.");
     }
 
     SparkSession spark = SparkSession
@@ -77,7 +87,7 @@ public class BatchProfilerCLI implements Serializable {
             .getOrCreate();
 
     BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(spark, config, globals, profiles);
+    long count = profiler.execute(spark, profilerProps, globals, profiles);
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
 
@@ -86,7 +96,7 @@ public class BatchProfilerCLI implements Serializable {
    *
    * @param commandLine The command line.
    */
-  private static Properties getGlobals(CommandLine commandLine) throws IOException {
+  private static Properties handleGlobals(CommandLine commandLine) throws IOException {
     Properties globals = new Properties();
     if(GLOBALS_FILE.has(commandLine)) {
       String globalsPath = GLOBALS_FILE.get(commandLine);
@@ -104,12 +114,12 @@ public class BatchProfilerCLI implements Serializable {
    *
    * @param commandLine The command line.
    */
-  private static Properties getConfiguration(CommandLine commandLine) throws IOException {
+  private static Properties handleProfilerProperties(CommandLine commandLine) throws IOException {
     Properties config = new Properties();
     if(CONFIGURATION_FILE.has(commandLine)) {
       String propertiesPath = CONFIGURATION_FILE.get(commandLine);
 
-      LOG.info("Loading profiler configuration from '{}'", propertiesPath);
+      LOG.info("Loading profiler properties from '{}'", propertiesPath);
       config.load(new FileInputStream(propertiesPath));
 
       LOG.info("Properties = {}", config.toString());
@@ -122,7 +132,7 @@ public class BatchProfilerCLI implements Serializable {
    *
    * @param commandLine The command line.
    */
-  private static ProfilerConfig getProfileDefinitions(CommandLine commandLine) throws IOException {
+  private static ProfilerConfig handleProfileDefinitions(CommandLine commandLine) throws IOException {
     ProfilerConfig profiles;
     if(PROFILE_DEFN_FILE.has(commandLine)) {
       String profilePath = PROFILE_DEFN_FILE.get(commandLine);
@@ -147,5 +157,17 @@ public class BatchProfilerCLI implements Serializable {
   private static CommandLine parseCommandLine(String[] args) throws ParseException {
     CommandLineParser parser = new PosixParser();
     return parse(parser, args);
+  }
+
+  public static Properties getGlobals() {
+    return globals;
+  }
+
+  public static Properties getProfilerProps() {
+    return profilerProps;
+  }
+
+  public static ProfilerConfig getProfiles() {
+    return profiles;
   }
 }

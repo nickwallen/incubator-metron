@@ -59,32 +59,30 @@ public class BatchProfiler implements Serializable {
    * Execute the Batch Profiler.
    *
    * @param spark The spark session.
-   * @param properties The profiler configuration properties.
+   * @param profilerProps The profiler configuration properties.
    * @param profiles The profile definitions.
    * @return The number of profile measurements produced.
    */
   public long execute(SparkSession spark,
-                      Properties properties,
+                      Properties profilerProps,
                       Properties globalProperties,
                       ProfilerConfig profiles) {
-    LOG.debug("Building {} profile(s)", profiles.getProfiles().size());
 
-    Map<String, String> globals = Maps.fromProperties(globalProperties);
+    long count = 0;
+    if(profiles.getProfiles().size() > 0) {
+      LOG.debug("Building {} profile(s)", profiles.getProfiles().size());
 
-    // fetch the archived telemetry
-    Dataset<String> telemetry = readTelemetry(spark, properties);
+      Map<String, String> globals = Maps.fromProperties(globalProperties);
+      Dataset<String> telemetry = readTelemetry(spark, profilerProps);
+      Dataset<MessageRoute> routes = findRoutes(telemetry, profiles, globals);
+      KeyValueGroupedDataset<String, MessageRoute> groupedRoutes = groupRoutes(routes, profilerProps);
+      Dataset<ProfileMeasurementAdapter> measurements = buildProfiles(groupedRoutes, profilerProps, globals);
+      count = write(measurements, profilerProps);
 
-    // find all routes for each message
-    Dataset<MessageRoute> routes = findRoutes(telemetry, profiles, globals);
+    } else {
+      LOG.error("No profiles defined.");
+    }
 
-    // group the routes
-    KeyValueGroupedDataset<String, MessageRoute> groupedRoutes = groupRoutes(routes, properties);
-
-    // build the profiles
-    Dataset<ProfileMeasurementAdapter> measurements = buildProfiles(groupedRoutes, properties, globals);
-
-    // write the profile measurements to HBase
-    long count = write(measurements, properties);
     return count;
   }
 
