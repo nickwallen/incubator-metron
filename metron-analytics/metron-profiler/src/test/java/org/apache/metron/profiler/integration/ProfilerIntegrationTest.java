@@ -21,11 +21,8 @@
 package org.apache.metron.profiler.integration;
 
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.Constants;
-import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
@@ -35,10 +32,15 @@ import org.apache.metron.integration.components.FluxTopologyComponent;
 import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
 import org.apache.metron.profiler.ProfileMeasurement;
-import org.apache.metron.profiler.hbase.ColumnBuilder;
+import org.apache.metron.profiler.client.stellar.FixedLookback;
+import org.apache.metron.profiler.client.stellar.GetProfile;
+import org.apache.metron.profiler.client.stellar.WindowLookback;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
-import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
+import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
+import org.apache.metron.stellar.common.StellarStatefulExecutor;
+import org.apache.metron.stellar.dsl.Context;
+import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -47,15 +49,23 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.code.tempusfugit.temporal.Duration.seconds;
 import static com.google.code.tempusfugit.temporal.Timeout.timeout;
 import static com.google.code.tempusfugit.temporal.WaitFor.waitOrTimeout;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -83,7 +93,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(15);
   private static final long maxRoutesPerBolt = 100000;
 
-  private static ColumnBuilder columnBuilder;
   private static ZKServerComponent zkComponent;
   private static FluxTopologyComponent fluxComponent;
   private static KafkaComponent kafkaComponent;
@@ -94,6 +103,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static String message1;
   private static String message2;
   private static String message3;
+
+  private StellarStatefulExecutor executor;
 
   /**
    * [
@@ -133,24 +144,23 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     kafkaComponent.writeMessages(inputTopic, message2);
     kafkaComponent.writeMessages(inputTopic, message3);
 
+    // retrieve the profile measurement using PROFILE_GET
+    String expression = "PROFILE_GET('processing-time-test', '10.0.0.1', PROFILE_FIXED('5', 'MINUTES'))";
+    List<Integer> actuals = execute(expression, List.class);
+
     // storm needs at least one message to close its event window
     int attempt = 0;
-    while(profilerTable.getPutLog().size() == 0 && attempt++ < 10) {
-
-      // sleep, at least beyond the current window
+    while(actuals.size() == 0 && attempt++ < 10) {
+      // sleep at least beyond the current window, then write another message to help close the current event window
       Thread.sleep(windowDurationMillis + windowLagMillis);
-
-      // send another message to help close the current event window
       kafkaComponent.writeMessages(inputTopic, message2);
+
+      // retrieve the profile measurement using PROFILE_GET
+      actuals = execute(expression, List.class);
     }
 
-    // validate what was flushed
-    List<Integer> actuals = read(
-            profilerTable.getPutLog(),
-            columnFamily,
-            columnBuilder.getColumnQualifier("value"),
-            Integer.class);
-    assertEquals(1, actuals.size());
+    // the profile should count at least 3 messages
+    assertTrue(actuals.size() > 0);
     assertTrue(actuals.get(0) >= 3);
   }
 
@@ -176,14 +186,10 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     // wait until the profile is flushed
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0, timeout(seconds(90)));
 
-    List<Put> puts = profilerTable.getPutLog();
-    assertEquals(1, puts.size());
-
-    // inspect the row key to ensure the profiler used event time correctly.  the timestamp
-    // embedded in the row key should match those in the source telemetry
-    byte[] expectedRowKey = generateExpectedRowKey("event-time-test", entity, startAt);
-    byte[] actualRowKey = puts.get(0).getRow();
-    assertArrayEquals(failMessage(expectedRowKey, actualRowKey), expectedRowKey, actualRowKey);
+    // retrieve the profile measurement using PROFILE_GET
+    assign("window", "PROFILE_WINDOW('24 hours', 86400000)");
+    String expression = "[2] == PROFILE_GET('event-time-test', '10.0.0.1', window)";
+    assertTrue(execute(expression, Boolean.class));
   }
 
   /**
@@ -239,50 +245,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
               new String(actual, "UTF-8"));
   }
 
-  /**
-   * Generates the expected row key.
-   *
-   * @param profileName The name of the profile.
-   * @param entity The entity.
-   * @param whenMillis A timestamp in epoch milliseconds.
-   * @return A row key.
-   */
-  private byte[] generateExpectedRowKey(String profileName, String entity, long whenMillis) {
-
-    // only the profile name, entity, and period are used to generate the row key
-    ProfileMeasurement measurement = new ProfileMeasurement()
-            .withProfileName(profileName)
-            .withEntity(entity)
-            .withPeriod(whenMillis, periodDurationMillis, TimeUnit.MILLISECONDS);
-
-    // build the row key
-    RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder(saltDivisor, periodDurationMillis, TimeUnit.MILLISECONDS);
-    return rowKeyBuilder.rowKey(measurement);
-  }
-
-  /**
-   * Reads a value written by the Profiler.
-   *
-   * @param family The column family.
-   * @param qualifier The column qualifier.
-   * @param clazz The expected type of the value.
-   * @param <T> The expected type of the value.
-   * @return The value written by the Profiler.
-   */
-  private <T> List<T> read(List<Put> puts, String family, byte[] qualifier, Class<T> clazz) {
-    List<T> results = new ArrayList<>();
-
-    for(Put put: puts) {
-      List<Cell> cells = put.get(Bytes.toBytes(family), qualifier);
-      for(Cell cell : cells) {
-        T value = SerDeUtils.fromBytes(cell.getValue(), clazz);
-        results.add(value);
-      }
-    }
-
-    return results;
-  }
-
   @BeforeClass
   public static void setupBeforeClass() throws UnableToStartException {
 
@@ -304,8 +266,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
             .withField("timestamp", startAt + (windowDurationMillis * 2))
             .build()
             .toJSONString();
-
-    columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
 
     // storm topology properties
     final Properties topologyProperties = new Properties() {{
@@ -396,6 +356,30 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   public void setup() {
     // create the mock table
     profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
+
+    // global properties
+    Map<String, Object> global = new HashMap<String, Object>() {{
+      put(PROFILER_HBASE_TABLE.getKey(), tableName);
+      put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
+      put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
+
+      // client needs to use the same period duration
+      put(PROFILER_PERIOD.getKey(), Long.toString(periodDurationMillis));
+      put(PROFILER_PERIOD_UNITS.getKey(), "MILLISECONDS");
+
+      // client needs to use the same salt divisor
+      put(PROFILER_SALT_DIVISOR.getKey(), saltDivisor);
+    }};
+
+    // create the stellar execution environment
+    executor = new DefaultStellarStatefulExecutor(
+            new SimpleFunctionResolver()
+                    .withClass(GetProfile.class)
+                    .withClass(FixedLookback.class)
+                    .withClass(WindowLookback.class),
+            new Context.Builder()
+                    .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
+                    .build());
   }
 
   @After
@@ -417,5 +401,27 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
             .withGlobalConfiguration(path)
             .withProfilerConfiguration(path)
             .update();
+  }
+
+  /**
+   * Assign a value to the result of an expression.
+   *
+   * @param var The variable to assign.
+   * @param expression The expression to execute.
+   */
+  private void assign(String var, String expression) {
+    executor.assign(var, expression, Collections.emptyMap());
+  }
+
+  /**
+   * Execute a Stellar expression.
+   *
+   * @param expression The Stellar expression to execute.
+   * @param clazz
+   * @param <T>
+   * @return The result of executing the Stellar expression.
+   */
+  private <T> T execute(String expression, Class<T> clazz) {
+    return executor.execute(expression, Collections.emptyMap(), clazz);
   }
 }
