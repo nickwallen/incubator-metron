@@ -21,6 +21,7 @@
 package org.apache.metron.profiler.integration;
 
 import org.adrianwalker.multilinestring.Multiline;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.metron.common.Constants;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
@@ -87,10 +88,16 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final String outputTopic = "profiles";
   private static final int saltDivisor = 10;
 
-  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(1);
-  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
-  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(10);
-  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(15);
+//  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(20);
+//  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(30);
+//  private static final long periodDurationMillis = TimeUnit.MINUTES.toMillis(1);
+//  private static final long profileTimeToLiveMillis = TimeUnit.MINUTES.toMillis(1);
+//
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(20);
+  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long profileTimeToLiveMillis = TimeUnit.MINUTES.toMillis(1);
+
   private static final long maxRoutesPerBolt = 100000;
 
   private static ZKServerComponent zkComponent;
@@ -116,6 +123,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
    *    org.apache.metron.common.configuration.profiler.ProfilerConfig,
    *    org.apache.metron.common.configuration.profiler.ProfileConfig,
    *    org.json.simple.JSONObject,
+   *    org.json.simple.JSONArray,
    *    java.util.LinkedHashMap,
    *    org.apache.metron.statistics.OnlineStatisticsProvider
    *  ]
@@ -179,18 +187,36 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1);
-    kafkaComponent.writeMessages(inputTopic, message2);
-    kafkaComponent.writeMessages(inputTopic, message3);
+
+    List<String> messages = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
+    kafkaComponent.writeMessages(inputTopic, messages);
 
     // wait until the profile is flushed
-    waitOrTimeout(() -> profilerTable.getPutLog().size() > 0, timeout(seconds(90)));
+    waitOrTimeout(() -> profilerTable.getPutLog().size() >= 3, timeout(seconds(90)));
 
-    // retrieve the profile measurement using PROFILE_GET
-    assign("window", "PROFILE_WINDOW('24 hours', 86400000)");
-    String expression = "[2] == PROFILE_GET('event-time-test', '10.0.0.1', window)";
-    assertTrue(execute(expression, Boolean.class));
+    // validate the measurements written by the batch profiler using `PROFILE_GET`
+    // the 'window' looks up to 5 hours before the last timestamp contained in the telemetry
+    assign("lastTimestamp", "1530978728982L");
+    assign("window", "PROFILE_WINDOW('from 5 hours ago', lastTimestamp)");
+
+    // validate the first profile period; the next has likely not been flushed yet
+    {
+      // there are 14 messages where ip_src_addr = 192.168.66.1
+      List results = execute("PROFILE_GET('count-by-ip', '192.168.66.1', window)", List.class);
+      assertEquals(14, results.get(0));
+    }
+    {
+      // there are 36 messages where ip_src_addr = 192.168.138.158
+      List results = execute("PROFILE_GET('count-by-ip', '192.168.138.158', window)", List.class);
+      assertEquals(36, results.get(0));
+    }
+    {
+      // there are 50 messages in all
+      List results = execute("PROFILE_GET('total-count', 'total', window)", List.class);
+      assertEquals(50, results.get(0));
+    }
   }
+
 
   /**
    * The result produced by a Profile has to be serializable within Storm. If the result is not
@@ -275,7 +301,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.executors", "0");
       setProperty("storm.auto.credentials", "[]");
       setProperty("topology.auto-credentials", "[]");
-      setProperty("topology.message.timeout.secs", "60");
+      setProperty("topology.message.timeout.secs", "180");
       setProperty("topology.max.spout.pending", "100000");
 
       // ensure tuples are serialized during the test, otherwise serialization problems
@@ -287,7 +313,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       // kafka settings
       setProperty("profiler.input.topic", inputTopic);
       setProperty("profiler.output.topic", outputTopic);
-      setProperty("kafka.start", "UNCOMMITTED_EARLIEST");
+      setProperty("kafka.start", "EARLIEST");
       setProperty("kafka.security.protocol", "PLAINTEXT");
 
       // hbase settings
