@@ -52,7 +52,8 @@ public class FixedFrequencyFlushSignalTest {
 
   @Test
   public void testOutOfOrderTimestamps() {
-    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(1000);
+    int flushFreq = 1000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
 
     // advance time, out-of-order
     signal.update(5000);
@@ -60,8 +61,83 @@ public class FixedFrequencyFlushSignalTest {
     signal.update(7000);
     signal.update(3000);
 
-    // need to flush @ 5000 + 1000 = 6000. if anything > 6000 (even out-of-order), then it should signal a flush
+    // need to flush @ min + flushFreq = 1000 + 1000 = 6000. if anything > 6000, then it should signal a flush
     assertTrue(signal.isTimeToFlush());
+  }
+
+  @Test
+  public void testOutOfOrderTimestampsNoFlush() {
+    int flushFreq = 7000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
+
+    // advance time, out-of-order
+    signal.update(5000);
+    signal.update(1000);
+    signal.update(7000);
+    signal.update(3000);
+
+    // need to flush @ min + flushFreq = 1000 + 7000 = 8000. if anything > 8000, then it should signal a flush
+    assertFalse(signal.isTimeToFlush());
+  }
+
+  @Test
+  public void testTimestampsDescending() {
+    int flushFreq = 3000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
+
+    // advance time, out-of-order
+    signal.update(4000);
+    signal.update(3000);
+    signal.update(2000);
+    signal.update(1000);
+
+    // need to flush @ min + flushFreq = 1000 + 3000 = 4000. if anything > 4000, then it should signal a flush
+    assertTrue(signal.isTimeToFlush());
+  }
+
+  @Test
+  public void testTimestampsDescendingNoFlush() {
+    int flushFreq = 4000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
+
+    // advance time, out-of-order
+    signal.update(4000);
+    signal.update(3000);
+    signal.update(2000);
+    signal.update(1000);
+
+    // need to flush @ min + flushFreq = 1000 + 4000 = 5000. if anything > 5000, then it should signal a flush
+    assertFalse(signal.isTimeToFlush());
+  }
+
+  @Test
+  public void testTimestampsAscending() {
+    int flushFreq = 3000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
+
+    // advance time, out-of-order
+    signal.update(1000);
+    signal.update(2000);
+    signal.update(3000);
+    signal.update(4000);
+
+    // need to flush @ min + flushFreq = 1000 + 3000 = 4000. if anything >= 4000, then it should signal a flush
+    assertTrue(signal.isTimeToFlush());
+  }
+
+  @Test
+  public void testTimestampsAscendingNoFlush() {
+    int flushFreq = 4000;
+    FixedFrequencyFlushSignal signal = new FixedFrequencyFlushSignal(flushFreq);
+
+    // advance time, out-of-order
+    signal.update(1000);
+    signal.update(2000);
+    signal.update(3000);
+    signal.update(4000);
+
+    // need to flush @ min + flushFreq = 1000 + 4000 = 5000. if anything >= 5000, then it should signal a flush
+    assertFalse(signal.isTimeToFlush());
   }
 
   @Test(expected = IllegalArgumentException.class)
