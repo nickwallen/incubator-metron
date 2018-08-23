@@ -87,7 +87,7 @@ public class BatchProfilerCLI implements Serializable {
             .getOrCreate();
 
     BatchProfiler profiler = new BatchProfiler();
-    long count = profiler.execute(spark, profilerProps, globals, profiles);
+    long count = profiler.run(spark, profilerProps, globals, profiles);
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
 
