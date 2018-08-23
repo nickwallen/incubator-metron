@@ -42,14 +42,18 @@ import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.stellar.common.StellarStatefulExecutor;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
+import org.json.simple.JSONObject;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
+import java.lang.invoke.MethodHandles;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -76,6 +80,7 @@ import static org.junit.Assert.assertTrue;
  */
 public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static final String TEST_RESOURCES = "../../metron-analytics/metron-profiler/src/test";
   private static final String FLUX_PATH = "../metron-profiler/src/main/flux/profiler/remote.yaml";
 
@@ -88,15 +93,10 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final String outputTopic = "profiles";
   private static final int saltDivisor = 10;
 
-//  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(20);
-//  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(30);
-//  private static final long periodDurationMillis = TimeUnit.MINUTES.toMillis(1);
-//  private static final long profileTimeToLiveMillis = TimeUnit.MINUTES.toMillis(1);
-//
   private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(20);
   private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(10);
   private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(10);
-  private static final long profileTimeToLiveMillis = TimeUnit.MINUTES.toMillis(1);
+  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(20);
 
   private static final long maxRoutesPerBolt = 100000;
 
@@ -133,10 +133,21 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
   /**
    * The Profiler can generate profiles based on processing time.  With processing time,
-   * the Profiler builds profiles based on when the telemetry was processed.
+   * the Profiler builds profiles based on when the telemetry is processed.
    *
    * <p>Not defining a 'timestampField' within the Profiler configuration tells the Profiler
    * to use processing time.
+   *
+   * <p>There are two mechanisms that will cause a profile to flush.
+   *
+   * (1) As new messages arrive, time is advanced. The splitter bolt attaches a timestamp to each
+   * message (which can be either event or system time.)  This advances time and leads to profile
+   * measurements being flushed.
+   *
+   * (2) If no messages arrive to advance time, then the "time-to-live" mechanism will flush a profile
+   * after a period of time.
+   *
+   * <p>This test specifically tests the *first* mechanism where time is advanced by incoming messages.
    */
   @Test
   public void testProcessingTime() throws Exception {
@@ -153,23 +164,97 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     kafkaComponent.writeMessages(inputTopic, message3);
 
     // retrieve the profile measurement using PROFILE_GET
-    String expression = "PROFILE_GET('processing-time-test', '10.0.0.1', PROFILE_FIXED('5', 'MINUTES'))";
-    List<Integer> actuals = execute(expression, List.class);
+    String profileGetExpression = "PROFILE_GET('processing-time-test', '10.0.0.1', PROFILE_FIXED('5', 'MINUTES'))";
+    List<Integer> actuals = execute(profileGetExpression, List.class);
+    LOG.debug("{} = {}", profileGetExpression, actuals);
 
     // storm needs at least one message to close its event window
     int attempt = 0;
     while(actuals.size() == 0 && attempt++ < 10) {
-      // sleep at least beyond the current window, then write another message to help close the current event window
-      Thread.sleep(windowDurationMillis + windowLagMillis);
+
+      // wait for the profiler to flush
+      long sleep = windowDurationMillis;
+      LOG.debug("Waiting {} millis for profiler to flush", sleep);
+      Thread.sleep(sleep);
+
+      // write another message to advance time.  this ensures that we are testing the 'normal' flush mechanism.
+      // if we do not send additional messages to advance time, then it is the profile TTL mechanism which
+      // will ultimately flush the profile
       kafkaComponent.writeMessages(inputTopic, message2);
 
       // retrieve the profile measurement using PROFILE_GET
-      actuals = execute(expression, List.class);
+      actuals = execute(profileGetExpression, List.class);
+      LOG.debug("{} = {}", profileGetExpression, actuals);
     }
 
     // the profile should count at least 3 messages
     assertTrue(actuals.size() > 0);
     assertTrue(actuals.get(0) >= 3);
+  }
+
+  /**
+   * The Profiler can generate profiles based on processing time.  With processing time,
+   * the Profiler builds profiles based on when the telemetry is processed.
+   *
+   * <p>Not defining a 'timestampField' within the Profiler configuration tells the Profiler
+   * to use processing time.
+   *
+   * <p>There are two mechanisms that will cause a profile to flush.
+   *
+   * (1) As new messages arrive, time is advanced. The splitter bolt attaches a timestamp to each
+   * message (which can be either event or system time.)  This advances time and leads to profile
+   * measurements being flushed.
+   *
+   * (2) If no messages arrive to advance time, then the "time to live" mechanism will flush a profile
+   * after a period of time.
+   *
+   * <p>This test specifically tests the *second* mechanism when a profile is flushed by the
+   * "time to live" mechanism.
+   */
+  @Test
+  public void testProcessingTimeWithTimeToLiveFlush() throws Exception {
+
+    // upload the config to zookeeper
+    uploadConfig(TEST_RESOURCES + "/config/zookeeper/processing-time-test");
+
+    // start the topology and write test messages to kafka
+    fluxComponent.submitTopology();
+
+    // the messages that will be applied to the profile
+    kafkaComponent.writeMessages(inputTopic, message1);
+    kafkaComponent.writeMessages(inputTopic, message2);
+    kafkaComponent.writeMessages(inputTopic, message3);
+
+    // wait a bit beyond the window lag before writing another message.  this allows storm's window manager to close
+    // the event window, which then lets the profiler processes the previous messages.
+    Thread.sleep(windowLagMillis * 2);
+    kafkaComponent.writeMessages(inputTopic, message3);
+
+    // retrieve the profile measurement using PROFILE_GET
+    String profileGetExpression = "PROFILE_GET('processing-time-test', '10.0.0.1', PROFILE_FIXED('5', 'MINUTES'))";
+    List<Integer> actuals = execute(profileGetExpression, List.class);
+    LOG.debug("{} = {}", profileGetExpression, actuals);
+
+    // storm needs at least one message to close its event window
+    int attempt = 0;
+    while(actuals.size() == 0 && attempt++ < 10) {
+
+      // wait for the profiler to flush
+      long sleep = windowDurationMillis;
+      LOG.debug("Waiting {} millis for profiler to flush", sleep);
+      Thread.sleep(sleep);
+
+      // do not write additional messages to advance time. this ensures that we are testing the "time to live"
+      // flush mechanism. the TTL setting defines when the profile will be flushed
+
+      // retrieve the profile measurement using PROFILE_GET
+      actuals = execute(profileGetExpression, List.class);
+      LOG.debug("{} = {}", profileGetExpression, actuals);
+    }
+
+    // the profile should count 3 messages
+    assertTrue(actuals.size() > 0);
+    assertEquals(3, actuals.get(0).intValue());
   }
 
   /**
@@ -271,27 +356,21 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
               new String(actual, "UTF-8"));
   }
 
+  private static String getMessage(String ipSource, long timestamp) {
+    return new MessageBuilder()
+            .withField("ip_src_addr", ipSource)
+            .withField("timestamp", timestamp)
+            .build()
+            .toJSONString();
+  }
+
   @BeforeClass
   public static void setupBeforeClass() throws UnableToStartException {
 
     // create some messages that contain a timestamp - a really old timestamp; close to 1970
-    message1 = new MessageBuilder()
-            .withField("ip_src_addr", entity)
-            .withField("timestamp", startAt)
-            .build()
-            .toJSONString();
-
-    message2 = new MessageBuilder()
-            .withField("ip_src_addr", entity)
-            .withField("timestamp", startAt + 100)
-            .build()
-            .toJSONString();
-
-    message3 = new MessageBuilder()
-            .withField("ip_src_addr", entity)
-            .withField("timestamp", startAt + (windowDurationMillis * 2))
-            .build()
-            .toJSONString();
+    message1 = getMessage(entity, startAt);
+    message2 = getMessage(entity, startAt + 100);
+    message3 = getMessage(entity, startAt + (windowDurationMillis * 2));
 
     // storm topology properties
     final Properties topologyProperties = new Properties() {{
