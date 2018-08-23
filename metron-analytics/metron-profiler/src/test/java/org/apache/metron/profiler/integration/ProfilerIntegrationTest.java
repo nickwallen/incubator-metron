@@ -38,6 +38,7 @@ import org.apache.metron.profiler.client.stellar.GetProfile;
 import org.apache.metron.profiler.client.stellar.WindowLookback;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
+import org.apache.metron.statistics.OnlineStatisticsProvider;
 import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.stellar.common.StellarStatefulExecutor;
 import org.apache.metron.stellar.dsl.Context;
@@ -272,14 +273,13 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-
     List<String> messages = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
     kafkaComponent.writeMessages(inputTopic, messages);
 
     // wait until the profile is flushed
     waitOrTimeout(() -> profilerTable.getPutLog().size() >= 3, timeout(seconds(90)));
 
-    // validate the measurements written by the batch profiler using `PROFILE_GET`
+    // validate the measurements written by the profiler using `PROFILE_GET`
     // the 'window' looks up to 5 hours before the last timestamp contained in the telemetry
     assign("lastTimestamp", "1530978728982L");
     assign("window", "PROFILE_WINDOW('from 5 hours ago', lastTimestamp)");
@@ -302,7 +302,6 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     }
   }
 
-
   /**
    * The result produced by a Profile has to be serializable within Storm. If the result is not
    * serializable the topology will crash and burn.
@@ -318,28 +317,21 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // start the topology and write test messages to kafka
     fluxComponent.submitTopology();
-    kafkaComponent.writeMessages(inputTopic, message1);
-    kafkaComponent.writeMessages(inputTopic, message2);
-    kafkaComponent.writeMessages(inputTopic, message3);
+    List<String> messages = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
+    kafkaComponent.writeMessages(inputTopic, messages);
 
     // wait until the profile is flushed
     waitOrTimeout(() -> profilerTable.getPutLog().size() > 0, timeout(seconds(90)));
 
-    // ensure that a value was persisted in HBase
-    List<Put> puts = profilerTable.getPutLog();
-    assertEquals(1, puts.size());
+    // validate the measurements written by the batch profiler using `PROFILE_GET`
+    // the 'window' looks up to 5 hours before the last timestamp contained in the telemetry
+    assign("lastTimestamp", "1530978728982L");
+    assign("window", "PROFILE_WINDOW('from 5 hours ago', lastTimestamp)");
 
-    // generate the expected row key. only the profile name, entity, and period are used to generate the row key
-    ProfileMeasurement measurement = new ProfileMeasurement()
-            .withProfileName("profile-with-stats")
-            .withEntity("global")
-            .withPeriod(startAt, periodDurationMillis, TimeUnit.MILLISECONDS);
-    RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder(saltDivisor, periodDurationMillis, TimeUnit.MILLISECONDS);
-    byte[] expectedRowKey = rowKeyBuilder.rowKey(measurement);
-
-    // ensure the correct row key was generated
-    byte[] actualRowKey = puts.get(0).getRow();
-    assertArrayEquals(failMessage(expectedRowKey, actualRowKey), expectedRowKey, actualRowKey);
+    // retrieve the stats stored by the profiler
+    List results = execute("PROFILE_GET('profile-with-stats', 'global', window)", List.class);
+    assertTrue(results.size() > 0);
+    assertTrue(results.get(0) instanceof OnlineStatisticsProvider);
   }
 
   /**
