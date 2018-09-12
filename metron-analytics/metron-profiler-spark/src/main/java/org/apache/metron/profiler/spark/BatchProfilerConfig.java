@@ -34,6 +34,10 @@ public enum BatchProfilerConfig {
 
   PERIOD_DURATION("profiler.period.duration", 15, Integer.class),
 
+  WINDOW_LAG("profiler.window.lag", 30, Integer.class),
+
+  WINDOW_LAG_UNITS("profiler.window.lag.units", "SECONDS", String.class),
+
   HBASE_SALT_DIVISOR("profiler.hbase.salt.divisor", 1000, Integer.class),
 
   HBASE_TABLE_PROVIDER("profiler.hbase.table.provider", "org.apache.metron.hbase.HTableProvider", String.class),

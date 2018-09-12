@@ -1,38 +1,46 @@
 /*
- *
- *  Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
+
 package org.apache.metron.profiler.spark;
 
 import org.adrianwalker.multilinestring.Multiline;
+import org.apache.commons.io.FileUtils;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
+import org.apache.metron.hbase.mock.MockHTable;
+import org.apache.metron.integration.BaseIntegrationTest;
+import org.apache.metron.integration.ComponentRunner;
+import org.apache.metron.integration.UnableToStartException;
+import org.apache.metron.integration.components.KafkaComponent;
+import org.apache.metron.integration.components.ZKServerComponent;
 import org.apache.metron.profiler.client.stellar.FixedLookback;
 import org.apache.metron.profiler.client.stellar.GetProfile;
 import org.apache.metron.profiler.client.stellar.WindowLookback;
+import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.stellar.common.StellarStatefulExecutor;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
 import org.apache.spark.SparkConf;
-import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -40,31 +48,34 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
+import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_SALT_DIVISOR;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_PROVIDER;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_FORMAT;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_PATH;
 import static org.junit.Assert.assertTrue;
 
 /**
- * An integration test for the {@link BatchProfiler}.
+ * An integration test for the {@link StreamingProfiler}.
  */
-public class BatchProfilerIntegrationTest {
+public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   /**
@@ -93,7 +104,24 @@ public class BatchProfilerIntegrationTest {
   private static SparkSession spark;
   private Properties profilerProperties;
   private Properties readerProperties;
+  private Properties writerProperties;
   private StellarStatefulExecutor executor;
+  private static ColumnBuilder columnBuilder;
+  private static ZKServerComponent zkComponent;
+  private static KafkaComponent kafkaComponent;
+  private static ComponentRunner runner;
+  private static MockHTable profilerTable;
+  private static final String tableName = "profiler";
+  private static final String columnFamily = "P";
+  private static final int saltDivisor = 10;
+  private static final String inputTopic = "indexing";
+  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(1);
+  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(15);
+  private static final long maxRoutesPerBolt = 100000;
+  private static final long startAt = 10;
+  private static final String entity = "10.0.0.1";
 
   @Rule
   public TemporaryFolder tempFolder = new TemporaryFolder();
@@ -102,7 +130,7 @@ public class BatchProfilerIntegrationTest {
   public static void setupSpark() {
     SparkConf conf = new SparkConf()
             .setMaster("local")
-            .setAppName("BatchProfilerIntegrationTest")
+            .setAppName("StreamingProfilerIntegrationTest")
             .set("spark.sql.shuffle.partitions", "8");
     spark = SparkSession
             .builder()
@@ -117,14 +145,41 @@ public class BatchProfilerIntegrationTest {
     }
   }
 
-  public void setup(int periodDuration, String periodDurationUnits) {
+  @AfterClass
+  public static void tearDownAfterClass() throws Exception {
+    MockHBaseTableProvider.clear();
+    if (runner != null) {
+      runner.stop();
+    }
+  }
+
+  @Before
+  public void setup() throws Exception {
     readerProperties = new Properties();
-    profilerProperties = new Properties();
+    writerProperties = new Properties();
 
     // the output will be written to a mock HBase table
-    String tableName = HBASE_TABLE_NAME.get(profilerProperties, String.class);
-    String columnFamily = HBASE_COLUMN_FAMILY.get(profilerProperties, String.class);
+    profilerProperties = new Properties();
+
+    // TODO need to create separate StreamingProfilerConfig or something like that
+
+    profilerProperties.put(PERIOD_DURATION.getKey(), Long.toString(periodDurationMillis));
+    profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "MILLISECONDS");
     profilerProperties.put(HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
+    profilerProperties.put(HBASE_SALT_DIVISOR.getKey(), Integer.toString(saltDivisor));
+    profilerProperties.put(HBASE_TABLE_NAME.getKey(), tableName);
+    profilerProperties.put(HBASE_COLUMN_FAMILY.getKey(), columnFamily);
+
+    // TODO are these needed?
+//    profilerProperties.put("profiler.input.topic", inputTopic);
+//    profilerProperties.put("profiler.ttl", Long.toString(profileTimeToLiveMillis));
+//    profilerProperties.put("profiler.ttl.units", "MILLISECONDS");
+//    profilerProperties.put("profiler.window.duration", Long.toString(windowDurationMillis));
+//    profilerProperties.put("profiler.window.duration.units", "MILLISECONDS");
+//    profilerProperties.put("profiler.window.lag", Long.toString(windowLagMillis));
+//    profilerProperties.put("profiler.window.lag.units", "MILLISECONDS");
+//    profilerProperties.put("kafka.start", "UNCOMMITTED_EARLIEST");
+//    profilerProperties.put("kafka.security.protocol", "PLAINTEXT");
 
     // create the mock hbase table
     MockHBaseTableProvider.addToCache(tableName, columnFamily);
@@ -134,8 +189,6 @@ public class BatchProfilerIntegrationTest {
       put(PROFILER_HBASE_TABLE.getKey(), tableName);
       put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
       put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
-      put(PROFILER_PERIOD.getKey(), periodDuration);
-      put(PROFILER_PERIOD_UNITS.getKey(), periodDurationUnits);
     }};
 
     // create the stellar execution environment
@@ -147,10 +200,26 @@ public class BatchProfilerIntegrationTest {
             new Context.Builder()
                     .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
                     .build());
+
+    zkComponent = getZKServerComponent(profilerProperties);
+
+    // create the input topic
+    kafkaComponent = getKafkaComponent(profilerProperties, Arrays.asList(
+            new KafkaComponent.Topic(inputTopic, 1)));
+
+    // start all components
+    runner = new ComponentRunner.Builder()
+            .withComponent("zk", zkComponent)
+            .withComponent("kafka", kafkaComponent)
+            .withMillisecondsBetweenAttempts(15000)
+            .withNumRetries(10)
+            .withCustomShutdownOrder(new String[] {"kafka","zk"})
+            .build();
+    runner.start();
   }
 
   /**
-   * This test uses the Batch Profiler to seed two profiles using archived telemetry.
+   * This test uses the Streaming Profiler to seed two profiles using archived telemetry.
    *
    * The first profile counts the number of messages by 'ip_src_addr'.  The second profile counts the total number
    * of messages.
@@ -159,99 +228,34 @@ public class BatchProfilerIntegrationTest {
    * produced will center around this date.
    */
   @Test
-  public void testBatchProfilerWithJSON() throws Exception {
-    setup(15, "MINUTES");
+  public void testStreamingProfiler() throws Exception {
 
-    // the input telemetry is text/json stored in the local filesystem
-    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), "src/test/resources/telemetry.json");
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "text");
+    // TODO configure writer properties
 
-    BatchProfiler profiler = new BatchProfiler();
-    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
+    // write the telemetry to the Kafka topic
+    List<String> telemetry = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
+    kafkaComponent.writeMessages(inputTopic, telemetry);
 
-    validateFifteenMinuteProfiles();
-  }
+    // setup Kafka
+    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "kafka");
+    readerProperties.put("subscribe", inputTopic);
+    readerProperties.put("kafka.bootstrap.servers", kafkaComponent.getBrokerList());
+    readerProperties.put("startingOffsets", "earliest");
 
-  @Test
-  public void testBatchProfilerWithORC() throws Exception {
-    setup(15, "MINUTES");
+    StreamingProfiler profiler = new StreamingProfiler();
+    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, writerProperties, getProfile());
 
-    // re-write the test data as ORC
-    String pathToORC = tempFolder.getRoot().getAbsolutePath();
-    spark.read()
-            .format("text")
-            .load("src/test/resources/telemetry.json")
-            .as(Encoders.STRING())
-            .write()
-            .mode("overwrite")
-            .format("org.apache.spark.sql.execution.datasources.orc")
-            .save(pathToORC);
-
-    // tell the profiler to use the ORC input data
-    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), pathToORC);
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "org.apache.spark.sql.execution.datasources.orc");
-
-    BatchProfiler profiler = new BatchProfiler();
-    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
-
-    validateFifteenMinuteProfiles();
-  }
-
-  @Test
-  public void testBatchProfilerWithCSV() throws Exception {
-    setup(15, "MINUTES");
-
-    // re-write the test data as a CSV with a header record
-    String pathToCSV = tempFolder.getRoot().getAbsolutePath();
-    spark.read()
-            .format("text")
-            .load("src/test/resources/telemetry.json")
-            .as(Encoders.STRING())
-            .write()
-            .mode("overwrite")
-            .option("header", "true")
-            .format("csv")
-            .save(pathToCSV);
-
-    // tell the profiler to use the CSV input data
-    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), pathToCSV);
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "csv");
-
-    // set a reader property; tell the reader to expect a header
-    readerProperties.put("header", "true");
-
-    BatchProfiler profiler = new BatchProfiler();
-    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
-
-    validateFifteenMinuteProfiles();
-  }
-
-  @Test
-  public void testBatchProfilerWithCustomPeriodDuration() throws Exception {
-    int periodDuration = 1;
-    setup(periodDuration, "MINUTES");
-
-    // the input telemetry is text/json stored in the local filesystem
-    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), "src/test/resources/telemetry.json");
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "text");
-
-    profilerProperties.put(PERIOD_DURATION.getKey(), periodDuration);
-    profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "MINUTES");
-
-    BatchProfiler profiler = new BatchProfiler();
-    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
-
-    validateFifteenMinuteProfiles();
+    validateProfiles();
   }
 
   /**
-   * Validates the profiles that were built with a 15 minute period duration.
+   * Validates the profiles that were built.
    *
    * These tests use the Batch Profiler to seed two profiles with archived telemetry.  The first profile
    * called 'count-by-ip', counts the number of messages by 'ip_src_addr'.  The second profile called
    * 'total-count', counts the total number of messages.
    */
-  private void validateFifteenMinuteProfiles() {
+  private void validateProfiles() {
     // the max timestamp in the data is around July 7, 2018
     assign("maxTimestamp", "1530978728982L");
 
@@ -259,8 +263,7 @@ public class BatchProfilerIntegrationTest {
     assign("window", "PROFILE_WINDOW('from 5 hours ago', maxTimestamp)");
 
     // there are 26 messages where ip_src_addr = 192.168.66.1
-    assign("countByIp", "PROFILE_GET('count-by-ip', '192.168.66.1', window)");
-    assertTrue(execute("[26] == countByIp", Boolean.class));
+    assertTrue(execute("[26] == PROFILE_GET('count-by-ip', '192.168.66.1', window)", Boolean.class));
 
     // there are 74 messages where ip_src_addr = 192.168.138.158
     assertTrue(execute("[74] == PROFILE_GET('count-by-ip', '192.168.138.158', window)", Boolean.class));
@@ -285,7 +288,6 @@ public class BatchProfilerIntegrationTest {
    */
   private void assign(String var, String expression) {
     executor.assign(var, expression, Collections.emptyMap());
-    LOG.debug("{} = {}", var, executor.getState().get(var));
   }
 
   /**
