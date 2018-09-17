@@ -107,10 +107,19 @@ public class StreamingProfiler {
             .select("value")
             .as(Encoders.STRING());
 
-    telemetry.map(new TimestampExtractorFunction(timestampField), Encoders.bean(JSONObject.class), Encoders.TIMESTAMP());
+    Dataset<Row> messages = telemetry
+            .map(new TimestampExtractorFunction(timestampField),
+                    Encoders.tuple(Encoders.bean(JSONObject.class), Encoders.TIMESTAMP()))
+            .toDF("message", "timestamp");
 
-    Dataset<MessageRoute> routes = telemetry
-            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));
+    messages.withWatermark("timestamp", "5 seconds")
+            .writeStream()
+            .format("console")
+            .start()
+            .awaitTermination();
+
+//    Dataset<MessageRoute> routes = telemetry
+//            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));
 
 //    Dataset<Row> foo = telemetry.select("value").map(row -> parseJSON(row.getString(0)))
 //            .map(row -> {
@@ -126,12 +135,12 @@ public class StreamingProfiler {
 //    }, Encoders.STRING());
 
     // TEMP to view results of above
-    StreamingQuery query = routes
-            .writeStream()
-            .trigger(Trigger.Once())
-            .format("console")
-            .start();
-    query.awaitTermination();
+//    StreamingQuery query = routes
+//            .writeStream()
+//            .trigger(Trigger.Once())
+//            .format("console")
+//            .start();
+//    query.awaitTermination();
 //
 //            .selectExpr("CAST(value AS STRING)")
 //            .as(Encoders.STRING());
