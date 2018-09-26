@@ -43,6 +43,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
+import java.sql.Timestamp;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -54,7 +55,9 @@ import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INP
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG_UNITS;
 import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.json_tuple;
 import static org.apache.spark.sql.functions.sum;
+import static org.apache.spark.sql.functions.window;
 
 public class StreamingProfiler {
 
@@ -88,35 +91,57 @@ public class StreamingProfiler {
 
     // TODO need to handle if profiler using processing time
     String timestampField = profiles.getTimestampField().get();
-    int periodDuration = PERIOD_DURATION.get(profilerProps, Integer.class);
-    String periodDurationUnits = PERIOD_DURATION_UNITS.get(profilerProps, String.class);
+
+    String periodDuration = String.join(" ",
+            PERIOD_DURATION.get(profilerProps, Integer.class).toString(),
+            PERIOD_DURATION_UNITS.get(profilerProps, String.class).toLowerCase());
+    LOG.debug("periodDuration = {}", periodDuration);
 
     String windowLag = String.join(" ",
             WINDOW_LAG.get(profilerProps, Integer.class).toString(),
             WINDOW_LAG_UNITS.get(profilerProps, String.class).toLowerCase());
+    LOG.debug("windowLag = {}", windowLag);
 
-    //    profilerProperties.put("profiler.window.lag", Long.toString(windowLagMillis));
-//    profilerProperties.put("profiler.window.lag.units", "MILLISECONDS");
-
-    // fetch the streaming telemetry
-    Dataset<String> telemetry = spark
+    Dataset<Row> telemetry = spark
             .readStream()
             .format(inputFormat)
             .options(Maps.fromProperties(readerProps))
-            .load()
-            .select("value")
-            .as(Encoders.STRING());
+            .load();
+//            .select(json_tuple(col("value").cast("string"), "timestamp"));
+            //.withWatermark(timestampField, windowLag);
 
-    Dataset<Row> messages = telemetry
-            .map(new TimestampExtractorFunction(timestampField),
-                    Encoders.tuple(Encoders.bean(JSONObject.class), Encoders.TIMESTAMP()))
-            .toDF("message", "timestamp");
-
-    messages.withWatermark("timestamp", "5 seconds")
+    telemetry
+//            .groupBy(window(telemetry.col(timestampField), periodDuration))
+//            .count()
             .writeStream()
             .format("console")
             .start()
             .awaitTermination();
+
+    // fetch the streaming telemetry
+//    Dataset<String> telemetry = spark
+//            .readStream()
+//            .format(inputFormat)
+//            .options(Maps.fromProperties(readerProps))
+//            .load()
+//            .select("value")
+//            .as(Encoders.STRING());
+
+//
+//    Dataset<Timestamp> messages = telemetry
+//            .map(new TimestampExtractorFunction(timestampField), Encoders.TIMESTAMP());
+//
+//    Dataset<Row> messages = telemetry
+//            .map(new TimestampExtractorFunction(timestampField),
+//                    Encoders.tuple(Encoders.bean(JSONObject.class), Encoders.TIMESTAMP()))
+//            .toDF("message", "timestamp");
+
+//    messages
+//            //.withWatermark("timestamp", "5 seconds")
+//            .writeStream()
+//            .format("console")
+//            .start()
+//            .awaitTermination();
 
 //    Dataset<MessageRoute> routes = telemetry
 //            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));

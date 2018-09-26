@@ -63,6 +63,8 @@ import java.util.concurrent.TimeUnit;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_SALT_DIVISOR;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
@@ -70,6 +72,8 @@ import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_P
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_FORMAT;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG_UNITS;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -115,9 +119,9 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
   private static final String columnFamily = "P";
   private static final int saltDivisor = 10;
   private static final String inputTopic = "indexing";
-  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(1);
+  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(5);
   private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
-  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(30);
   private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(15);
   private static final long maxRoutesPerBolt = 100000;
   private static final long startAt = 10;
@@ -241,6 +245,12 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
     readerProperties.put("subscribe", inputTopic);
     readerProperties.put("kafka.bootstrap.servers", kafkaComponent.getBrokerList());
     readerProperties.put("startingOffsets", "earliest");
+
+    // setup profiler
+    profilerProperties.put(PERIOD_DURATION.getKey(), 30);
+    profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "seconds");
+    profilerProperties.put(WINDOW_LAG.getKey(), 5);
+    profilerProperties.put(WINDOW_LAG_UNITS.getKey(), "seconds");
 
     StreamingProfiler profiler = new StreamingProfiler();
     profiler.run(spark, profilerProperties, getGlobals(), readerProperties, writerProperties, getProfile());
