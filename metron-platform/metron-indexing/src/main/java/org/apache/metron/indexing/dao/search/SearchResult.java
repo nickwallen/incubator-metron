@@ -22,6 +22,7 @@ import java.util.Map;
 public class SearchResult {
 
   private String id;
+//  private String guid;
   private Map<String, Object> source;
   private float score;
   private String index;
@@ -49,6 +50,18 @@ public class SearchResult {
   public void setId(String id) {
     this.id = id;
   }
+
+//  /**
+//   * Returns Metron's unique identifier for the search result.
+//   * @return
+//   */
+//  public String getGuid() {
+//    return guid;
+//  }
+//
+//  public void setGuid(String guid) {
+//    this.guid = guid;
+//  }
 
   /**
    * The source (the actual result).

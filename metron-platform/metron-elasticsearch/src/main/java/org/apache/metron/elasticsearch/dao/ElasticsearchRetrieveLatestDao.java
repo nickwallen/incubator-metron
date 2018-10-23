@@ -155,7 +155,7 @@ public class ElasticsearchRetrieveLatestDao implements RetrieveLatestDao {
     Long ts = 0L;
     String doc = hit.getSourceAsString();
     String sourceType = toSourceType(hit.getType());
-    String guid = ElasticsearchUtils.getGUID(hit);
+    String guid = hit.getId();
     try {
       return Optional.of(new Document(doc, guid, sourceType, ts));
     } catch (IOException e) {

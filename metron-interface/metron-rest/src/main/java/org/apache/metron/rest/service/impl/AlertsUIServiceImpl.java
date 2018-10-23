@@ -90,23 +90,32 @@ public class AlertsUIServiceImpl implements AlertsUIService {
         String message = JSONUtils.INSTANCE.toJSON(alert, false);
         kafkaService.produceMessage(topic, message);
       }
-    } catch (JsonProcessingException e) {
+    } catch (org.apache.metron.jackson.core.JsonProcessingException e) {
       throw new RestException(e);
     }
   }
 
   @Override
   public Optional<AlertsUIUserSettings> getAlertsUIUserSettings() throws RestException {
-    try {
-      Optional<String> alertUserSettings = userSettingsClient.findOne(SecurityUtils.getCurrentUser(), ALERT_USER_SETTING_TYPE);
-      if (alertUserSettings.isPresent()) {
-        return Optional.of(_mapper.get().readValue(alertUserSettings.get(), AlertsUIUserSettings.class));
-      } else {
-        return Optional.empty();
-      }
-    } catch (IOException e) {
-      throw new RestException(e);
-    }
+    AlertsUIUserSettings settings = new AlertsUIUserSettings();
+
+    List<String> facetFields = new java.util.ArrayList<>();
+    facetFields.add("bro");
+    facetFields.add("yaf");
+    facetFields.add("snort");
+    settings.setFacetFields(facetFields);
+    return Optional.of(settings);
+
+//    try {
+//      Optional<String> alertUserSettings = userSettingsClient.findOne(SecurityUtils.getCurrentUser(), ALERT_USER_SETTING_TYPE);
+//      if (alertUserSettings.isPresent()) {
+//        return Optional.of(_mapper.get().readValue(alertUserSettings.get(), AlertsUIUserSettings.class));
+//      } else {
+//        return Optional.empty();
+//      }
+//    } catch (IOException e) {
+//      throw new RestException(e);
+//    }
   }
 
   @Override

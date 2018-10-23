@@ -197,6 +197,8 @@ public class ElasticsearchUpdateDao implements UpdateDao {
   protected IndexRequest buildIndexRequest(Document update, String sensorType, String indexName) {
     String type = sensorType + "_doc";
     Object ts = update.getTimestamp();
+
+    // TODO for example right here this needs to be the document ID, not metron GUID
     IndexRequest indexRequest = new IndexRequest(indexName, type, update.getGuid())
         .source(update.getDocument());
     if (ts != null) {

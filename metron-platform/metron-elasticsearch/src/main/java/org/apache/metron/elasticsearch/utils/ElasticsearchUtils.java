@@ -396,9 +396,10 @@ public class ElasticsearchUtils {
    * @param searchHit The search hit to transform.
    * @return A {@link SearchResult} representing the {@link SearchHit}.
    */
-  protected static SearchResult toSearchResult(SearchHit searchHit) {
+  public static SearchResult toSearchResult(SearchHit searchHit) {
     SearchResult searchResult = new SearchResult();
-    searchResult.setId(getGUID(searchHit));
+    searchResult.setId(searchHit.getId());
+//    searchResult.setGuid(getGUID(searchHit));
     searchResult.setSource(searchHit.getSource());
     searchResult.setScore(searchHit.getScore());
     searchResult.setIndex(searchHit.getIndex());
