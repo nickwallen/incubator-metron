@@ -21,13 +21,46 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * The interface used to define a Stellar function.
+ */
 public interface StellarFunction extends Closeable {
-  Object apply(List<Object> args, Context context) throws ParseException;
-  void initialize(Context context);
-  boolean isInitialized();
 
+  /**
+   * Apply the Stellar function to the function arguments.
+   *
+   * @param args The function arguments.
+   * @param context The execution context.
+   * @return The result of executing the function.
+   * @throws ParseException
+   */
+  Object apply(List<Object> args, Context context) throws ParseException;
+
+  /**
+   * Allows the function to initialize resources.
+   *
+   * @param context The execution context.
+   */
+  default void initialize(Context context) {
+    // no initialization needed
+  }
+
+  /**
+   * Indicates if the function has been initialized.
+   *
+   * @return True if the function has been initialized. Otherwise, false.
+   */
+  default boolean isInitialized() {
+    // no initialization needed
+    return true;
+  }
+
+  /**
+   * Allows the function to close any resources.
+   * @throws IOException
+   */
   @Override
   default void close() throws IOException {
-
+    // do nothing
   }
 }

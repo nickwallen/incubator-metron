@@ -26,6 +26,7 @@ import org.apache.metron.stellar.common.shell.StellarResult;
 import org.apache.metron.stellar.common.shell.StellarShellExecutor;
 import org.apache.zeppelin.interpreter.Interpreter;
 import org.apache.zeppelin.interpreter.InterpreterContext;
+import org.apache.zeppelin.interpreter.InterpreterException;
 import org.apache.zeppelin.interpreter.InterpreterResult;
 import org.apache.zeppelin.interpreter.thrift.InterpreterCompletion;
 import org.slf4j.Logger;
@@ -74,7 +75,7 @@ public class StellarInterpreter extends Interpreter {
       this.autoCompleter = new DefaultStellarAutoCompleter();
 
       // create the stellar executor
-      Properties props = getProperty();
+      Properties props = getProperties();
       this.executor = createExecutor(props);
 
     } catch (Exception e) {
@@ -93,7 +94,6 @@ public class StellarInterpreter extends Interpreter {
     InterpreterResult result = new InterpreterResult(SUCCESS, TEXT, "");
 
     try {
-
       // allow separate expressions on each line
       String[] expressions = input.split(System.lineSeparator());
       for (String expression : expressions) {
@@ -101,7 +101,6 @@ public class StellarInterpreter extends Interpreter {
       }
 
     } catch(Throwable t){
-
       // unexpected exception
       String message = getErrorMessage(Optional.of(t), input);
       result = new InterpreterResult(ERROR, TEXT, message);
@@ -161,14 +160,13 @@ public class StellarInterpreter extends Interpreter {
   }
 
   @Override
-  public List<InterpreterCompletion> completion(String buf, int cursor) {
-
+  public List<InterpreterCompletion> completion(String buf, int cursor, InterpreterContext context) {
     // use the autoCompleter to return a list of completes to Zeppelin
     List<InterpreterCompletion> completes = new ArrayList<>();
     for(String candidate : autoCompleter.autoComplete(buf)) {
-      completes.add(new InterpreterCompletion(candidate, candidate));
+      completes.add(new InterpreterCompletion(candidate, candidate, null));
     }
-
+    
     return completes;
   }
 
@@ -182,7 +180,6 @@ public class StellarInterpreter extends Interpreter {
   private String getErrorMessage(Optional<Throwable> e, String input) {
     String message;
     if(e.isPresent()) {
-
       // base the error message on the exception
       String error = ExceptionUtils.getRootCauseMessage(e.get());
       String trace = ExceptionUtils.getStackTrace(e.get());

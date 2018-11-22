@@ -159,7 +159,7 @@ public class StellarInterpreterTest {
     // the cursor is at the end of the buffer
     int cursor = buffer.length();
 
-    List<InterpreterCompletion> completions = interpreter.completion(buffer, cursor);
+    List<InterpreterCompletion> completions = interpreter.completion(buffer, cursor, context);
 
     // expect some completions to be offered
     assertTrue(completions.size() > 0);
@@ -191,7 +191,7 @@ public class StellarInterpreterTest {
     int cursor = buffer.length();
 
     // perform auto-completion
-    List<InterpreterCompletion> completions = interpreter.completion(buffer, cursor);
+    List<InterpreterCompletion> completions = interpreter.completion(buffer, cursor, context);
 
     // expect no completions
     assertEquals(0, completions.size());
