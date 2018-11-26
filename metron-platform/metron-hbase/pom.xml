@@ -29,6 +29,7 @@
         <slf4j.version>1.7.7</slf4j.version>
         <storm.hdfs.version>0.1.2</storm.hdfs.version>
         <guava.version>${global_hbase_guava_version}</guava.version>
+        <spring.version>5.0.5.RELEASE</spring.version>
     </properties>
     <dependencies>
         <dependency>
@@ -53,6 +54,22 @@
                     <artifactId>slf4j-log4j12</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-integration-test</artifactId>
+            <version>${project.parent.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>${spring.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-dbcp2</artifactId>
+            <version>2.5.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -238,6 +255,12 @@
             <artifactId>log4j</artifactId>
             <version>1.2.17</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.phoenix</groupId>
+            <artifactId>phoenix-client</artifactId>
+            <version>4.14.1-HBase-1.1</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
     <build>
