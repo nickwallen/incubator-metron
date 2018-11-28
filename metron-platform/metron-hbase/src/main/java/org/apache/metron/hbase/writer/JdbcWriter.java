@@ -83,8 +83,12 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       return response;
     }
 
-    // TODO all fields are set as strings right now; preparedStatment.setString
+    // TODO all fields are set as strings right now; can SimpleJdbc* help choose based on the value in the table??
+
+    // TODO simply by defining the table columns and types, the user is defining which fields from the message are persisted??
+
     // TODO the only thing phoenix-ish about this is the weird upsert statement
+
     // TODO allow user to whitelist fields?
 
     // the columns are determined by the first 'prototype' message
@@ -99,7 +103,6 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       @Override
       public void setValues(PreparedStatement ps, int messageIndex) throws SQLException {
         JSONObject message = messages.get(messageIndex);
-
         for(int i=0; i<fields.size(); i++) {
           String field = fields.get(i);
           Object value = message.getOrDefault(field, "");

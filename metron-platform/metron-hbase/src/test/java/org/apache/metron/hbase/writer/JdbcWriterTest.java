@@ -65,7 +65,6 @@ public class JdbcWriterTest {
     JdbcWriter writer = new JdbcWriter();
     writer.driver = "org.apache.phoenix.jdbc.PhoenixDriver";
     writer.url = "jdbc:phoenix:localhost:2181";
-    //writer.url = "jdbc:phoenix:localhost:55953:/hbase";
 
     // TODO fix this
     writer.init(null, null, null);
@@ -81,6 +80,7 @@ public class JdbcWriterTest {
     JSONObject message1 = new JSONObject();
     message1.put("guid", UUID.randomUUID());
     message1.put("field", "value1");
+    message1.put("another", "another1");
     messages.add(message1);
 
     JSONObject message2 = new JSONObject();
