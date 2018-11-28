@@ -17,6 +17,7 @@
  */
 package org.apache.metron.hbase.writer;
 
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.writer.BulkMessageWriter;
@@ -49,24 +50,25 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private JdbcTemplate jdbcTemplate;
-  private DriverManagerDataSource dataSource;
+  private BasicDataSource dataSource;
 
   // TODO get these from globals?
   String driver = "org.apache.phoenix.jdbc.PhoenixDriver";
   String url = "jdbc:phoenix:server1,server2:3333";
   String username = "";
   String password = "";
-  Properties connectionProperties = new Properties();
+
 
   @Override
   public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) throws Exception {
     // TODO does user need to define what type of DataSource for things like pooled connections?
-    dataSource = new DriverManagerDataSource();
+
+    dataSource = new BasicDataSource();
     dataSource.setDriverClassName(driver);
     dataSource.setUrl(url);
     dataSource.setUsername(username);
     dataSource.setPassword(password);
-    dataSource.setConnectionProperties(connectionProperties);
+    dataSource.setDefaultAutoCommit(true);
 
     jdbcTemplate = new JdbcTemplate(dataSource);
   }
@@ -81,9 +83,10 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       return response;
     }
 
+    // TODO all fields are set as strings right now; preparedStatment.setString
     // TODO the only thing phoenix-ish about this is the weird upsert statement
-
     // TODO allow user to whitelist fields?
+
     // the columns are determined by the first 'prototype' message
     JSONObject prototype = messages.get(0);
     List<String> fields = new ArrayList<>(prototype.keySet());
@@ -91,86 +94,34 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
     String values = StringUtils.repeat("?", ",", fields.size());
     String table = configurations.getIndex(sensorType);
     String updateSql = String.format("upsert into %s (%s) values (%s)", table, columns, values);
-    LOG.debug("Using upsert statement = {}", updateSql);
 
-    // TODO TEST 1 - using raw JDBC statement works!
-//    try {
-//      Connection conn = DriverManager.getConnection(url);
-//      conn.createStatement().execute("upsert into test (guid, field, another) values ('guid1', 'field1', 2)");
-//      conn.commit();
-//
-//    } catch(Exception e) {
-//      throw new RuntimeException(e);
-//    }
+    BatchPreparedStatementSetter setter = new BatchPreparedStatementSetter() {
+      @Override
+      public void setValues(PreparedStatement ps, int messageIndex) throws SQLException {
+        JSONObject message = messages.get(messageIndex);
 
-    // TODO TEST 2 - using a prepared statement works!
-//    try {
-//      Connection conn = DriverManager.getConnection(url);
-//
-//      for(JSONObject message: messages) {
-//        PreparedStatement ps = conn.prepareStatement(updateSql);
-//        for (int i = 0; i < fields.size(); i++) {
-//          String field = fields.get(i);
-//          Object value = message.getOrDefault(field, "");
-//          ps.setString(i + 1, value.toString());
-//        }
-//        ps.executeUpdate();
-//      }
-//      conn.commit();
-//
-//    } catch(Exception e) {
-//      throw new RuntimeException(e);
-//    }
-
-
-    // TODO TEST 3 - using a prepared statement with the data source above works!
-    try {
-      Connection conn = dataSource.getConnection();
-
-      for (JSONObject message : messages) {
-        PreparedStatement ps = conn.prepareStatement(updateSql);
-        for (int i = 0; i < fields.size(); i++) {
+        for(int i=0; i<fields.size(); i++) {
           String field = fields.get(i);
           Object value = message.getOrDefault(field, "");
-          ps.setString(i + 1, value.toString());
+          ps.setString(i+1, value.toString());
         }
-        ps.executeUpdate();
       }
-      conn.commit();
 
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+      @Override
+      public int getBatchSize() {
+        return messages.size();
+      }
+    };
+
+    try {
+      jdbcTemplate.batchUpdate(updateSql, setter);
+      response.addAllSuccesses(tuples);
+
+    } catch(Exception e) {
+      LOG.error(String.format("Failed to write %d message(s)", messages.size()), e);
+      response.addAllErrors(e, tuples);
     }
 
-//    // TODO using JdbcTemplate does not seem to work
-//    BatchPreparedStatementSetter setter = new BatchPreparedStatementSetter() {
-//      @Override
-//      public void setValues(PreparedStatement ps, int messageIndex) throws SQLException {
-//        JSONObject message = messages.get(messageIndex);
-//
-//        // TODO parameter index starts at 1?
-//        for(int i=0; i<fields.size(); i++) {
-//          String field = fields.get(i);
-//          Object value = message.getOrDefault(field, "");
-//          ps.setString(i+1, value.toString());
-//          // TODO must we assume string?  user-specified type?
-//        }
-//      }
-//
-//      @Override
-//      public int getBatchSize() {
-//        return messages.size();
-//      }
-//    };
-//
-//    try {
-//      jdbcTemplate.batchUpdate(updateSql, setter);
-//      response.addAllSuccesses(tuples);
-//
-//    } catch(Exception e) {
-//      LOG.error(String.format("Failed to write %d message(s)", messages.size()), e);
-//      response.addAllErrors(e, tuples);
-//    }
 
     return response;
   }
