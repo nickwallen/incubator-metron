@@ -89,9 +89,10 @@ public class GetProfileTest {
     final HTableInterface table = MockHBaseTableProvider.addToCache(tableName, columnFamily);
 
     // used to write values to be read during testing
+    long periodDurationMillis = TimeUnit.MINUTES.toMillis(15);
     RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder();
     ColumnBuilder columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-    profileWriter = new ProfileWriter(rowKeyBuilder, columnBuilder, table);
+    profileWriter = new ProfileWriter(rowKeyBuilder, columnBuilder, table, periodDurationMillis);
 
     // global properties
     Map<String, Object> global = new HashMap<String, Object>() {{
@@ -176,7 +177,6 @@ public class GetProfileTest {
             .withProfileName("profile1")
             .withEntity("entity1")
             .withPeriod(startTime, periodDuration, periodUnits);
-
     profileWriter.write(m, count, group, val -> expectedValue);
 
     // execute - read the profile values - no groups
@@ -445,6 +445,66 @@ public class GetProfileTest {
 
     // validate - expect to fail to read any values
     Assert.assertEquals(0, result.size());
+  }
+
+  @Test
+  public void testSimpleView() {
+    final int periodsPerHour = 4;
+    final int expectedValue = 2302;
+    final int hours = 2;
+    final long startTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(hours);
+    final List<Object> group = Collections.emptyList();
+
+    // setup - write some measurements to be read later
+    final int count = hours * periodsPerHour;
+    ProfileMeasurement m = new ProfileMeasurement()
+            .withProfileName("profile1")
+            .withEntity("entity1")
+            .withPeriod(startTime, periodDuration, periodUnits);
+    profileWriter.write(m, count, group, val -> expectedValue);
+
+    // execute - read the profile values
+    String expr = "PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'), [], {'profiler.client.view':'simple'})";
+    List<Integer> result = run(expr, List.class);
+
+    // validate - expect to read all values from the past 4 hours
+    Assert.assertEquals(count, result.size());
+    for(Integer actual: result) {
+      Assert.assertEquals(expectedValue, actual.intValue());
+    }
+  }
+
+  @Test
+  public void testRichView() {
+    final int periodsPerHour = 4;
+    final int expectedValue = 2302;
+    final int hours = 2;
+    final long startTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(hours);
+    final List<Object> group = Collections.emptyList();
+
+    // setup - write some measurements to be read later
+    final int count = hours * periodsPerHour;
+    ProfileMeasurement m = new ProfileMeasurement()
+            .withProfileName("profile1")
+            .withEntity("entity1")
+            .withPeriod(startTime, periodDuration, periodUnits);
+    profileWriter.write(m, count, group, val -> expectedValue);
+
+    // execute - read the profile values
+    String expr = "PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'), [], {'profiler.client.view':'rich'})";
+    List<Map<String, Object>> result = run(expr, List.class);
+
+    // validate - expect to read all values from the past 4 hours
+    Assert.assertEquals(count, result.size());
+    for(Map<String, Object> actual: result) {
+      Assert.assertEquals("profile1", actual.get("profile"));
+      Assert.assertEquals("entity1", actual.get("entity"));
+      Assert.assertNotNull(actual.get("period"));
+      Assert.assertNotNull(actual.get("period.start"));
+      Assert.assertNotNull(actual.get("period.end"));
+      Assert.assertNotNull(actual.get("groups"));
+      Assert.assertEquals(expectedValue, actual.get("value"));
+    }
   }
 
 }
