@@ -24,6 +24,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.metron.hbase.HTableProvider;
 import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.client.HBaseProfilerClient;
 import org.apache.metron.profiler.client.ProfilerClient;
@@ -178,7 +179,16 @@ public class GetProfile implements StellarFunction {
     if(cachedConfigMap != null) {
       defaultValue = ProfilerClientConfig.PROFILER_DEFAULT_VALUE.get(cachedConfigMap);
     }
-    return client.fetch(Object.class, profile, entity, groups, periods.orElse(new ArrayList<>(0)), Optional.ofNullable(defaultValue));
+
+    List<ProfileMeasurement> measurements = client.fetch(Object.class, profile, entity, groups,
+            periods.orElse(new ArrayList<>(0)), Optional.ofNullable(defaultValue));
+
+    // return only the value of each profile measurement
+    List<Object> values = new ArrayList<>();
+    for(ProfileMeasurement m: measurements) {
+      values.add(m.getProfileValue());
+    }
+    return values;
   }
 
   /**
