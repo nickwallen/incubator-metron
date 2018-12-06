@@ -24,7 +24,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.metron.hbase.HTableProvider;
 import org.apache.metron.hbase.TableProvider;
-import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.client.HBaseProfilerClient;
 import org.apache.metron.profiler.client.ProfilerClient;
@@ -48,9 +47,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_CLIENT_VIEW;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_DEFAULT_VALUE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
@@ -58,6 +55,7 @@ import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PRO
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
 import static org.apache.metron.profiler.client.stellar.Util.getArg;
 import static org.apache.metron.profiler.client.stellar.Util.getEffectiveConfig;
+import static org.apache.metron.profiler.client.stellar.Util.getPeriodDurationInMillis;
 
 /**
  * A Stellar function that can retrieve data contained within a Profile.
@@ -106,19 +104,6 @@ import static org.apache.metron.profiler.client.stellar.Util.getEffectiveConfig;
 public class GetProfile implements StellarFunction {
 
   /**
-   * An acceptable value for the {@link ProfilerClientConfig#PROFILER_CLIENT_VIEW} property. When defined, the
-   * `PROFILE_GET` function returns a 'rich' view of the profile measurements retrieved by `PROFILE_GET`. The
-   * profile name, entity, period, groups, value, and other related information are returned for each measurement.
-   */
-  public static final String RICH_VIEW = "rich";
-
-  /**
-   * An acceptable value for the {@link ProfilerClientConfig#PROFILER_CLIENT_VIEW} property. When defined, the
-   * `PROFILE_GET` function returns only the value of each profile measurement.
-   */
-  public static final String SIMPLE_VIEW = "simple";
-
-  /**
    * Cached client that can retrieve profile values.
    */
   private ProfilerClient client;
@@ -153,83 +138,47 @@ public class GetProfile implements StellarFunction {
    */
   @Override
   public Object apply(List<Object> args, Context context) throws ParseException {
-    // required arguments
+
     String profile = getArg(0, String.class, args);
     String entity = getArg(1, String.class, args);
     Optional<List<ProfilePeriod>> periods = Optional.ofNullable(getArg(2, List.class, args));
-
-    // optional arguments
+    //Optional arguments
+    @SuppressWarnings("unchecked")
     List<Object> groups = null;
     Map configOverridesMap = null;
     if (args.size() < 4) {
       // no optional args, so default 'groups' and configOverridesMap remains null.
       groups = new ArrayList<>(0);
-
-    } else if (args.get(3) instanceof List) {
+    }
+    else if (args.get(3) instanceof List) {
       // correct extensible usage
       groups = getArg(3, List.class, args);
       if (args.size() >= 5) {
         configOverridesMap = getArg(4, Map.class, args);
-        if (configOverridesMap.isEmpty()) {
-          configOverridesMap = null;
-        }
+        if (configOverridesMap.isEmpty()) configOverridesMap = null;
       }
-    } else {
-      // deprecated "varargs" style usage for groups_list
+    }
+    else {
+      // Deprecated "varargs" style usage for groups_list
       // configOverridesMap cannot be specified so it remains null.
       groups = getGroupsArg(3, args);
     }
 
     Map<String, Object> effectiveConfig = getEffectiveConfig(context, configOverridesMap);
-    if (client == null || !cachedConfigMap.equals(effectiveConfig)) {
-      // lazily create new profiler client
-      cachedConfigMap = effectiveConfig;
-      RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(cachedConfigMap);
-      ColumnBuilder columnBuilder = getColumnBuilder(cachedConfigMap);
-      HTableInterface table = getTable(cachedConfigMap);
-      long periodDuration = getPeriodDurationInMillis(cachedConfigMap);
-      client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder, periodDuration);
-    }
-
     Object defaultValue = null;
+    //lazily create new profiler client if needed
+    if (client == null || !cachedConfigMap.equals(effectiveConfig)) {
+      RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(effectiveConfig);
+      ColumnBuilder columnBuilder = getColumnBuilder(effectiveConfig);
+      HTableInterface table = getTable(effectiveConfig);
+      long periodDuration = getPeriodDurationInMillis(effectiveConfig);
+      client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder, periodDuration);
+      cachedConfigMap = effectiveConfig;
+    }
     if(cachedConfigMap != null) {
-      defaultValue = PROFILER_DEFAULT_VALUE.get(cachedConfigMap);
+      defaultValue = ProfilerClientConfig.PROFILER_DEFAULT_VALUE.get(cachedConfigMap);
     }
-
-    List<ProfileMeasurement> measurements = client.fetch(Object.class, profile, entity, groups,
-            periods.orElse(new ArrayList<>(0)), Optional.ofNullable(defaultValue));
-    return render(measurements);
-  }
-
-  /**
-   * Renders a view of the profile measurements based on the {@link ProfilerClientConfig#PROFILER_CLIENT_VIEW} property.
-   * @param measurements The profile measurements to render.
-   */
-  private List<Object> render(List<ProfileMeasurement> measurements) {
-    List<Object> results = new ArrayList<>();
-    for(ProfileMeasurement measurement: measurements) {
-
-      Object viewProperty = PROFILER_CLIENT_VIEW.get(cachedConfigMap);
-      if(SIMPLE_VIEW.equals(viewProperty)) {
-        Object view = measurement.getProfileValue();
-        results.add(view);
-
-      } else if(RICH_VIEW.equals(viewProperty)) {
-        Map<String, Object> view = new HashMap<>();
-        view.put("profile", measurement.getProfileName());
-        view.put("entity", measurement.getEntity());
-        view.put("period", measurement.getPeriod().getPeriod());
-        view.put("period.start", measurement.getPeriod().getStartTimeMillis());
-        view.put("period.end", measurement.getPeriod().getEndTimeMillis());
-        view.put("value", measurement.getProfileValue());
-        view.put("groups", measurement.getGroups());
-        results.add(view);
-
-      } else {
-        throw new IllegalArgumentException(String.format("Unexpected value; property=%s, value=%s", PROFILER_CLIENT_VIEW, viewProperty));
-      }
-    }
-    return results;
+    return client.fetch(Object.class, profile, entity, groups, periods.orElse(new ArrayList<>(0)), Optional.ofNullable(defaultValue));
   }
 
   /**
@@ -259,19 +208,12 @@ public class GetProfile implements StellarFunction {
    * @param global The global configuration.
    */
   private ColumnBuilder getColumnBuilder(Map<String, Object> global) {
+    ColumnBuilder columnBuilder;
+
     String columnFamily = PROFILER_COLUMN_FAMILY.get(global, String.class);
-    return new ValueOnlyColumnBuilder(columnFamily);
-  }
+    columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
 
-  private long getPeriodDurationInMillis(Map<String, Object> global) {
-    long duration = PROFILER_PERIOD.get(global, Long.class);
-    LOG.debug("profiler client: {}={}", PROFILER_PERIOD, duration);
-
-    String configuredUnits = PROFILER_PERIOD_UNITS.get(global, String.class);
-    TimeUnit units = TimeUnit.valueOf(configuredUnits);
-    LOG.debug("profiler client: {}={}", PROFILER_PERIOD_UNITS, units);
-
-    return units.toMillis(duration);
+    return columnBuilder;
   }
 
   /**
@@ -279,8 +221,21 @@ public class GetProfile implements StellarFunction {
    * @param global The global configuration.
    */
   private RowKeyBuilder getRowKeyBuilder(Map<String, Object> global) {
+
+    // how long is the profile period?
+    long duration = PROFILER_PERIOD.get(global, Long.class);
+    LOG.debug("profiler client: {}={}", PROFILER_PERIOD, duration);
+
+    // which units are used to define the profile period?
+    String configuredUnits = PROFILER_PERIOD_UNITS.get(global, String.class);
+    TimeUnit units = TimeUnit.valueOf(configuredUnits);
+    LOG.debug("profiler client: {}={}", PROFILER_PERIOD_UNITS, units);
+
+    // what is the salt divisor?
     Integer saltDivisor = PROFILER_SALT_DIVISOR.get(global, Integer.class);
-    return new SaltyRowKeyBuilder(saltDivisor, getPeriodDurationInMillis(global), TimeUnit.MILLISECONDS);
+    LOG.debug("profiler client: {}={}", PROFILER_SALT_DIVISOR, saltDivisor);
+
+    return new SaltyRowKeyBuilder(saltDivisor, duration, units);
   }
 
   /**
@@ -289,6 +244,7 @@ public class GetProfile implements StellarFunction {
    * @return
    */
   private HTableInterface getTable(Map<String, Object> global) {
+
     String tableName = PROFILER_HBASE_TABLE.get(global, String.class);
     TableProvider provider = getTableProvider(global);
 

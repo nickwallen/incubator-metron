@@ -61,14 +61,7 @@ public enum ProfilerClientConfig {
   /**
    * The default value to be returned if a profile is not written for a given period for a profile and entity.
    */
-  PROFILER_DEFAULT_VALUE("profiler.default.value", null, Object.class),
-
-  /**
-   * Defines how much information is returned by `PROFILE_GET` for each profile measurement.
-   *
-   * See {@link GetProfile#SIMPLE_VIEW}, {@link GetProfile#RICH_VIEW}.
-   */
-  PROFILER_CLIENT_VIEW("profiler.client.view", GetProfile.SIMPLE_VIEW, String.class);
+  PROFILER_DEFAULT_VALUE("profiler.default.value", null, Object.class);
 
   String key;
   Object defaultValue;

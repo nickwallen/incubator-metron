@@ -44,7 +44,13 @@ public interface ProfilerClient {
    * @param <T>     The type of values stored by the profile.
    * @return A list of {@link ProfileMeasurement} values.
    */
-  <T> List<ProfileMeasurement> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, long start, long end, Optional<T> defaultValue);
+  <T> List<ProfileMeasurement> fetch(Class<T> clazz,
+                                     String profile,
+                                     String entity,
+                                     List<Object> groups,
+                                     long start,
+                                     long end,
+                                     Optional<T> defaultValue);
 
   /**
    * Fetch the values stored in a profile based on a set of period keys.
@@ -58,5 +64,10 @@ public interface ProfilerClient {
    * @param <T>     The type of values stored by the profile.
    * @return A list of {@link ProfileMeasurement} values.
    */
-  <T> List<ProfileMeasurement> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, Iterable<ProfilePeriod> periods, Optional<T> defaultValue);
+  <T> List<ProfileMeasurement> fetch(Class<T> clazz,
+                                     String profile,
+                                     String entity,
+                                     List<Object> groups,
+                                     Iterable<ProfilePeriod> periods,
+                                     Optional<T> defaultValue);
 }
