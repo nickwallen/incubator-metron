@@ -61,8 +61,8 @@ import static org.apache.metron.stellar.dsl.Context.Capabilities.GLOBAL_CONFIG;
  *
  *  PROFILE_VIEW
  *
- * Differs from PROFILE_GET by returning a map containing the profile name, entity, period id, period start timestamp,
- * period end timestamp, for each profile measurement, a map containing
+ * Differs from PROFILE_GET by returning a map containing the profile name, entity, period id, period start,
+ * period end for each profile measurement.
  *
  * Retrieve all values for 'entity1' from 'profile1' over the past 4 hours.
  *
@@ -75,12 +75,13 @@ import static org.apache.metron.stellar.dsl.Context.Capabilities.GLOBAL_CONFIG;
 @Stellar(
         namespace="PROFILE",
         name="VIEW",
-        description="Retrieves a series of measurements from a stored profile. " +
-                "Provides a more verbose view of each measurement than PROFILE_GET.",
+        description="Retrieves a series of measurements from a stored profile. Provides a more verbose " +
+                    "view of each measurement than PROFILE_GET. Returns a map containing the profile name, " +
+                    "entity, period id, period start, period end for each profile measurement.",
         params={
                 "profile - The name of the profile.",
                 "entity - The name of the entity.",
-                "periods - The list of profile periods to grab.  These are ProfilePeriod objects.",
+                "periods - The list of profile periods to fetch. Use PROFILE_WINDOW or PROFILE_FIXED.",
                 "groups - Optional, The groups to retrieve. Must correspond to the 'groupBy' " +
                         "list used during profile creation. Defaults to an empty list, meaning no groups. "
         },

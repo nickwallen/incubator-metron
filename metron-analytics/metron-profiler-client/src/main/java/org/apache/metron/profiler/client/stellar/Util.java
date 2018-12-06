@@ -79,8 +79,8 @@ public class Util {
     // ensure the required capabilities are defined
     final Context.Capabilities[] required = { GLOBAL_CONFIG };
     validateCapabilities(context, required);
+    @SuppressWarnings("unchecked")
     Map<String, Object> global = (Map<String, Object>) context.getCapability(GLOBAL_CONFIG).get();
-
     Map<String, Object> result = new HashMap<>(6);
 
     // extract the relevant parameters from global, the overrides and the defaults

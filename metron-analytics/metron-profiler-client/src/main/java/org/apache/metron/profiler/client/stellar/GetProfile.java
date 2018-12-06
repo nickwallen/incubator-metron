@@ -93,10 +93,9 @@ import static org.apache.metron.profiler.client.stellar.Util.getPeriodDurationIn
         params={
           "profile - The name of the profile.",
           "entity - The name of the entity.",
-          "periods - The list of profile periods to grab.  These are ProfilePeriod objects.",
-          "groups_list - Optional, must correspond to the 'groupBy' list used in profile creation - List (in square brackets) of "+
-                  "groupBy values used to filter the profile. Default is the " +
-                  "empty list, meaning groupBy was not used when creating the profile.",
+          "periods - The list of profile periods to fetch. Use PROFILE_WINDOW or PROFILE_FIXED.",
+          "groups - Optional - The groups to retrieve. Must correspond to the 'groupBy' " +
+                    "list used during profile creation. Defaults to an empty list, meaning no groups.",
           "config_overrides - Optional - Map (in curly braces) of name:value pairs, each overriding the global config parameter " +
                   "of the same name. Default is the empty Map, meaning no overrides."
         },
