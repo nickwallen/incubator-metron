@@ -58,7 +58,6 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
   String username = "";
   String password = "";
 
-
   @Override
   public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) throws Exception {
     // TODO does user need to define what type of DataSource for things like pooled connections?

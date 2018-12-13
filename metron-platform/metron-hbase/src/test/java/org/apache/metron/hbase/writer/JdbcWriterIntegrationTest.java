@@ -17,8 +17,10 @@
  */
 package org.apache.metron.hbase.writer;
 
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.metron.common.configuration.IndexingConfigurations;
 import org.apache.metron.common.configuration.writer.IndexingWriterConfiguration;
 import org.apache.metron.common.writer.BulkWriterResponse;
@@ -31,40 +33,61 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-public class JdbcWriterTest {
+public class JdbcWriterIntegrationTest {
 
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static HBaseComponent hbase;
+  private static String jdbcDriver;
+  private static String jdbcUrl;
+  private static JdbcTemplate jdbcTemplate;
+  private static BasicDataSource dataSource;
 
-//  @BeforeClass
-//  public static void setup() throws Exception {
-//      hbase = new HBaseComponent();
-//      hbase.start();
-//  }
-//
-//  @AfterClass
-//  public static void tearDown() throws Exception {
-//    if(hbase != null) {
-//      hbase.stop();
-//    }
-//  }
+  @BeforeClass
+  public static void setup() throws Exception {
+    hbase = new HBaseComponent();
+    hbase.start();
 
-  // TODO setup in-memory HBase
-  // TODO call this an integration test?
+    // gather the connection info
+    jdbcDriver = "org.apache.phoenix.jdbc.PhoenixDriver";
+    jdbcUrl = String.format("jdbc:phoenix:localhost:%d", hbase.getUtility().getZkCluster().getClientPort());
+    log.debug("Using driver={}, url={}", jdbcDriver, jdbcUrl);
+
+    // create a connection
+    dataSource = new BasicDataSource();
+    dataSource.setDriverClassName(jdbcDriver);
+    dataSource.setUrl(jdbcUrl);
+    dataSource.setDefaultAutoCommit(true);
+
+    // create the table to write data to
+    jdbcTemplate = new JdbcTemplate(dataSource);
+    jdbcTemplate.execute("create table test (guid varchar primary key, field varchar, another varchar)");
+  }
+
+  @AfterClass
+  public static void tearDown() throws Exception {
+    if(hbase != null) {
+      hbase.stop();
+    }
+    if(dataSource != null) {
+      dataSource.close();
+    }
+  }
 
   @Test
-  public void test() throws Exception {
-//    Table table = hbase.getUtility().createTable(TableName.valueOf("table"), "family");
-//    Assert.assertNotNull(table);
-
+  public void testWrite() throws Exception {
     JdbcWriter writer = new JdbcWriter();
-    writer.driver = "org.apache.phoenix.jdbc.PhoenixDriver";
-    writer.url = "jdbc:phoenix:localhost:2181";
+    writer.driver = jdbcDriver;
+    writer.url = jdbcUrl;
 
     // TODO fix this
     writer.init(null, null, null);
@@ -78,13 +101,15 @@ public class JdbcWriterTest {
 
     List<JSONObject> messages = new ArrayList<>();
     JSONObject message1 = new JSONObject();
-    message1.put("guid", UUID.randomUUID());
+    String guid1 = UUID.randomUUID().toString();
+    message1.put("guid", guid1);
     message1.put("field", "value1");
     message1.put("another", "another1");
     messages.add(message1);
 
     JSONObject message2 = new JSONObject();
-    message2.put("guid", UUID.randomUUID());
+    String guid2 = UUID.randomUUID().toString();
+    message2.put("guid", guid2);
     message2.put("field", "value2");
     messages.add(message2);
 
@@ -93,11 +118,17 @@ public class JdbcWriterTest {
     IndexingWriterConfiguration configuration = new IndexingWriterConfiguration("test", broConfig);
     BulkWriterResponse response = writer.write("test", configuration, tuples, messages);
 
+    // the writer response should contain only successes
     Assert.assertEquals(false, response.hasErrors());
     Assert.assertEquals(2, response.getSuccesses().size());
-    //Assert.assertEquals(1, hbase.getUtility().countRows(table));
-    // TODO use start-hbase.sh from command-line to start-up HBase
+
+    // validate message 1
+    Assert.assertEquals(message1.get("field"), getFieldValue(guid1));
+    Assert.assertEquals(message2.get("field"), getFieldValue(guid2));
   }
 
+  private String getFieldValue(String guid) {
+    return jdbcTemplate.queryForObject("select field from test where guid = ?", new Object[] { guid }, String.class);
+  }
 
 }
