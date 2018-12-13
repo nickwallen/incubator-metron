@@ -102,8 +102,6 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
           String field = fields.get(i);
           Object value = message.getOrDefault(field, "");
           ps.setString(i+1, value.toString());
-
-          log.debug("setting value; index={}, field={}, value={}", messageIndex, field, value);
         }
       }
 

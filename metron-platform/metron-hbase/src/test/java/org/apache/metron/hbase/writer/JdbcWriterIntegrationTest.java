@@ -17,10 +17,14 @@
  */
 package org.apache.metron.hbase.writer;
 
+import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.IndexingConfigurations;
 import org.apache.metron.common.configuration.writer.IndexingWriterConfiguration;
+import org.apache.metron.common.configuration.writer.WriterConfiguration;
+import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.BulkWriterResponse;
 import org.apache.metron.hbase.integration.component.HBaseComponent;
 import org.apache.storm.tuple.Tuple;
@@ -34,10 +38,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+
+import static org.apache.metron.common.configuration.writer.ConfigurationsStrategies.INDEXING;
 
 public class JdbcWriterIntegrationTest {
 
@@ -47,9 +56,12 @@ public class JdbcWriterIntegrationTest {
   private static String jdbcUrl;
   private static JdbcTemplate jdbcTemplate;
   private static BasicDataSource dataSource;
+  private static String sensorType;
 
   @BeforeClass
   public static void setup() throws Exception {
+    sensorType = "test";
+
     hbase = new HBaseComponent();
     hbase.start();
 
@@ -63,10 +75,7 @@ public class JdbcWriterIntegrationTest {
     dataSource.setDriverClassName(jdbcDriver);
     dataSource.setUrl(jdbcUrl);
     dataSource.setDefaultAutoCommit(true);
-
-    // create the table to write data to
     jdbcTemplate = new JdbcTemplate(dataSource);
-    jdbcTemplate.execute("create table test (guid varchar primary key, field1 varchar, field2 varchar)");
   }
 
   @AfterClass
@@ -79,13 +88,21 @@ public class JdbcWriterIntegrationTest {
     }
   }
 
+  /**
+   * {
+   *    "jdbc": {
+   *       "index": "test_table",
+   *       "batchSize" : 100,
+   *       "batchTimeout" : 0,
+   *       "enabled" : true
+   *     }
+   * }
+   */
+  @Multiline
+  private static String jdbcWriterConfig;
+
   @Test
   public void testWrite() throws Exception {
-    JdbcWriter writer = new JdbcWriter();
-    writer.driver = jdbcDriver;
-    writer.url = jdbcUrl;
-    writer.init(null, null, null);
-
     List<Tuple> tuples = new ArrayList<>();
     Tuple tuple1 = Mockito.mock(Tuple.class);
     tuples.add(tuple1);
@@ -108,26 +125,48 @@ public class JdbcWriterIntegrationTest {
     message2.put("field2", "value2-" + guid2);
     messages.add(message2);
 
-    // TODO table name not coming from the 'index'; seems to be using the sensor name for some reason
-    IndexingConfigurations broConfig = new IndexingConfigurations();
-    IndexingWriterConfiguration configuration = new IndexingWriterConfiguration("test", broConfig);
-    BulkWriterResponse response = writer.write("test", configuration, tuples, messages);
+    // create the writer
+    JdbcWriter writer = new JdbcWriter();
+    writer.driver = jdbcDriver;
+    writer.url = jdbcUrl;
+
+    // create the writer configuration
+    WriterConfiguration configuration = configuration(writer, sensorType);
+
+    // create the table to write to
+    String tableName = configuration.getIndex(sensorType);
+    createTable(tableName);
+
+    // write the messages
+    writer.init(null, null, null);
+    BulkWriterResponse response = writer.write(sensorType, configuration, tuples, messages);
 
     // the writer response should contain only successes
     Assert.assertEquals(false, response.hasErrors());
     Assert.assertEquals(2, response.getSuccesses().size());
 
     // validate message 1
-    Assert.assertEquals(message1.get("field1"), getFieldValue(guid1, "field1"));
-    Assert.assertEquals(message1.get("field2"), getFieldValue(guid1, "field2"));
+    Assert.assertEquals(message1.get("field1"), getFieldValue(guid1, "field1", tableName));
+    Assert.assertEquals(message1.get("field2"), getFieldValue(guid1, "field2", tableName));
 
     // validate message 2
-    Assert.assertEquals(message2.get("field1"), getFieldValue(guid2, "field1"));
-    Assert.assertEquals(message2.get("field2"), getFieldValue(guid2, "field2"));
+    Assert.assertEquals(message2.get("field1"), getFieldValue(guid2, "field1", tableName));
+    Assert.assertEquals(message2.get("field2"), getFieldValue(guid2, "field2", tableName));
   }
 
-  private String getFieldValue(String guid, String fieldName) {
-    String sql = String.format("select %s from test where guid = '%s'", fieldName, guid);
+  private void createTable(String tableName) {
+    String sql = String.format("create table %s (guid varchar primary key, field1 varchar, field2 varchar)", tableName);
+    jdbcTemplate.execute(sql);
+  }
+
+  private WriterConfiguration configuration(BulkMessageWriter writer, String sensorType) throws IOException {
+    IndexingConfigurations configs = new IndexingConfigurations();
+    configs.updateSensorIndexingConfig(sensorType, jdbcWriterConfig.getBytes());
+    return INDEXING.createWriterConfig(writer, configs);
+  }
+
+  private String getFieldValue(String guid, String fieldName, String tableName) {
+    String sql = String.format("select %s from %s where guid = '%s'", fieldName, tableName, guid);
     return jdbcTemplate.queryForObject(sql, String.class);
   }
 
