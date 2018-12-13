@@ -52,10 +52,7 @@ public class JdbcWriterIntegrationTest {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static HBaseComponent hbase;
-  private static String jdbcDriver;
-  private static String jdbcUrl;
   private static JdbcTemplate jdbcTemplate;
-  private static BasicDataSource dataSource;
   private static String sensorType;
 
   @BeforeClass
@@ -65,16 +62,12 @@ public class JdbcWriterIntegrationTest {
     hbase = new HBaseComponent();
     hbase.start();
 
-    // gather the connection info
-    jdbcDriver = "org.apache.phoenix.jdbc.PhoenixDriver";
-    jdbcUrl = String.format("jdbc:phoenix:localhost:%d", hbase.getUtility().getZkCluster().getClientPort());
-    log.debug("Using driver={}, url={}", jdbcDriver, jdbcUrl);
-
-    // create a connection
-    dataSource = new BasicDataSource();
-    dataSource.setDriverClassName(jdbcDriver);
-    dataSource.setUrl(jdbcUrl);
+    // create a jdbc template for creating tables
+    BasicDataSource dataSource = new BasicDataSource();
+    dataSource.setDriverClassName("org.apache.phoenix.jdbc.PhoenixDriver");
+    dataSource.setUrl(String.format("jdbc:phoenix:localhost:%d", hbase.getUtility().getZkCluster().getClientPort()));
     dataSource.setDefaultAutoCommit(true);
+
     jdbcTemplate = new JdbcTemplate(dataSource);
   }
 
@@ -82,9 +75,6 @@ public class JdbcWriterIntegrationTest {
   public static void tearDown() throws Exception {
     if(hbase != null) {
       hbase.stop();
-    }
-    if(dataSource != null) {
-      dataSource.close();
     }
   }
 
@@ -94,64 +84,47 @@ public class JdbcWriterIntegrationTest {
    *       "index": "test_table",
    *       "batchSize" : 100,
    *       "batchTimeout" : 0,
-   *       "enabled" : true
+   *       "enabled" : true,
+   *
+   *       "jdbc.driver": "org.apache.phoenix.jdbc.PhoenixDriver",
+   *       "jdbc.url": "jdbc:phoenix:localhost:%d",
+   *       "jdbc.username": "",
+   *       "jdbc.password": ""
    *     }
    * }
    */
   @Multiline
-  private static String jdbcWriterConfig;
+  private static String testWrite;
 
   @Test
   public void testWrite() throws Exception {
-    List<Tuple> tuples = new ArrayList<>();
-    Tuple tuple1 = Mockito.mock(Tuple.class);
-    tuples.add(tuple1);
+    int count = 2;
+    List<Tuple> tuples = createTuples(count);
+    List<JSONObject> messages = createMessages(count, sensorType);
 
-    Tuple tuple2 = Mockito.mock(Tuple.class);
-    tuples.add(tuple2);
-
-    List<JSONObject> messages = new ArrayList<>();
-    JSONObject message1 = new JSONObject();
-    String guid1 = UUID.randomUUID().toString();
-    message1.put(Constants.GUID, guid1);
-    message1.put("field1", "value1-" + guid1);
-    message1.put("field2", "value2-" + guid1);
-    messages.add(message1);
-
-    JSONObject message2 = new JSONObject();
-    String guid2 = UUID.randomUUID().toString();
-    message2.put(Constants.GUID, guid2);
-    message2.put("field1", "value1-" + guid2);
-    message2.put("field2", "value2-" + guid2);
-    messages.add(message2);
-
-    // create the writer
+    // create the writer and its configuration; have to get the port number from the mini cluster
     JdbcWriter writer = new JdbcWriter();
-    writer.driver = jdbcDriver;
-    writer.url = jdbcUrl;
-
-    // create the writer configuration
-    WriterConfiguration configuration = configuration(writer, sensorType);
+    String testWriteWithPort = String.format(testWrite, hbase.getUtility().getZkCluster().getClientPort());
+    WriterConfiguration writerConfig = createConfig(writer, sensorType, testWriteWithPort);
 
     // create the table to write to
-    String tableName = configuration.getIndex(sensorType);
+    String tableName = writerConfig.getIndex(sensorType);
     createTable(tableName);
 
     // write the messages
-    writer.init(null, null, null);
-    BulkWriterResponse response = writer.write(sensorType, configuration, tuples, messages);
+    writer.init(null, null, writerConfig);
+    BulkWriterResponse response = writer.write(sensorType, writerConfig, tuples, messages);
 
     // the writer response should contain only successes
     Assert.assertEquals(false, response.hasErrors());
-    Assert.assertEquals(2, response.getSuccesses().size());
+    Assert.assertEquals(count, response.getSuccesses().size());
 
-    // validate message 1
-    Assert.assertEquals(message1.get("field1"), getFieldValue(guid1, "field1", tableName));
-    Assert.assertEquals(message1.get("field2"), getFieldValue(guid1, "field2", tableName));
-
-    // validate message 2
-    Assert.assertEquals(message2.get("field1"), getFieldValue(guid2, "field1", tableName));
-    Assert.assertEquals(message2.get("field2"), getFieldValue(guid2, "field2", tableName));
+    for(JSONObject message: messages) {
+      // ensure the message was written
+      String guid = String.class.cast(message.get(Constants.GUID));
+      Assert.assertEquals(message.get("field1"), getFieldValue(guid, "field1", tableName));
+      Assert.assertEquals(message.get("field2"), getFieldValue(guid, "field2", tableName));
+    }
   }
 
   private void createTable(String tableName) {
@@ -159,9 +132,9 @@ public class JdbcWriterIntegrationTest {
     jdbcTemplate.execute(sql);
   }
 
-  private WriterConfiguration configuration(BulkMessageWriter writer, String sensorType) throws IOException {
+  private WriterConfiguration createConfig(BulkMessageWriter writer, String sensorType, String jsonConfig) throws IOException {
     IndexingConfigurations configs = new IndexingConfigurations();
-    configs.updateSensorIndexingConfig(sensorType, jdbcWriterConfig.getBytes());
+    configs.updateSensorIndexingConfig(sensorType, jsonConfig.getBytes());
     return INDEXING.createWriterConfig(writer, configs);
   }
 
@@ -170,4 +143,29 @@ public class JdbcWriterIntegrationTest {
     return jdbcTemplate.queryForObject(sql, String.class);
   }
 
+  List<JSONObject> createMessages(int count, String sensorType) {
+    List<JSONObject> messages = new ArrayList<>();
+    for(int i=0; i<count; i++) {
+      String guid = UUID.randomUUID().toString();
+
+      JSONObject message = new JSONObject();
+      message.put(Constants.GUID, guid);
+//      message.put(Constants.SENSOR_TYPE, sensorType);
+      message.put("field1", "value1-" + guid);
+      message.put("field2", "value2-" + guid);
+      messages.add(message);
+    }
+
+    return messages;
+  }
+
+  List<Tuple> createTuples(int count) {
+    List<Tuple> tuples = new ArrayList<>();
+    for(int i=0; i<count; i++) {
+      Tuple tuple = Mockito.mock(Tuple.class);
+      tuples.add(tuple);
+    }
+
+    return tuples;
+  }
 }

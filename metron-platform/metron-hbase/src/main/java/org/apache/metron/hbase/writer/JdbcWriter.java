@@ -17,6 +17,8 @@
  */
 package org.apache.metron.hbase.writer;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
@@ -37,6 +39,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Writes messages to a data source using JDBC.
@@ -44,32 +48,24 @@ import java.util.Map;
 public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private JdbcTemplate jdbcTemplate;
-  private BasicDataSource dataSource;
-
-  // TODO get these from globals?
-  String driver = "org.apache.phoenix.jdbc.PhoenixDriver";
-  String url = "jdbc:phoenix:server1,server2:3333";
-  String username = "";
-  String password = "";
+  private Cache<String, JdbcTemplate> templateCache;
 
   @Override
-  public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) throws Exception {
-    // TODO does user need to define what type of DataSource for things like pooled connections?
-
-    dataSource = new BasicDataSource();
-    dataSource.setDriverClassName(driver);
-    dataSource.setUrl(url);
-    dataSource.setUsername(username);
-    dataSource.setPassword(password);
-    dataSource.setDefaultAutoCommit(true);
-
-    jdbcTemplate = new JdbcTemplate(dataSource);
+  public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) {
+    // TODO make cache settings configurable by user
+    Caffeine cacheBuilder = Caffeine
+            .newBuilder()
+            .maximumSize(100)
+            .expireAfterAccess(30, TimeUnit.MINUTES);
+    if (log.isDebugEnabled()) {
+      cacheBuilder.recordStats();
+    }
+    templateCache = cacheBuilder.build();
   }
 
   @Override
   public BulkWriterResponse write(String sensorType,
-                                  WriterConfiguration configurations,
+                                  WriterConfiguration writerConfig,
                                   Iterable<Tuple> tuples,
                                   List<JSONObject> messages) {
     BulkWriterResponse response = new BulkWriterResponse();
@@ -90,9 +86,8 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
     List<String> fields = new ArrayList<>(prototype.keySet());
     String columns = StringUtils.join(fields, ",");
     String values = StringUtils.repeat("?", ",", fields.size());
-    String table = configurations.getIndex(sensorType);
+    String table = writerConfig.getIndex(sensorType);
     String updateSql = String.format("upsert into %s (%s) values (%s)", table, columns, values);
-    log.debug("Will insert data using sql = {}", updateSql);
 
     BatchPreparedStatementSetter setter = new BatchPreparedStatementSetter() {
       @Override
@@ -112,7 +107,7 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
     };
 
     try {
-      jdbcTemplate.batchUpdate(updateSql, setter);
+      getTemplate(sensorType, writerConfig).batchUpdate(updateSql, setter);
       response.addAllSuccesses(tuples);
 
     } catch(Exception e) {
@@ -131,5 +126,28 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
   @Override
   public void close() throws Exception {
     // TODO what do we need to close?
+  }
+
+  private JdbcTemplate getTemplate(String sensorType, WriterConfiguration config) {
+    Function<String, JdbcTemplate> creator = (key) -> {
+      log.debug("Creating JDBC connection; sensorType={}, configuration={}", config.getSensorConfig(sensorType));
+
+      // TODO use an enum of config values
+      String url = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.url"));
+      String driver = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.driver"));
+      String username = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.url"));
+      String password = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.password"));
+
+      // TODO probably not the right data source.  how does user define pooled connections?
+      BasicDataSource dataSource = new BasicDataSource();
+      dataSource.setDriverClassName(driver);
+      dataSource.setUrl(url);
+      dataSource.setUsername(username);
+      dataSource.setPassword(password);
+      dataSource.setDefaultAutoCommit(true);
+      return new JdbcTemplate(dataSource);
+    };
+
+    return templateCache.get(sensorType, creator);
   }
 }
