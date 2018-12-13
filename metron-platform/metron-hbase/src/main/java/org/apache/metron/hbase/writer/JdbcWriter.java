@@ -27,28 +27,23 @@ import org.apache.storm.tuple.Tuple;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * Writes messages to a data source using JDBC.
  */
 public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private JdbcTemplate jdbcTemplate;
   private BasicDataSource dataSource;
 
@@ -97,6 +92,7 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
     String values = StringUtils.repeat("?", ",", fields.size());
     String table = configurations.getIndex(sensorType);
     String updateSql = String.format("upsert into %s (%s) values (%s)", table, columns, values);
+    log.debug("Will insert data using sql = {}", updateSql);
 
     BatchPreparedStatementSetter setter = new BatchPreparedStatementSetter() {
       @Override
@@ -106,6 +102,8 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
           String field = fields.get(i);
           Object value = message.getOrDefault(field, "");
           ps.setString(i+1, value.toString());
+
+          log.debug("setting value; index={}, field={}, value={}", messageIndex, field, value);
         }
       }
 
@@ -120,10 +118,9 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       response.addAllSuccesses(tuples);
 
     } catch(Exception e) {
-      LOG.error(String.format("Failed to write %d message(s)", messages.size()), e);
+      log.error(String.format("Failed to write %d message(s)", messages.size()), e);
       response.addAllErrors(e, tuples);
     }
-
 
     return response;
   }
