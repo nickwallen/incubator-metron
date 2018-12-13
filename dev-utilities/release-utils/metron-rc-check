@@ -67,8 +67,6 @@ for i in "$@"; do
     #   --bro=0.1.0
     #
     -b=*|--bro=*)
-    BRO="${i#*=}"
-    shift # past argument=value
     ;;
 
     #
@@ -157,6 +155,7 @@ fi
 echo "Working directory $WORK"
 
 KEYS="$METRON_RC_DIST/KEYS"
+KEYS="https://dist.apache.org/repos/dist/release/metron/KEYS"
 METRON_ASSEMBLY="$METRON_RC_DIST/apache-metron-$METRON_VERSION-$RC.tar.gz"
 METRON_ASSEMBLY_SIG="$METRON_ASSEMBLY.asc"
 

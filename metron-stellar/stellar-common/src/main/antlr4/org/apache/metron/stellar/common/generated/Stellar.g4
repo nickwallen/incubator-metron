@@ -178,6 +178,7 @@ in_expr:
   | identifier_operand NIN b_expr #NInExpressionStatement
   ;
 
+
 comparison_expr :
   comparison_expr comp_operator comparison_expr #ComparisonExpressionWithOperator
   | NOT LPAREN logical_expr RPAREN #NotFunc
@@ -207,6 +208,12 @@ list_entity :
   LBRACKET RBRACKET
   | LBRACKET op_list RBRACKET
   ;
+
+lookup_expr:
+  identifier_operand LBRACKET arithmetic_expr RBRACKET
+  |
+  ;
+
 
 kv_list :
   identifier_operand COLON transformation_expr
