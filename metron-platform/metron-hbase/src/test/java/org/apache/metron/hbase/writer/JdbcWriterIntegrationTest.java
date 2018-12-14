@@ -19,10 +19,8 @@ package org.apache.metron.hbase.writer;
 
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.IndexingConfigurations;
-import org.apache.metron.common.configuration.writer.IndexingWriterConfiguration;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.BulkWriterResponse;
@@ -34,25 +32,20 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.Mockito;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
+import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.apache.metron.common.configuration.writer.ConfigurationsStrategies.INDEXING;
 
 public class JdbcWriterIntegrationTest {
 
-  private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private static HBaseComponent hbase;
-  private static JdbcTemplate jdbcTemplate;
+  private static JdbcTemplate template;
   private static String sensorType;
 
   @BeforeClass
@@ -68,7 +61,7 @@ public class JdbcWriterIntegrationTest {
     dataSource.setUrl(String.format("jdbc:phoenix:localhost:%d", hbase.getUtility().getZkCluster().getClientPort()));
     dataSource.setDefaultAutoCommit(true);
 
-    jdbcTemplate = new JdbcTemplate(dataSource);
+    template = new JdbcTemplate(dataSource);
   }
 
   @AfterClass
@@ -79,17 +72,29 @@ public class JdbcWriterIntegrationTest {
   }
 
   /**
+   * create table messages (
+   *    guid varchar primary key,
+   *    created_at timestamp,
+   *    src_addr varchar,
+   *    src_port integer
+   * )
+   */
+  @Multiline
+  private static String createTable;
+
+  /**
    * {
    *    "jdbc": {
-   *       "index": "test_table",
    *       "batchSize" : 100,
    *       "batchTimeout" : 0,
    *       "enabled" : true,
+   *
    *       "jdbc.driver": "org.apache.phoenix.jdbc.PhoenixDriver",
    *       "jdbc.url": "jdbc:phoenix:localhost:%d",
    *       "jdbc.username": "",
    *       "jdbc.password": "",
-   *       "jdbc.sql": "upsert into test_table (guid, field1, field2) values (:guid, :field1, :field2)"
+   *
+   *       "jdbc.sql": "upsert into messages (guid, created_at, src_addr, src_port) values (:guid, :timestamp, :ip_src_addr, :ip_src_port)"
    *     }
    * }
    */
@@ -98,7 +103,7 @@ public class JdbcWriterIntegrationTest {
 
   @Test
   public void testWrite() throws Exception {
-    int count = 2;
+    int count = 10;
     List<Tuple> tuples = createTuples(count);
     List<JSONObject> messages = createMessages(count, sensorType);
 
@@ -107,9 +112,8 @@ public class JdbcWriterIntegrationTest {
     String testWriteWithPort = String.format(testWrite, hbase.getUtility().getZkCluster().getClientPort());
     WriterConfiguration writerConfig = createConfig(writer, sensorType, testWriteWithPort);
 
-    // create the table to write to
-    String tableName = writerConfig.getIndex(sensorType);
-    createTable(tableName);
+    // create the table to write to. this needs to match the upsert statement
+    template.execute(createTable);
 
     // write the messages
     writer.init(null, null, writerConfig);
@@ -119,28 +123,35 @@ public class JdbcWriterIntegrationTest {
     Assert.assertEquals(false, response.hasErrors());
     Assert.assertEquals(count, response.getSuccesses().size());
 
+    // ensure each of the messages were written to the table
     for(JSONObject message: messages) {
-      // ensure the message was written
       String guid = String.class.cast(message.get(Constants.GUID));
-      Assert.assertEquals(message.get("field1"), getFieldValue(guid, "field1", tableName));
-      Assert.assertEquals(message.get("field2"), getFieldValue(guid, "field2", tableName));
+
+      // the message has a Long called 'timestamp' stored as a Timestamp called 'created_at' in the table
+      Assert.assertEquals(
+              new Timestamp(Long.class.cast(message.get("timestamp"))),
+              query("select created_at from messages where guid = ?", guid, Timestamp.class));
+
+      // the message has a String called 'ip_src_addr' stored as a varchar called 'src_addr' in the table
+      Assert.assertEquals(
+              message.get("ip_src_addr"),
+              query("select src_addr from messages where guid = ?", guid, String.class));
+
+      // the message has an int called 'ip_src_port' stored as an Integer called 'src_port' in the table
+      Assert.assertEquals(
+              message.get("ip_src_port"),
+              query("select src_port from messages where guid = ?", guid, Integer.class));
     }
   }
 
-  private void createTable(String tableName) {
-    String sql = String.format("create table %s (guid varchar primary key, field1 varchar, field2 varchar)", tableName);
-    jdbcTemplate.execute(sql);
+  private <T> T query(String sql, String guid, Class<T> clazz) {
+    return template.queryForObject(sql, new Object[] { guid }, clazz);
   }
 
   private WriterConfiguration createConfig(BulkMessageWriter writer, String sensorType, String jsonConfig) throws IOException {
     IndexingConfigurations configs = new IndexingConfigurations();
     configs.updateSensorIndexingConfig(sensorType, jsonConfig.getBytes());
     return INDEXING.createWriterConfig(writer, configs);
-  }
-
-  private String getFieldValue(String guid, String fieldName, String tableName) {
-    String sql = String.format("select %s from %s where guid = '%s'", fieldName, tableName, guid);
-    return jdbcTemplate.queryForObject(sql, String.class);
   }
 
   List<JSONObject> createMessages(int count, String sensorType) {
@@ -151,8 +162,9 @@ public class JdbcWriterIntegrationTest {
       JSONObject message = new JSONObject();
       message.put(Constants.GUID, guid);
       message.put(Constants.SENSOR_TYPE, sensorType);
-      message.put("field1", "value1-" + guid);
-      message.put("field2", "value2-" + guid);
+      message.put(Constants.Fields.SRC_ADDR.getName(), "192.168.1.1");
+      message.put(Constants.Fields.SRC_PORT.getName(), 22);
+      message.put(Constants.Fields.TIMESTAMP.getName(), System.currentTimeMillis());
       messages.add(message);
     }
 

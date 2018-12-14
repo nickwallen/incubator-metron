@@ -83,14 +83,6 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       return response;
     }
 
-    // TODO all fields are set as strings right now; can SimpleJdbc* help choose based on the value in the table??
-
-    // TODO simply by defining the table columns and types, the user is defining which fields from the message are persisted??
-
-    // TODO the only thing phoenix-ish about this is the weird upsert statement
-
-    // TODO allow user to whitelist fields?
-
     try {
       String sql = JDBC_SQL.get(writerConfig.getSensorConfig(sensorType), String.class);
       SqlParameterSource[] parameters = SqlParameterSourceUtils.createBatch(messages.toArray());
