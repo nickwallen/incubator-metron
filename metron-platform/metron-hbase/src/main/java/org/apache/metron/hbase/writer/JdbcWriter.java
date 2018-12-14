@@ -42,6 +42,11 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_DRIVER;
+import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_PASSWORD;
+import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_URL;
+import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_USERNAME;
+
 /**
  * Writes messages to a data source using JDBC.
  */
@@ -124,26 +129,22 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     // TODO what do we need to close?
   }
 
   private JdbcTemplate getTemplate(String sensorType, WriterConfiguration config) {
+    // creates the template, if none already cached
     Function<String, JdbcTemplate> creator = (key) -> {
-      log.debug("Creating JDBC connection; sensorType={}, configuration={}", config.getSensorConfig(sensorType));
-
-      // TODO use an enum of config values
-      String url = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.url"));
-      String driver = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.driver"));
-      String username = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.url"));
-      String password = String.class.cast(config.getSensorConfig(sensorType).get("jdbc.password"));
+      Map<String, Object> allOptions = config.getSensorConfig(sensorType);
+      log.debug("Creating JDBC connection; sensorType={}, options={}", sensorType, allOptions);
 
       // TODO probably not the right data source.  how does user define pooled connections?
       BasicDataSource dataSource = new BasicDataSource();
-      dataSource.setDriverClassName(driver);
-      dataSource.setUrl(url);
-      dataSource.setUsername(username);
-      dataSource.setPassword(password);
+      dataSource.setDriverClassName(JDBC_DRIVER.getOrDefault(allOptions, String.class));
+      dataSource.setUrl(JDBC_URL.getOrDefault(allOptions, String.class));
+      dataSource.setUsername(JDBC_USERNAME.getOrDefault(allOptions, String.class));
+      dataSource.setPassword(JDBC_PASSWORD.getOrDefault(allOptions, String.class));
       dataSource.setDefaultAutoCommit(true);
       return new JdbcTemplate(dataSource);
     };
