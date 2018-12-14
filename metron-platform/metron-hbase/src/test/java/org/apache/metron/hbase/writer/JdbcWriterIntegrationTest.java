@@ -144,6 +144,139 @@ public class JdbcWriterIntegrationTest {
     }
   }
 
+  /**
+   * create table bro (
+   *    guid varchar primary key,
+   *    created_at timestamp,
+   *    source_type varchar
+   * )
+   */
+  @Multiline
+  private static String createBroTable;
+
+  /**
+   * {
+   *    "jdbc": {
+   *       "batchSize" : 100,
+   *       "batchTimeout" : 0,
+   *       "enabled" : true,
+   *
+   *       "jdbc.driver": "org.apache.phoenix.jdbc.PhoenixDriver",
+   *       "jdbc.url": "jdbc:phoenix:localhost:%d",
+   *       "jdbc.username": "",
+   *       "jdbc.password": "",
+   *
+   *       "jdbc.sql": "upsert into bro (guid, created_at, source_type) values (:guid, :timestamp, :source.type)"
+   *     }
+   * }
+   */
+  @Multiline
+  private static String testWriteBro;
+
+  /**
+   * create table snort (
+   *    guid varchar primary key,
+   *    created_at timestamp,
+   *    source_type varchar
+   * )
+   */
+  @Multiline
+  private static String createSnortTable;
+
+  /**
+   * {
+   *    "jdbc": {
+   *       "batchSize" : 100,
+   *       "batchTimeout" : 0,
+   *       "enabled" : true,
+   *
+   *       "jdbc.driver": "org.apache.phoenix.jdbc.PhoenixDriver",
+   *       "jdbc.url": "jdbc:phoenix:localhost:%d",
+   *       "jdbc.username": "",
+   *       "jdbc.password": "",
+   *
+   *       "jdbc.sql": "upsert into snort (guid, created_at, source_type) values (:guid, :timestamp, :source.type)"
+   *     }
+   * }
+   */
+  @Multiline
+  private static String testWriteSnort;
+
+  @Test
+  public void testWriteMultipleSensorTypes() throws Exception {
+    int count = 10;
+
+    // create a table for Snort and another for Bro
+    template.execute(createBroTable);
+    template.execute(createSnortTable);
+
+    // define the config for Bro. have to get the HBase port from the mini cluster
+    IndexingConfigurations configs = new IndexingConfigurations();
+    String testWriteBroWithPort = String.format(testWriteBro, hbase.getUtility().getZkCluster().getClientPort());
+    configs.updateSensorIndexingConfig("bro", testWriteBroWithPort.getBytes());
+
+    // define the config for Snort. have to get the HBase port from the mini cluster
+    String testWriteSnortWithPort = String.format(testWriteSnort, hbase.getUtility().getZkCluster().getClientPort());
+    configs.updateSensorIndexingConfig("snort", testWriteSnortWithPort.getBytes());
+
+    // init the message writer
+    JdbcWriter writer = new JdbcWriter();
+    WriterConfiguration writerConfig = INDEXING.createWriterConfig(writer, configs);
+    writer.init(null, null, writerConfig);
+
+    {
+      // write the Bro messages
+      List<Tuple> broTuples = createTuples(count);
+      List<JSONObject> broMessages = createMessages(count, "bro");
+      BulkWriterResponse broResponse = writer.write("bro", writerConfig, broTuples, broMessages);
+
+      // the writer response should contain only successes
+      Assert.assertEquals(false, broResponse.hasErrors());
+      Assert.assertEquals(count, broResponse.getSuccesses().size());
+
+      // ensure each of the messages were written to the table
+      for (JSONObject message : broMessages) {
+        String guid = String.class.cast(message.get(Constants.GUID));
+
+        // the message has a Long called 'timestamp' stored as a Timestamp called 'created_at' in the table
+        Assert.assertEquals(
+                new Timestamp(Long.class.cast(message.get("timestamp"))),
+                query("select created_at from bro where guid = ?", guid, Timestamp.class));
+
+        // the message has a String called 'source.type' stored as a varchar called 'source_type' in the table
+        Assert.assertEquals(
+                message.get("source.type"),
+                query("select source_type from bro where guid = ?", guid, String.class));
+
+      }
+    }
+    {
+      // write the Snort messages
+      List<Tuple> snortTuples = createTuples(count);
+      List<JSONObject> snortMessages = createMessages(count, "snort");
+      BulkWriterResponse snortResponse = writer.write("snort", writerConfig, snortTuples, snortMessages);
+
+      // the writer response should contain only successes
+      Assert.assertEquals(false, snortResponse.hasErrors());
+      Assert.assertEquals(count, snortResponse.getSuccesses().size());
+
+      // ensure each of the messages were written to the table
+      for (JSONObject message : snortMessages) {
+        String guid = String.class.cast(message.get(Constants.GUID));
+
+        // the message has a Long called 'timestamp' stored as a Timestamp called 'created_at' in the table
+        Assert.assertEquals(
+                new Timestamp(Long.class.cast(message.get("timestamp"))),
+                query("select created_at from snort where guid = ?", guid, Timestamp.class));
+
+        // the message has a String called 'source.type' stored as a varchar called 'source_type' in the table
+        Assert.assertEquals(
+                message.get("source.type"),
+                query("select source_type from snort where guid = ?", guid, String.class));
+      }
+    }
+  }
+
   private <T> T query(String sql, String guid, Class<T> clazz) {
     return template.queryForObject(sql, new Object[] { guid }, clazz);
   }
