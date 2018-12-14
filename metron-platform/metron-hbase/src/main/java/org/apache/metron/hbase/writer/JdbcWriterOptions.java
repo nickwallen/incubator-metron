@@ -30,7 +30,8 @@ public enum JdbcWriterOptions implements ConfigOption {
   JDBC_URL("jdbc.url", null),
   JDBC_DRIVER("jdbc.driver", null),
   JDBC_USERNAME("jdbc.username", null),
-  JDBC_PASSWORD("jdbc.password", null);
+  JDBC_PASSWORD("jdbc.password", null),
+  JDBC_SQL("jdbc.sql", null);
 
   private String key;
   private Object defaultValue;

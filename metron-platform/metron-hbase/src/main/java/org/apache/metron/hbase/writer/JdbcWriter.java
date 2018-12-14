@@ -31,6 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
+import org.springframework.jdbc.core.namedparam.SqlParameterSourceUtils;
 
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
@@ -44,6 +48,7 @@ import java.util.function.Function;
 
 import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_DRIVER;
 import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_PASSWORD;
+import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_SQL;
 import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_URL;
 import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_USERNAME;
 
@@ -53,7 +58,7 @@ import static org.apache.metron.hbase.writer.JdbcWriterOptions.JDBC_USERNAME;
 public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private Cache<String, JdbcTemplate> templateCache;
+  private Cache<String, NamedParameterJdbcTemplate> templateCache;
 
   @Override
   public void init(Map stormConf, TopologyContext topologyContext, WriterConfiguration config) {
@@ -86,33 +91,10 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
 
     // TODO allow user to whitelist fields?
 
-    // the columns are determined by the first 'prototype' message
-    JSONObject prototype = messages.get(0);
-    List<String> fields = new ArrayList<>(prototype.keySet());
-    String columns = StringUtils.join(fields, ",");
-    String values = StringUtils.repeat("?", ",", fields.size());
-    String table = writerConfig.getIndex(sensorType);
-    String updateSql = String.format("upsert into %s (%s) values (%s)", table, columns, values);
-
-    BatchPreparedStatementSetter setter = new BatchPreparedStatementSetter() {
-      @Override
-      public void setValues(PreparedStatement ps, int messageIndex) throws SQLException {
-        JSONObject message = messages.get(messageIndex);
-        for(int i=0; i<fields.size(); i++) {
-          String field = fields.get(i);
-          Object value = message.getOrDefault(field, "");
-          ps.setString(i+1, value.toString());
-        }
-      }
-
-      @Override
-      public int getBatchSize() {
-        return messages.size();
-      }
-    };
-
     try {
-      getTemplate(sensorType, writerConfig).batchUpdate(updateSql, setter);
+      String sql = JDBC_SQL.get(writerConfig.getSensorConfig(sensorType), String.class);
+      SqlParameterSource[] parameters = SqlParameterSourceUtils.createBatch(messages.toArray());
+      getTemplate(sensorType, writerConfig).batchUpdate(sql, parameters);
       response.addAllSuccesses(tuples);
 
     } catch(Exception e) {
@@ -133,9 +115,9 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
     // TODO what do we need to close?
   }
 
-  private JdbcTemplate getTemplate(String sensorType, WriterConfiguration config) {
+  private NamedParameterJdbcTemplate getTemplate(String sensorType, WriterConfiguration config) {
     // creates the template, if none already cached
-    Function<String, JdbcTemplate> creator = (key) -> {
+    Function<String, NamedParameterJdbcTemplate> creator = (key) -> {
       Map<String, Object> allOptions = config.getSensorConfig(sensorType);
       log.debug("Creating JDBC connection; sensorType={}, options={}", sensorType, allOptions);
 
@@ -146,7 +128,8 @@ public class JdbcWriter implements BulkMessageWriter<JSONObject>, Serializable {
       dataSource.setUsername(JDBC_USERNAME.getOrDefault(allOptions, String.class));
       dataSource.setPassword(JDBC_PASSWORD.getOrDefault(allOptions, String.class));
       dataSource.setDefaultAutoCommit(true);
-      return new JdbcTemplate(dataSource);
+
+      return new NamedParameterJdbcTemplate(dataSource);
     };
 
     return templateCache.get(sensorType, creator);

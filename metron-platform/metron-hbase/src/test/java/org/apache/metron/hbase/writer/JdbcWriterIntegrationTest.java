@@ -85,11 +85,11 @@ public class JdbcWriterIntegrationTest {
    *       "batchSize" : 100,
    *       "batchTimeout" : 0,
    *       "enabled" : true,
-   *
    *       "jdbc.driver": "org.apache.phoenix.jdbc.PhoenixDriver",
    *       "jdbc.url": "jdbc:phoenix:localhost:%d",
    *       "jdbc.username": "",
-   *       "jdbc.password": ""
+   *       "jdbc.password": "",
+   *       "jdbc.sql": "upsert into test_table (guid, field1, field2) values (:guid, :field1, :field2)"
    *     }
    * }
    */
@@ -150,7 +150,7 @@ public class JdbcWriterIntegrationTest {
 
       JSONObject message = new JSONObject();
       message.put(Constants.GUID, guid);
-//      message.put(Constants.SENSOR_TYPE, sensorType);
+      message.put(Constants.SENSOR_TYPE, sensorType);
       message.put("field1", "value1-" + guid);
       message.put("field2", "value2-" + guid);
       messages.add(message);
