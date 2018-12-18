@@ -66,9 +66,9 @@ public class ProfileBuilderFunctionTest {
 
     // validate the measurement
     Assert.assertEquals(entity, measurement.getEntity());
-    Assert.assertEquals(profile.getProfile(), measurement.getProfile());
+    Assert.assertEquals(profile.getProfile(), measurement.getProfileName());
     Assert.assertEquals(routes.size(), measurement.toProfileMeasurement().getProfileValue());
-    Assert.assertEquals(expectedPeriod.getPeriod(), (long) measurement.getPeriod());
+    Assert.assertEquals(expectedPeriod.getPeriod(), (long) measurement.getPeriodId());
   }
 
   private JSONObject getMessage() {
