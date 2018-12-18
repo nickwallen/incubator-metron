@@ -28,16 +28,14 @@ import java.util.concurrent.TimeUnit;
 
 /*
 
-
  create table profiler1 (
    profileName varchar not null,
    entity varchar not null,
    periodId bigint not null,
    durationMillis bigint,
-   profileValue varbinary,
+   profileValue integer,
    constraint pk primary key (profileName, entity, periodId)
  );
-
 
   spark-submit \
     --class org.apache.metron.profiler.spark.cli.BatchProfilerCLI \
@@ -84,7 +82,7 @@ public class ProfileMeasurementAdapter implements Serializable {
    * The `Encoders.bean(Class<T>)` encoder does not handle serialization of type `Object`. This
    * adapter encodes the profile's result as `byte[]` rather than an `Object` to work around this.
    */
-  private byte[] profileValue;
+  private Integer profileValue;
 
   public ProfileMeasurementAdapter() {
     // default constructor required for serialization in Spark
@@ -95,7 +93,7 @@ public class ProfileMeasurementAdapter implements Serializable {
     this.entity = measurement.getEntity();
     this.periodId = measurement.getPeriod().getPeriod();
     this.durationMillis = measurement.getPeriod().getDurationMillis();
-    this.profileValue = SerDeUtils.toBytes(measurement.getProfileValue());
+    this.profileValue = Integer.class.cast(measurement.getProfileValue());
   }
 
   public ProfileMeasurement toProfileMeasurement() {
@@ -104,7 +102,7 @@ public class ProfileMeasurementAdapter implements Serializable {
             .withProfileName(profileName)
             .withEntity(entity)
             .withPeriod(period)
-            .withProfileValue(SerDeUtils.fromBytes(profileValue, Object.class));
+            .withProfileValue(profileValue);
     return measurement;
   }
 
@@ -140,15 +138,11 @@ public class ProfileMeasurementAdapter implements Serializable {
     this.durationMillis = durationMillis;
   }
 
-  public byte[] getProfileValue() {
+  public Integer getProfileValue() {
     return profileValue;
   }
 
-  public void setProfileValue(byte[] profileValue) {
+  public void setProfileValue(Integer profileValue) {
     this.profileValue = profileValue;
-  }
-
-  public void setProfileValue(Object profileValue) {
-    this.profileValue = SerDeUtils.toBytes(profileValue);
   }
 }

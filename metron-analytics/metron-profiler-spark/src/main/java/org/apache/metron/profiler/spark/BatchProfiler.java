@@ -96,7 +96,7 @@ public class BatchProfiler implements Serializable {
             .mapGroups(new ProfileBuilderFunction(profilerProps, globals), Encoders.bean(ProfileMeasurementAdapter.class));
     LOG.debug("Produced {} profile measurement(s)", measurements.cache().count());
 
-    // TODO get these
+    // TODO set these values via user configuration
     measurements
             .write()
             .mode("overwrite")
@@ -105,6 +105,7 @@ public class BatchProfiler implements Serializable {
             .option("zkUrl", "localhost:2181")
             .save();
 
+    // TODO no longer returning the number of measurements taken?
     return 0;
 
     // write the profile measurements to HBase
