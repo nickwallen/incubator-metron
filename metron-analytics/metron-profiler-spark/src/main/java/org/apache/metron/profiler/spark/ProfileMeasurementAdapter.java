@@ -19,7 +19,6 @@
  */
 package org.apache.metron.profiler.spark;
 
-import org.apache.metron.common.utils.SerDeUtils;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 
@@ -38,7 +37,7 @@ public class ProfileMeasurementAdapter implements Serializable {
   /**
    * The name of the profile that this measurement is associated with.
    */
-  private String profileName;
+  private String profile;
 
   /**
    * The name of the entity being profiled.
@@ -49,12 +48,12 @@ public class ProfileMeasurementAdapter implements Serializable {
    * A monotonically increasing number identifying the period.  The first period is 0
    * and began at the epoch.
    */
-  private Long periodId;
+  private Long period;
 
   /**
    * The duration of each period in milliseconds.
    */
-  private Long durationMillis;
+  private Long duration;
 
   /**
    * The result of evaluating the profile expression.
@@ -62,36 +61,36 @@ public class ProfileMeasurementAdapter implements Serializable {
    * The `Encoders.bean(Class<T>)` encoder does not handle serialization of type `Object`. This
    * adapter encodes the profile's result as `byte[]` rather than an `Object` to work around this.
    */
-  private byte[] profileValue;
+  private Object result;
 
   public ProfileMeasurementAdapter() {
     // default constructor required for serialization in Spark
   }
 
   public ProfileMeasurementAdapter(ProfileMeasurement measurement) {
-    this.profileName = measurement.getProfileName();
+    this.profile = measurement.getProfileName();
     this.entity = measurement.getEntity();
-    this.periodId = measurement.getPeriod().getPeriod();
-    this.durationMillis = measurement.getPeriod().getDurationMillis();
-    this.profileValue = SerDeUtils.toBytes(measurement.getProfileValue());
+    this.period = measurement.getPeriod().getPeriod();
+    this.duration = measurement.getPeriod().getDurationMillis();
+    this.result = measurement.getProfileValue();
   }
 
   public ProfileMeasurement toProfileMeasurement() {
-    ProfilePeriod period = ProfilePeriod.fromPeriodId(periodId, durationMillis, TimeUnit.MILLISECONDS);
+    ProfilePeriod period = ProfilePeriod.fromPeriodId(this.period, duration, TimeUnit.MILLISECONDS);
     ProfileMeasurement measurement = new ProfileMeasurement()
-            .withProfileName(profileName)
+            .withProfileName(profile)
             .withEntity(entity)
             .withPeriod(period)
-            .withProfileValue(SerDeUtils.fromBytes(profileValue, Object.class));
+            .withProfileValue(result);
     return measurement;
   }
 
-  public String getProfileName() {
-    return profileName;
+  public String getProfile() {
+    return profile;
   }
 
-  public void setProfileName(String profileName) {
-    this.profileName = profileName;
+  public void setProfile(String profile) {
+    this.profile = profile;
   }
 
   public String getEntity() {
@@ -102,31 +101,27 @@ public class ProfileMeasurementAdapter implements Serializable {
     this.entity = entity;
   }
 
-  public Long getPeriodId() {
-    return periodId;
+  public Long getPeriod() {
+    return period;
   }
 
-  public void setPeriodId(Long periodId) {
-    this.periodId = periodId;
+  public void setPeriod(Long period) {
+    this.period = period;
   }
 
-  public Long getDurationMillis() {
-    return durationMillis;
+  public Long getDuration() {
+    return duration;
   }
 
-  public void setDurationMillis(Long durationMillis) {
-    this.durationMillis = durationMillis;
+  public void setDuration(Long duration) {
+    this.duration = duration;
   }
 
-  public byte[] getProfileValue() {
-    return profileValue;
+  public Object getResult() {
+    return result;
   }
 
-  public void setProfileValue(byte[] profileValue) {
-    this.profileValue = profileValue;
-  }
-
-  public void setProfileValue(Object profileValue) {
-    this.profileValue = SerDeUtils.toBytes(profileValue);
+  public void setResult(Object result) {
+    this.result = result;
   }
 }

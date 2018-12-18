@@ -96,15 +96,26 @@ public class BatchProfiler implements Serializable {
             .mapGroups(new ProfileBuilderFunction(profilerProps, globals), Encoders.bean(ProfileMeasurementAdapter.class));
     LOG.debug("Produced {} profile measurement(s)", measurements.cache().count());
 
-    // write the profile measurements to HBase
-    long count = measurements
-            .mapPartitions(new HBaseWriterFunction(profilerProps), Encoders.INT())
-            .agg(sum("value"))
-            .head()
-            .getLong(0);
-    LOG.debug("{} profile measurement(s) written to HBase", count);
+    // TODO get these
+    measurements
+            .write()
+            .mode("overwrite")
+            .format("org.apache.phoenix.spark")
+            .option("table", "profiler1")
+            .option("zkUrl", "localhost:2181")
+            .save();
 
-    return count;
+    return 0;
+
+    // write the profile measurements to HBase
+//    long count = measurements
+//            .mapPartitions(new HBaseWriterFunction(profilerProps), Encoders.INT())
+//            .agg(sum("value"))
+//            .head()
+//            .getLong(0);
+//    LOG.debug("{} profile measurement(s) written to HBase", count);
+
+//    return count;
   }
 
   /**

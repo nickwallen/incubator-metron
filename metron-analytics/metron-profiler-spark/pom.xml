@@ -29,6 +29,16 @@
     </properties>
     <dependencies>
         <dependency>
+            <groupId>org.apache.phoenix</groupId>
+            <artifactId>phoenix-spark</artifactId>
+            <version>4.14.1-HBase-1.1</version>
+        </dependency>
+        <!--<dependency>-->
+            <!--<groupId>org.apache.phoenix</groupId>-->
+            <!--<artifactId>phoenix-client</artifactId>-->
+            <!--<version>4.14.1-HBase-1.1</version>-->
+        <!--</dependency>-->
+        <dependency>
           <groupId>org.apache.spark</groupId>
           <artifactId>spark-core_2.11</artifactId>
           <version>${global_spark_version}</version>
