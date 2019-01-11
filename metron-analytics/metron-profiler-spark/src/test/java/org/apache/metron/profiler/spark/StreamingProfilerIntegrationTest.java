@@ -247,7 +247,7 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
     readerProperties.put("startingOffsets", "earliest");
 
     // setup profiler
-    profilerProperties.put(PERIOD_DURATION.getKey(), 30);
+    profilerProperties.put(PERIOD_DURATION.getKey(), 10);
     profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "seconds");
     profilerProperties.put(WINDOW_LAG.getKey(), 5);
     profilerProperties.put(WINDOW_LAG_UNITS.getKey(), "seconds");

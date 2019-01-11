@@ -37,6 +37,9 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.streaming.DataStreamWriter;
 import org.apache.spark.sql.streaming.StreamingQuery;
 import org.apache.spark.sql.streaming.Trigger;
+import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.slf4j.Logger;
@@ -55,6 +58,8 @@ import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INP
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.WINDOW_LAG_UNITS;
 import static org.apache.spark.sql.functions.col;
+import static org.apache.spark.sql.functions.explode;
+import static org.apache.spark.sql.functions.from_json;
 import static org.apache.spark.sql.functions.json_tuple;
 import static org.apache.spark.sql.functions.sum;
 import static org.apache.spark.sql.functions.window;
@@ -88,6 +93,7 @@ public class StreamingProfiler {
 
     String inputFormat = TELEMETRY_INPUT_FORMAT.get(profilerProps, String.class);
     String inputPath = TELEMETRY_INPUT_PATH.get(profilerProps, String.class);
+    LOG.debug("inputFormat = {}", inputFormat);
 
     // TODO need to handle if profiler using processing time
     String timestampField = profiles.getTimestampField().get();
@@ -102,19 +108,33 @@ public class StreamingProfiler {
             WINDOW_LAG_UNITS.get(profilerProps, String.class).toLowerCase());
     LOG.debug("windowLag = {}", windowLag);
 
+    StructType schema = new StructType()
+            .add("timestamp", DataTypes.LongType)
+            .add("ip_src_addr", DataTypes.StringType)
+            .add("ip_dst_addr", DataTypes.StringType);
+
+
+
     Dataset<Row> telemetry = spark
             .readStream()
             .format(inputFormat)
             .options(Maps.fromProperties(readerProps))
-            .load();
-//            .select(json_tuple(col("value").cast("string"), "timestamp"));
-            //.withWatermark(timestampField, windowLag);
+            .load()
+            .select(col("topic"),
+                    col("offset"),
+                    col("timestamp").alias("kafkaTimestamp"),
+                    from_json(col("value").cast("string"), schema).alias("json"))
+            .selectExpr("topic", "offset", "json.timestamp", "json.ip_src_addr", "json.ip_dst_addr");
 
     telemetry
+            .withColumn("timestamp", telemetry.col("timestamp").divide(1000).cast(DataTypes.TimestampType))
+            .withWatermark("timestamp", "5 seconds")
 //            .groupBy(window(telemetry.col(timestampField), periodDuration))
 //            .count()
             .writeStream()
             .format("console")
+            .option("truncate", false)
+            .option("numRows", 120)
             .start()
             .awaitTermination();
 
