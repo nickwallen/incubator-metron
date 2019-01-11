@@ -18,15 +18,14 @@
 package org.apache.metron.rest.service;
 
 import org.apache.metron.indexing.dao.update.CommentAddRemoveRequest;
+import org.apache.metron.indexing.dao.update.Document;
 import org.apache.metron.indexing.dao.update.OriginalNotFoundException;
 import org.apache.metron.indexing.dao.update.PatchRequest;
-import org.apache.metron.indexing.dao.update.ReplaceRequest;
 import org.apache.metron.rest.RestException;
 
 public interface UpdateService {
 
-  void patch(PatchRequest request) throws RestException, OriginalNotFoundException;
-  void replace(ReplaceRequest request) throws RestException;
-  void addComment(CommentAddRemoveRequest request) throws RestException;
-  void removeComment(CommentAddRemoveRequest request) throws RestException;
+  Document patch(PatchRequest request) throws RestException, OriginalNotFoundException;
+  Document addComment(CommentAddRemoveRequest request) throws RestException;
+  Document removeComment(CommentAddRemoveRequest request) throws RestException;
 }

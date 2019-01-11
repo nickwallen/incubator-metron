@@ -16,26 +16,22 @@
  * limitations under the License.
  */
 import {Injectable} from '@angular/core';
-import {Headers, RequestOptions} from '@angular/http';
-import {Subject}    from 'rxjs/Subject';
-import {Observable} from 'rxjs/Rx';
-import 'rxjs/add/observable/interval';
-import 'rxjs/add/operator/switchMap';
-import 'rxjs/add/operator/onErrorResumeNext';
+import { HttpClient } from '@angular/common/http';
+import {Observable} from 'rxjs';
+import { forkJoin as observableForkJoin, Subject } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 import {HttpUtil} from '../utils/httpUtil';
 import {Alert} from '../model/alert';
-import {Http} from '@angular/http';
 import {PatchRequest} from '../model/patch-request';
 import {Utils} from '../utils/utils';
 import {Patch} from '../model/patch';
 import { GlobalConfigService } from './global-config.service';
 import {CommentAddRemoveRequest} from "../model/comment-add-remove-request";
+import { AppConfigService } from './app-config.service';
 
 @Injectable()
 export class UpdateService {
-
-  defaultHeaders = {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'};
 
   alertChangedSource = new Subject<PatchRequest>();
   alertChanged$ = this.alertChangedSource.asObservable();
@@ -43,46 +39,46 @@ export class UpdateService {
   alertCommentChangedSource = new Subject<CommentAddRemoveRequest>();
   alertCommentChanged$ = this.alertCommentChangedSource.asObservable();
 
-  constructor(private http: Http, private globalConfigService: GlobalConfigService) {
+  constructor(private http: HttpClient, private globalConfigService: GlobalConfigService, private appConfigService: AppConfigService) {
     this.globalConfigService.get().subscribe((config: {}) => {
       this.sourceType = config['source.type.field'];
     });
   }
 
   public addComment(commentRequest: CommentAddRemoveRequest, fireChangeListener = true): Observable<{}> {
-    let url = '/api/v1/update/add/comment';
-    return this.http.post(url, commentRequest, new RequestOptions({headers: new Headers(this.defaultHeaders)}))
-    .catch(HttpUtil.handleError)
-    .map(result => {
+    let url = this.appConfigService.getApiRoot() + '/update/add/comment';
+    return this.http.post(url, commentRequest).pipe(
+    catchError(HttpUtil.handleError),
+    map(result => {
       if (fireChangeListener) {
         this.alertCommentChangedSource.next(commentRequest);
       }
       return result;
-    });
+    }));
   }
 
   public removeComment(commentRequest: CommentAddRemoveRequest, fireChangeListener = true): Observable<{}> {
-    let url = '/api/v1/update/remove/comment';
-    return this.http.post(url, commentRequest, new RequestOptions({headers: new Headers(this.defaultHeaders)}))
-    .catch(HttpUtil.handleError)
-    .map(result => {
+    let url = this.appConfigService.getApiRoot() + '/update/remove/comment';
+    return this.http.post(url, commentRequest).pipe(
+    catchError(HttpUtil.handleError),
+    map(result => {
       if (fireChangeListener) {
         this.alertCommentChangedSource.next(commentRequest);
       }
       return result;
-    });
+    }));
   }
 
   public patch(patchRequest: PatchRequest, fireChangeListener = true): Observable<{}> {
-    let url = '/api/v1/update/patch';
-    return this.http.patch(url, patchRequest, new RequestOptions({headers: new Headers(this.defaultHeaders)}))
-    .catch(HttpUtil.handleError)
-    .map(result => {
+    let url = this.appConfigService.getApiRoot() + '/update/patch';
+    return this.http.patch(url, patchRequest).pipe(
+    catchError(HttpUtil.handleError),
+    map(result => {
       if (fireChangeListener) {
         this.alertChangedSource.next(patchRequest);
       }
       return result;
-    });
+    }),);
   }
 
   public updateAlertState(alerts: Alert[], state: string, fireChangeListener = true): Observable<{}> {
@@ -97,6 +93,6 @@ export class UpdateService {
     for (let patchRequest of patchRequests) {
       patchObservables.push(this.patch(patchRequest, fireChangeListener));
     }
-    return Observable.forkJoin(patchObservables);
+    return observableForkJoin(patchObservables);
   }
 }

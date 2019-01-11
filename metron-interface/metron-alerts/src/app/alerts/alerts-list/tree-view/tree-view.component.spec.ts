@@ -17,7 +17,7 @@
  */
 
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpModule } from '@angular/http';
+import { HttpClientModule } from '@angular/common/http';
 
 import { TreeViewComponent } from './tree-view.component';
 import { AlertSeverityHexagonDirective } from '../../../shared/directives/alert-severity-hexagon.directive';
@@ -28,10 +28,18 @@ import { ColumnNameTranslatePipe } from '../../../shared/pipes/column-name-trans
 import { AlertSeverityDirective } from '../../../shared/directives/alert-severity.directive';
 import { MetronTablePaginationComponent } from '../../../shared/metron-table/metron-table-pagination/metron-table-pagination.component';
 import { SearchService } from '../../../service/search.service';
-import { MetronDialogBox } from '../../../shared/metron-dialog-box';
 import { UpdateService } from '../../../service/update.service';
 import { GlobalConfigService } from '../../../service/global-config.service';
 import { MetaAlertService } from '../../../service/meta-alert.service';
+import { DialogService } from 'app/service/dialog.service';
+import { AppConfigService } from '../../../service/app-config.service';
+
+class FakeAppConfigService {
+
+  getApiRoot() {
+    return '/api/v1'
+  }
+}
 
 describe('TreeViewComponent', () => {
   let component: TreeViewComponent;
@@ -39,15 +47,16 @@ describe('TreeViewComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      imports: [ HttpModule ],
+      imports: [ HttpClientModule ],
       providers: [
         SearchService,
         UpdateService,
         GlobalConfigService,
         MetaAlertService,
-        MetronDialogBox,
+        DialogService,
+        { provide: AppConfigService, useClass: FakeAppConfigService }
       ],
-      declarations: [ 
+      declarations: [
         MetronTableDirective,
         MetronSorterComponent,
         MetronTablePaginationComponent,

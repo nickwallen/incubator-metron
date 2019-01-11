@@ -159,6 +159,45 @@
         </component>
 
         <component>
+          <name>METRON_PCAP</name>
+          <displayName>Metron PCAP</displayName>
+          <category>MASTER</category>
+          <cardinality>1</cardinality>
+          <versionAdvertised>false</versionAdvertised>
+          <dependencies>
+            <dependency>
+              <name>HDFS/HDFS_CLIENT</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>ZOOKEEPER/ZOOKEEPER_SERVER</name>
+              <scope>cluster</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+              </auto-deploy>
+            </dependency>
+            <dependency>
+              <name>KAFKA/KAFKA_BROKER</name>
+              <scope>host</scope>
+              <auto-deploy>
+                <enabled>true</enabled>
+              </auto-deploy>
+            </dependency>
+          </dependencies>
+          <commandScript>
+            <script>scripts/pcap_master.py</script>
+            <scriptType>PYTHON</scriptType>
+            <timeout>600</timeout>
+          </commandScript>
+          <configuration-dependencies>
+            <config-type>metron-pcap-env</config-type>
+          </configuration-dependencies>
+        </component>
+
+        <component>
           <name>METRON_INDEXING</name>
           <displayName>Metron Indexing</displayName>
           <category>MASTER</category>
@@ -283,8 +322,10 @@
             <scriptType>PYTHON</scriptType>
           </commandScript>
           <configuration-dependencies>
+            <config-type>metron-security-env</config-type>
             <config-type>metron-indexing-env</config-type>
             <config-type>metron-rest-env</config-type>
+            <config-type>metron-pcap-env</config-type>
           </configuration-dependencies>
         </component>
 
@@ -331,6 +372,7 @@
             <scriptType>PYTHON</scriptType>
           </commandScript>
             <configuration-dependencies>
+                <config-type>metron-security-env</config-type>
                 <config-type>metron-rest-env</config-type>
                 <config-type>metron-management-ui-env</config-type>
             </configuration-dependencies>
@@ -357,6 +399,7 @@
             <scriptType>PYTHON</scriptType>
           </commandScript>
           <configuration-dependencies>
+            <config-type>metron-security-env</config-type>
             <config-type>metron-rest-env</config-type>
             <config-type>metron-alerts-ui-env</config-type>
           </configuration-dependencies>
@@ -373,6 +416,9 @@
             <scriptType>PYTHON</scriptType>
             <timeout>1200</timeout>
           </commandScript>
+          <configuration-dependencies>
+            <config-type>metron-security-env</config-type>
+          </configuration-dependencies>
         </component>
 
       </components>
@@ -398,7 +444,13 @@
               <name>metron-management</name>
             </package>
             <package>
+              <name>metron-parsers-common</name>
+            </package>
+            <package>
               <name>metron-parsers</name>
+            </package>
+            <package>
+              <name>metron-parsing-storm</name>
             </package>
             <package>
               <name>metron-enrichment</name>
@@ -477,6 +529,7 @@
         <config-type>kafka-broker</config-type>
         <config-type>kafka-env</config-type>
         <config-type>zeppelin-config</config-type>
+        <config-type>metron-client-jaas-conf</config-type>
       </configuration-dependencies>
       <restartRequiredAfterChange>true</restartRequiredAfterChange>
       <quickLinksConfigurations>

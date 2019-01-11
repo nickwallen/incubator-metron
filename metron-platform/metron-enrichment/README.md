@@ -22,7 +22,7 @@ limitations under the License.
 The `enrichment` topology is a topology dedicated to taking the data
 from the parsing topologies that have been normalized into the Metron
 data format (e.g. a JSON Map structure with `original_message` and
-`timestamp`) and 
+`timestamp`) and
 * Enriching messages with external data from data stores (e.g. hbase) by
   adding new fields based on existing fields in the messages.
 * Marking messages as threats based on data in external data stores
@@ -31,35 +31,21 @@ data format (e.g. a JSON Map structure with `original_message` and
 
 ## Enrichment Architecture
 
-![Architecture](enrichment_arch.png)
+![Unified Architecture](unified_enrichment_arch.svg)
 
 ### Unified Enrichment Topology
 
-There is an experimental unified enrichment topology which is shipped.
-Currently the architecture, as described above, has a split/join in
-order to perform enrichments in parallel.  This poses some issues in
-terms of ease of tuning and reasoning about performance.  
-
-In order to deal with these issues, there is an alternative enrichment topology which
-uses data parallelism as opposed to the split/join task parallelism.
-This architecture uses a worker pool to fully enrich any message within 
-a worker.  This results in 
-* Fewer bolts in the topology 
+The unified enrichment topology uses data parallelism as opposed to the deprecated
+split/join topology's task parallelism. This architecture uses a worker pool to fully
+enrich any message within a worker.  This results in
+* Fewer bolts in the topology
 * Each bolt fully operates on a message.
 * Fewer network hops
 
-![Unified Architecture](unified_enrichment_arch.svg)
-
-This architecture is fully backwards compatible; the only difference is
-how the enrichment will operate on each message (in one bolt where the
-split/join is done in a threadpool as opposed
+This architecture is fully backwards compatible with the old split-join
+topology; the only difference is how the enrichment will operate on each
+message (in one bolt where the split/join is done in a threadpool as opposed
 to split across multiple bolts).
-
-#### Using It
-
-In order to use this, you will need to 
-* Edit `$METRON_HOME/bin/start_enrichment_topology.sh` and adjust it to use `remote-unified.yaml` instead of `remote.yaml`
-* Restart the enrichment topology.
 
 #### Configuring It
 
@@ -76,6 +62,19 @@ intel bolt, the configurations will be taken from the respective join bolt
 parallelism.  When proper ambari support for this is added, we will add
 its own property.
 
+### Split-Join Enrichment Topology
+
+The now-deprecated split/join topology is also available and performs enrichments in parallel.
+This poses some issues in terms of ease of tuning and reasoning about performance.
+
+![Architecture](enrichment_arch.png)
+
+#### Using It
+
+In order to use the older, deprecated topology, you will need to
+* Edit `$METRON_HOME/bin/start_enrichment_topology.sh` and adjust it to use `remote-splitjoin.yaml` instead of `remote-unified.yaml`
+* Restart the enrichment topology.
+
 ## Enrichment Configuration
 
 The configuration for the `enrichment` topology, the topology primarily
@@ -85,8 +84,7 @@ defined by JSON documents stored in zookeeper.
 There are two types of configurations at the moment, `global` and
 `sensor` specific.  
 
-
-## Global Configuration 
+## Global Configuration
 
 There are a few enrichments which have independent configurations, such
 as from the global config. You can also configure the enrichment topology's
@@ -106,7 +104,7 @@ The location on HDFS of the GeoLite2 database file to use for GeoIP
 lookups.  This file will be localized on the storm supervisors running
 the topology and used from there. This is lazy, so if this property
 changes in a running topology, the file will be localized from HDFS upon first
-time the file is used via the geo enrichment. 
+time the file is used via the geo enrichment.
 
 ### Writer Batching
 
@@ -117,7 +115,7 @@ The size of the batch that is written to Kafka at once. Defaults to `15` (size o
 #### `enrichment.writer.batchTimeout`
 
 The timeout after which a batch will be flushed even if batchSize has not been met.  Optional.
-If unspecified, or set to `0`, it defaults to a system-determined duration which is a fraction of the Storm 
+If unspecified, or set to `0`, it defaults to a system-determined duration which is a fraction of the Storm
 parameter `topology.message.timeout.secs`.  Ignored if batchSize is `1`, since this disables batching.
 
 ## Sensor Enrichment Configuration
@@ -133,7 +131,6 @@ The configuration is a complex JSON object with the following top level fields:
 * `threatIntel` : A complex JSON object representing the configuration of the threat intelligence enrichments
 
 ### The `enrichment` Configuration
-
 
 | Field            | Description                                                                                                                                                                                                                   | Example                                                          |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------|
@@ -164,16 +161,16 @@ The simplest, by far, is just providing a simple list as in
       ]
       }
 ```
-Based on this sample config, both `ip_src_addr` and `ip_dst_addr` will go to the `geo`, `host`, and 
-`hbaseEnrichment` adapter bolts. 
- 
+Based on this sample config, both `ip_src_addr` and `ip_dst_addr` will go to the `geo`, `host`, and
+`hbaseEnrichment` adapter bolts.
+
 #### Stellar Enrichment Configuration
-For the `geo`, `host` and `hbaseEnrichment`, this is sufficient. However, more complex enrichments 
+For the `geo`, `host` and `hbaseEnrichment`, this is sufficient. However, more complex enrichments
 may contain their own configuration.  Currently, the `stellar` enrichment is more adaptable and thus
 requires a more nuanced configuration.
 
 At its most basic, we want to take a message and apply a couple of enrichments, such as converting the
-`hostname` field to lowercase. We do this by specifying the transformation inside of the 
+`hostname` field to lowercase. We do this by specifying the transformation inside of the
 `config` for the `stellar` fieldMap.  There are two syntaxes that are supported, specifying the transformations
 as a map with the key as the field and the value the stellar expression:
 ```
@@ -202,7 +199,7 @@ in the Stellar REPL, such as:
 
 Sometimes arbitrary stellar enrichments may take enough time that you would prefer to split some of them
 into groups and execute the groups of stellar enrichments in parallel.  Take, for instance, if you wanted
-to do an HBase enrichment and a profiler call which were independent of one another.  This usecase is 
+to do an HBase enrichment and a profiler call which were independent of one another.  This usecase is
 supported by splitting the enrichments up as groups.
 
 Consider the following example:
@@ -215,13 +212,13 @@ Consider the following example:
             "is_bad_domain" : "ENRICHMENT_EXISTS('malicious_domains', ip_dst_addr, 'enrichments', 'cf')"
           },
           "login_profile" : [
-            "profile_window := PROFILE_WINDOW('from 6 months ago')", 
+            "profile_window := PROFILE_WINDOW('from 6 months ago')",
             "global_login_profile := PROFILE_GET('distinct_login_attempts', 'global', profile_window)",
             "stats := STATS_MERGE(global_login_profile)",
-            "auth_attempts_median := STATS_PERCENTILE(stats, 0.5)", 
+            "auth_attempts_median := STATS_PERCENTILE(stats, 0.5)",
             "auth_attempts_sd := STATS_SD(stats)",
-            "profile_window := null", 
-            "global_login_profile := null", 
+            "profile_window := null",
+            "global_login_profile := null",
             "stats := null"
           ]
         }
@@ -278,20 +275,20 @@ A risk level rule is of the following format:
 * `name` : The name of the threat triage rule
 * `comment` : A comment describing the rule
 * `rule` : The rule, represented as a Stellar statement
-* `score` : Associated threat triage score for the rule
+* `score` : The score attributed to the rule. Can be either numeric or a Stellar expression.  The expression has access to all fields with the message being triaged.
 * `reason` : Reason the rule tripped. Can be represented as a Stellar statement
 
 An example of a rule is as follows:
 ```
-    "riskLevelRules" : [ 
-        { 
-          "name" : "is internal"
-        , "comment" : "determines if the destination is internal."
-        , "rule" : "IN_SUBNET(ip_dst_addr, '192.168.0.0/24')"
-        , "score" : 10
-        , "reason" : "FORMAT('%s is internal', ip_dst_addr)"
+    "riskLevelRules" : [
+        {
+          "name" : "is internal",
+          "comment" : "determines if the destination is internal.",
+          "rule" : "IN_SUBNET(ip_dst_addr, '192.168.0.0/24')",
+          "score" : 10, 
+          "reason" : "FORMAT('%s is internal', ip_dst_addr)"
         }
-                       ]
+    ]
 ```
 
 The supported aggregation functions are:
@@ -346,7 +343,7 @@ An example configuration for the YAF sensor is as follows:
       ]
     },
     "triageConfig" : {
-      "riskLevelRules" : [ 
+      "riskLevelRules" : [
         {
           "rule" : "ip_src_addr == '10.0.2.3' or ip_dst_addr == '10.0.2.3'",
           "score" : 10
@@ -375,7 +372,7 @@ Start Squid via `service squid start`
 ## Adjust Enrichment Configurations for Squid to Call Stellar
 Let's adjust the configurations for the Squid topology to annotate the messages using some Stellar functions.
 
-* Edit the squid enrichment configuration at `$METRON_HOME/config/zookeeper/enrichments/squid.json` (this file will not exist, so create a new one) to add some new fields based on stellar queries: 
+* Edit the squid enrichment configuration at `$METRON_HOME/config/zookeeper/enrichments/squid.json` (this file will not exist, so create a new one) to add some new fields based on stellar queries:
 
 ```
 {
@@ -397,7 +394,7 @@ Let's adjust the configurations for the Squid topology to annotate the messages 
         "config" : {
           "bar" : "TO_UPPER(source.type)"
         }
-      } 
+      }
     },
     "triageConfig" : {
     }
@@ -406,7 +403,7 @@ Let's adjust the configurations for the Squid topology to annotate the messages 
 ```
 We have added the following fields as part of the enrichment phase of the enrichment topology:
 * `foo` ==  2
-* `ALL_CAPS` == SQUID 
+* `ALL_CAPS` == SQUID
 
 We have added the following as part of the threat intel:
 * ` bar` == SQUID
@@ -427,5 +424,3 @@ Now we need to start the topologies and send some data:
 * Ensure that the documents have new fields `foo`, `bar` and `ALL_CAPS` with values as described above.
 
 Note that we could have used any Stellar statements here, including calling out to HBase via `ENRICHMENT_GET` and `ENRICHMENT_EXISTS` or even calling a machine learning model via [Model as a Service](../../metron-analytics/metron-maas-service).
-
-

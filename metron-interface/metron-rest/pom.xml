@@ -18,7 +18,7 @@
     <parent>
         <groupId>org.apache.metron</groupId>
         <artifactId>metron-interface</artifactId>
-        <version>0.5.1</version>
+        <version>0.7.1</version>
     </parent>
     <artifactId>metron-rest</artifactId>
     <url>https://metron.apache.org/</url>
@@ -31,12 +31,15 @@
         <powermock.version>1.6.4</powermock.version>
         <spring.boot.version>2.0.1.RELEASE</spring.boot.version>
         <spring.kerberos.version>1.0.1.RELEASE</spring.kerberos.version>
+        <spring.ldap.core.version>2.3.2.RELEASE</spring.ldap.core.version>
+        <spring.security.ldap.version>5.1.1.RELEASE</spring.security.ldap.version>
         <swagger.version>2.5.0</swagger.version>
         <mysql.client.version>5.1.40</mysql.client.version>
         <spring-kafka.version>2.0.4.RELEASE</spring-kafka.version>
         <spring.version>5.0.5.RELEASE</spring.version>
         <eclipse.link.version>2.6.4</eclipse.link.version>
         <jsonpath.version>2.4.0</jsonpath.version>
+        <jwt.version>4.41.2</jwt.version>
     </properties>
     <dependencies>
       <dependency>
@@ -116,6 +119,16 @@
                     <artifactId>log4j</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+          <groupId>org.springframework.ldap</groupId>
+          <artifactId>spring-ldap-core</artifactId>
+          <version>${spring.ldap.core.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>org.springframework.security</groupId>
+          <artifactId>spring-security-ldap</artifactId>
+          <version>${spring.security.ldap.version}</version>
         </dependency>
         <dependency>
             <groupId>com.googlecode.json-simple</groupId>
@@ -225,7 +238,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.metron</groupId>
-            <artifactId>metron-parsers</artifactId>
+            <artifactId>metron-parsers-common</artifactId>
             <version>${project.parent.version}</version>
             <scope>provided</scope>
             <exclusions>
@@ -255,6 +268,38 @@
                 </exclusion>
             </exclusions>
         </dependency>
+      <dependency>
+        <groupId>org.apache.metron</groupId>
+        <artifactId>metron-parsers</artifactId>
+        <version>${project.parent.version}</version>
+        <scope>provided</scope>
+        <exclusions>
+          <exclusion>
+            <groupId>org.apache.hbase</groupId>
+            <artifactId>hbase-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-profiler-client</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-statistics</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-writer</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
         <dependency>
             <groupId>com.jayway.jsonpath</groupId>
             <artifactId>json-path</artifactId>
@@ -413,6 +458,11 @@
                     <artifactId>slf4j-log4j12</artifactId>
                 </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.nimbusds</groupId>
+            <artifactId>nimbus-jose-jwt</artifactId>
+            <version>${jwt.version}</version>
         </dependency>
     </dependencies>
 

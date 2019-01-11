@@ -25,9 +25,10 @@ import { PcapStatusResponse } from '../model/pcap-status-response';
 import { PcapPagination } from '../model/pcap-pagination';
 import { By } from '../../../../node_modules/@angular/platform-browser';
 import { PcapRequest } from '../model/pcap.request';
-import { defer } from 'rxjs/observable/defer';
-import { Observable } from 'rxjs/Observable';
+import { of, defer } from 'rxjs';
 import { RestError } from '../../model/rest-error';
+import { ConfirmationPopoverModule } from 'angular-confirmation-popover';
+import { AppConfigService } from '../../service/app-config.service';
 
 @Component({
   selector: 'app-pcap-filters',
@@ -60,6 +61,13 @@ class FakePcapService {
   }
 }
 
+class FakeAppConfigService {
+
+  getApiRoot() {
+    return '/api/v1'
+  }
+}
+
 describe('PcapPanelComponent', () => {
   let component: PcapPanelComponent;
   let fixture: ComponentFixture<PcapPanelComponent>;
@@ -67,6 +75,9 @@ describe('PcapPanelComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
+      imports: [
+        ConfirmationPopoverModule.forRoot(),
+      ],
       declarations: [
         FakeFilterComponent,
         FakePcapListComponent,
@@ -74,6 +85,7 @@ describe('PcapPanelComponent', () => {
       ],
       providers: [
         { provide: PcapService, useClass: FakePcapService },
+        { provide: AppConfigService, useClass: FakeAppConfigService }
       ]
     })
     .compileComponents();
@@ -82,7 +94,7 @@ describe('PcapPanelComponent', () => {
   beforeEach(() => {
     pcapService = TestBed.get(PcapService);
     pcapService.getRunningJob = jasmine.createSpy('getRunningJob')
-            .and.returnValue(Observable.of([]));
+            .and.returnValue(of([]));
     fixture = TestBed.createComponent(PcapPanelComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -347,7 +359,7 @@ describe('PcapPanelComponent', () => {
     expect(fixture.debugElement.query(By.css('[data-qe-id="pcap-cancel-query-button"]'))).toBeDefined();
   });
 
-  it('should hide the progress bar if the user clicks on the cancel button', fakeAsync(() => {
+  it('should hide the progress bar if the user clicks on the cancel button and confirms', fakeAsync(() => {
     component.queryRunning = true;
     component.queryId = '42';
     fixture.detectChanges();
@@ -357,6 +369,12 @@ describe('PcapPanelComponent', () => {
     const cancelBtnEl = cancelBtn.nativeElement;
 
     cancelBtnEl.click();
+    fixture.detectChanges();
+
+    const confirmButton = fixture.debugElement.query(By.css('.pcap-cancel-query-confirm-popover .btn-danger'));
+    const confirmButtonEl = confirmButton.nativeElement;
+
+    confirmButtonEl.click();
     tick();
     fixture.detectChanges();
 
@@ -378,6 +396,12 @@ describe('PcapPanelComponent', () => {
     const cancelBtnEl = cancelBtn.nativeElement;
 
     cancelBtnEl.click();
+    fixture.detectChanges();
+
+    const confirmButton = fixture.debugElement.query(By.css('.pcap-cancel-query-confirm-popover .btn-danger'));
+    const confirmButtonEl = confirmButton.nativeElement;
+
+    confirmButtonEl.click();
     tick();
     fixture.detectChanges();
 
@@ -400,6 +424,12 @@ describe('PcapPanelComponent', () => {
     const cancelBtnEl = cancelBtn.nativeElement;
 
     cancelBtnEl.click();
+    fixture.detectChanges();
+
+    const confirmButton = fixture.debugElement.query(By.css('.pcap-cancel-query-confirm-popover .btn-danger'));
+    const confirmButtonEl = confirmButton.nativeElement;
+
+    confirmButtonEl.click();
     tick();
     fixture.detectChanges();
 
@@ -439,6 +469,12 @@ describe('PcapPanelComponent', () => {
     const cancelBtnEl = cancelBtn.nativeElement;
 
     cancelBtnEl.click();
+    fixture.detectChanges();
+
+    const confirmButton = fixture.debugElement.query(By.css('.pcap-cancel-query-confirm-popover .btn-danger'));
+    const confirmButtonEl = confirmButton.nativeElement;
+
+    confirmButtonEl.click();
     tick();
     fixture.detectChanges();
 
@@ -458,6 +494,12 @@ describe('PcapPanelComponent', () => {
     const cancelBtnEl = cancelBtn.nativeElement;
 
     cancelBtnEl.click();
+    fixture.detectChanges();
+
+    const confirmButton = fixture.debugElement.query(By.css('.pcap-cancel-query-confirm-popover .btn-danger'));
+    const confirmButtonEl = confirmButton.nativeElement;
+
+    confirmButtonEl.click();
     tick();
     fixture.detectChanges();
 
@@ -479,7 +521,7 @@ describe('PcapPanelComponent', () => {
     );
 
     const restError = new RestError();
-    restError.responseCode = 404;
+    restError.status = 404;
     pcapService.getPackets = jasmine.createSpy('getPackets').and.returnValue(
             defer(() => Promise.reject(restError))
     );
@@ -509,7 +551,7 @@ describe('PcapPanelComponent', () => {
     );
 
     const restError = new RestError();
-    restError.responseCode = 500;
+    restError.status = 500;
     restError.message = 'error message';
     pcapService.getPackets = jasmine.createSpy('getPackets').and.returnValue(
             defer(() => Promise.reject(restError))

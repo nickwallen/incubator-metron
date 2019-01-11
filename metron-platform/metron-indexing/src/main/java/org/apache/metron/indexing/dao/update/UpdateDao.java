@@ -17,12 +17,14 @@
  */
 package org.apache.metron.indexing.dao.update;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.indexing.dao.RetrieveLatestDao;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.Optional;
+
+import static java.lang.String.format;
 
 public interface UpdateDao {
 
@@ -33,76 +35,67 @@ public interface UpdateDao {
    *
    * @param update The document to replace from the index.
    * @param index The index where the document lives.
+   * @return The updated document
    * @throws IOException If an error occurs during the update.
    */
-  void update(Document update, Optional<String> index) throws IOException;
+  Document update(Document update, Optional<String> index) throws IOException;
 
   /**
    * Similar to the update method but accepts multiple documents and performs updates in batch.
    *
    * @param updates A map of the documents to update to the index where they live.
+   * @return The updated documents.
    * @throws IOException If an error occurs during the updates.
    */
-  void batchUpdate(Map<Document, Optional<String>> updates) throws IOException;
+  Map<Document, Optional<String>> batchUpdate(Map<Document, Optional<String>> updates) throws IOException;
 
-  void addCommentToAlert(CommentAddRemoveRequest request) throws IOException;
+  Document addCommentToAlert(CommentAddRemoveRequest request) throws IOException;
 
-  void removeCommentFromAlert(CommentAddRemoveRequest request) throws IOException;
+  Document removeCommentFromAlert(CommentAddRemoveRequest request) throws IOException;
 
-  void addCommentToAlert(CommentAddRemoveRequest request, Document latest) throws IOException;
+  Document addCommentToAlert(CommentAddRemoveRequest request, Document latest) throws IOException;
 
-  void removeCommentFromAlert(CommentAddRemoveRequest request, Document latest) throws IOException;
-
+  Document removeCommentFromAlert(CommentAddRemoveRequest request, Document latest) throws IOException;
 
   /**
    * Update a document in an index given a JSON Patch (see RFC 6902 at
    * https://tools.ietf.org/html/rfc6902)
    * @param request The patch request
    * @param timestamp Optionally a timestamp to set. If not specified then current time is used.
+   * @return The patched document.
    * @throws OriginalNotFoundException If the original is not found, then it cannot be patched.
    * @throws IOException If an error occurs while patching.
    */
-  default void patch(RetrieveLatestDao retrieveLatestDao, PatchRequest request
+  default Document patch(RetrieveLatestDao retrieveLatestDao, PatchRequest request
       , Optional<Long> timestamp
   ) throws OriginalNotFoundException, IOException {
     Document d = getPatchedDocument(retrieveLatestDao, request, timestamp);
-    update(d, Optional.ofNullable(request.getIndex()));
+    return update(d, Optional.ofNullable(request.getIndex()));
   }
 
   default Document getPatchedDocument(RetrieveLatestDao retrieveLatestDao, PatchRequest request,
-      Optional<Long> timestamp
+      Optional<Long> optionalTimestamp
   ) throws OriginalNotFoundException, IOException {
-    Map<String, Object> latest = request.getSource();
-    if (latest == null) {
-      Document latestDoc = retrieveLatestDao.getLatest(request.getGuid(), request.getSensorType());
-      if (latestDoc != null && latestDoc.getDocument() != null) {
-        latest = latestDoc.getDocument();
+    String guid = request.getGuid();
+    String sensorType = request.getSensorType();
+    String documentID = null;
+    Long timestamp = optionalTimestamp.orElse(System.currentTimeMillis());
+
+    Map<String, Object> originalSource = request.getSource();
+    if (originalSource == null) {
+      // no document source provided, lookup the latest
+      Document toPatch = retrieveLatestDao.getLatest(guid, sensorType);
+      if(toPatch != null && toPatch.getDocument() != null) {
+        originalSource = toPatch.getDocument();
+        documentID = toPatch.getDocumentID().orElse(null);
+
       } else {
-        throw new OriginalNotFoundException(
-            "Unable to patch an document that doesn't exist and isn't specified.");
+        String error = format("Document does not exist, but is required; guid=%s, sensorType=%s", guid, sensorType);
+        throw new OriginalNotFoundException(error);
       }
     }
 
-    Map<String, Object> updated = JSONUtils.INSTANCE.applyPatch(request.getPatch(), latest);
-    return new Document(updated,
-        request.getGuid(),
-        request.getSensorType(),
-        timestamp.orElse(System.currentTimeMillis()));
-  }
-
-  /**
-   * Replace a document in an index.
-   * @param request The replacement request.
-   * @param timestamp The timestamp (optional) of the update.  If not specified, then current time will be used.
-   * @throws IOException If an error occurs during replacement.
-   */
-  default void replace(ReplaceRequest request, Optional<Long> timestamp)
-      throws IOException {
-    Document d = new Document(request.getReplacement(),
-        request.getGuid(),
-        request.getSensorType(),
-        timestamp.orElse(System.currentTimeMillis())
-    );
-    update(d, Optional.ofNullable(request.getIndex()));
+    Map<String, Object> patchedSource = JSONUtils.INSTANCE.applyPatch(request.getPatch(), originalSource);
+    return new Document(patchedSource, guid, sensorType, timestamp, documentID);
   }
 }

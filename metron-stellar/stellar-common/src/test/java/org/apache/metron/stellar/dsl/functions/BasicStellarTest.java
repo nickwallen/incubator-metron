@@ -18,9 +18,21 @@
 
 package org.apache.metron.stellar.dsl.functions;
 
+import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.run;
+import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.runPredicate;
+import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.validate;
+
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.metron.stellar.common.StellarProcessor;
 import org.apache.metron.stellar.dsl.Context;
@@ -36,12 +48,6 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-
-import java.util.*;
-
-import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.run;
-import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.validate;
-import static org.apache.metron.stellar.common.utils.StellarProcessorUtils.runPredicate;
 
 @SuppressWarnings("ALL")
 public class BasicStellarTest {
@@ -70,6 +76,7 @@ public class BasicStellarTest {
     public boolean isInitialized() {
       return true;
     }
+
   }
 
   @Stellar(
@@ -96,6 +103,7 @@ public class BasicStellarTest {
     public boolean isInitialized() {
       return true;
     }
+
   }
 
   @Test
@@ -221,6 +229,7 @@ public class BasicStellarTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   public void testConditionalsAsMapKeys() {
     {
       String query = "{ ( RET_TRUE() && y < 50 ) : 'info', y >= 50 : 'warn'}";
@@ -548,6 +557,7 @@ public class BasicStellarTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   public void testInNotIN(){
     HashMap variables = new HashMap<>();
     boolean thrown = false;
@@ -910,6 +920,73 @@ public class BasicStellarTest {
   }
 
   @Test
+  public void testShortCircuit_nestedIf() throws Exception {
+    // Single nested
+    // IF true
+    //   THEN IF true
+    //     THEN 'a'
+    //   ELSE 'b'
+    // ELSE 'c'
+    Assert.assertEquals("a", run("IF true THEN IF true THEN 'a' ELSE 'b' ELSE 'c'", new HashMap<>()));
+    Assert.assertEquals("b", run("IF true THEN IF false THEN 'a' ELSE 'b' ELSE 'c'", new HashMap<>()));
+    Assert.assertEquals("c", run("IF false THEN IF false THEN 'a' ELSE 'b' ELSE 'c'", new HashMap<>()));
+
+    // 3 layer deep
+    // IF true
+    //   THEN IF true
+    //     THEN IF true
+    //       THEN 'a'
+    //     ELSE 'b'
+    //   ELSE 'c'
+    // ELSE 'd'
+    Assert.assertEquals("a", run("IF true THEN IF true THEN IF true THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("b", run("IF true THEN IF true THEN IF false THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("c", run("IF true THEN IF false THEN IF true THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("c", run("IF true THEN IF false THEN IF false THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF true THEN IF true THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF true THEN IF false THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF false THEN IF true THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF false THEN IF false THEN 'a' ELSE 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+
+    // Nested inside inner if
+    // IF true
+    //   THEN IF true
+    //     THEN 'a'
+    //   ELSE IF true
+    //     THEN 'b'
+    //   ELSE 'c'
+    // ELSE 'd'
+    Assert.assertEquals("a", run("IF true THEN IF true THEN 'a' ELSE IF true THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("a", run("IF true THEN IF true THEN 'a' ELSE IF false THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("b", run("IF true THEN IF false THEN 'a' ELSE IF true THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("c", run("IF true THEN IF false THEN 'a' ELSE IF false THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF true THEN 'a' ELSE IF true THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF true THEN 'a' ELSE IF false THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF false THEN 'a' ELSE IF true THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+    Assert.assertEquals("d", run("IF false THEN IF false THEN 'a' ELSE IF false THEN 'b' ELSE 'c' ELSE 'd'", new HashMap<>()));
+  }
+
+  @Test
+  public void testShortCircuit_complexNested() {
+    // IF TO_UPPER('foo') == 'FOO'
+    //   THEN IF GET_FIRST(MAP(['test_true'], x -> TO_UPPER(x))) == 'TEST_TRUE'
+    //     THEN match{ var1 < 12 => 'less', var1 >= 10 => 'more', default => 'default'}
+    //   ELSE 'b'
+    // ELSE 'c'
+
+    // Should hit the match cases
+    Assert.assertEquals("less", run("IF TO_UPPER('foo') == 'FOO' THEN IF GET_FIRST(MAP(['test_true'], x -> TO_UPPER(x))) == 'TEST_TRUE' THEN match{ var1 < 10 => 'less', var1 >= 12 => 'more', default => 'default'} ELSE 'b' ELSE 'c'", Collections.singletonMap("var1", 1)));
+    Assert.assertEquals("default", run("IF TO_UPPER('foo') == 'FOO' THEN IF GET_FIRST(MAP(['test_true'], x -> TO_UPPER(x))) == 'TEST_TRUE' THEN match{ var1 < 10 => 'less', var1 >= 12 => 'more', default => 'default'} ELSE 'b' ELSE 'c'", Collections.singletonMap("var1", 11)));
+    Assert.assertEquals("more", run("IF TO_UPPER('foo') == 'FOO' THEN IF GET_FIRST(MAP(['test_true'], x -> TO_UPPER(x))) == 'TEST_TRUE' THEN match{ var1 < 10 => 'less', var1 >= 12 => 'more', default => 'default'} ELSE 'b' ELSE 'c'", Collections.singletonMap("var1", 100)));
+
+    // Should fail first if and hit 'c'
+    Assert.assertEquals("c", run("IF TO_UPPER('bar') == 'FOO' THEN IF GET_FIRST(MAP(['test_true'], x -> TO_UPPER(x))) == 'TEST_TRUE' THEN match{ var1 < 10 => 'less', var1 >= 12 => 'more', default => 'default'} ELSE 'b' ELSE 'c'", Collections.singletonMap("var1", 1)));
+
+    // Should fail second if and hit 'b'
+    Assert.assertEquals("b", run("IF TO_UPPER('foo') == 'FOO' THEN IF GET_FIRST(MAP(['test_false'], x -> TO_UPPER(x))) == 'TEST_TRUE' THEN match{ var1 < 10 => 'less', var1 >= 12 => 'more', default => 'default'} ELSE 'b' ELSE 'c'", Collections.singletonMap("var1", 1)));
+  }
+
+  @Test
   public void testShortCircuit_boolean() throws Exception {
     Assert.assertTrue(runPredicate("'metron' in ['metron', 'metronicus', 'mortron'] or (true or THROW('exception'))", new DefaultVariableResolver(x -> null,x -> false)));
     Assert.assertTrue(runPredicate("true or (true or THROW('exception'))", new DefaultVariableResolver(x -> null,x -> false)));
@@ -961,6 +1038,7 @@ public class BasicStellarTest {
   }
 
   @Test
+  @SuppressWarnings("unchecked")
   public void all_fields_test() {
     final Map<String, Object> varMap1 = new HashMap<String, Object>();
     varMap1.put("field1", "val1");
@@ -1000,4 +1078,5 @@ public class BasicStellarTest {
     checkFalsey("{}");
     checkFalsey("LIST_ADD([])");
   }
+
 }

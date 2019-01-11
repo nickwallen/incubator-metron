@@ -35,14 +35,13 @@ import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.HBaseDao;
 import org.apache.metron.indexing.dao.IndexDao;
-import org.apache.metron.indexing.dao.MultiIndexDao;
 import org.apache.metron.indexing.dao.UpdateIntegrationTest;
 import org.apache.metron.indexing.dao.search.AlertComment;
 import org.apache.metron.indexing.dao.search.GetRequest;
 import org.apache.metron.indexing.dao.update.Document;
 import org.junit.After;
 import org.junit.Assert;
-import org.junit.BeforeClass;
+import org.junit.Before;
 import org.junit.Test;
 
 public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
@@ -61,8 +60,8 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
           0x54,0x79,0x70,0x65
   };
 
-  @BeforeClass
-  public static void startHBase() throws Exception {
+  @Before
+  public void startHBase() throws Exception {
     AccessConfig accessConfig = new AccessConfig();
     accessConfig.setMaxSearchResults(1000);
     accessConfig.setMaxSearchGroups(1000);
@@ -168,13 +167,6 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
     }
 
     Assert.assertFalse("Result size should be 12 but was greater", results.hasNext());
-  }
-
-  @Override
-  public void test() {
-    // The main test ensures a variety of things not implemented by HBase run alongside
-    // HBaseDao itself.
-    // Therefore, just don't do anything for this test.
   }
 
   protected List<Document> buildAlerts(int count) throws IOException {

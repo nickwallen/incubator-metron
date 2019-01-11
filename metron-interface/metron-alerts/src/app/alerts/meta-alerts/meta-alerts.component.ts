@@ -17,7 +17,7 @@
  */
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import {Router} from '@angular/router';
-import { Subscription } from 'rxjs/Rx';
+import { Subscription } from 'rxjs';
 
 import {MetaAlertService} from '../../service/meta-alert.service';
 import {UpdateService} from '../../service/update.service';
@@ -26,7 +26,6 @@ import {SearchService} from '../../service/search.service';
 import {SearchResponse} from '../../model/search-response';
 import {SortField} from '../../model/sort-field';
 import { META_ALERTS_SENSOR_TYPE } from '../../utils/constants';
-import {MetronDialogBox} from '../../shared/metron-dialog-box';
 import {MetaAlertAddRemoveRequest} from '../../model/meta-alert-add-remove-request';
 import {GetRequest} from '../../model/get-request';
 import { GlobalConfigService } from '../../service/global-config.service';
@@ -47,7 +46,6 @@ export class MetaAlertsComponent implements OnInit, OnDestroy {
               private metaAlertService: MetaAlertService,
               private updateService: UpdateService,
               private searchService: SearchService,
-              private metronDialogBox: MetronDialogBox,
               private globalConfigService: GlobalConfigService) {
   }
 

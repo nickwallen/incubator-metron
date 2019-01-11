@@ -33,6 +33,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
@@ -50,16 +51,17 @@ import java.util.Properties;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_PROVIDER;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_BEGIN;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_END;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_FORMAT;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_PATH;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.TELEMETRY_INPUT_READER;
 import static org.junit.Assert.assertTrue;
+
+import static org.apache.metron.profiler.spark.reader.TelemetryReaders.*;
 
 /**
  * An integration test for the {@link BatchProfiler}.
@@ -117,7 +119,8 @@ public class BatchProfilerIntegrationTest {
     }
   }
 
-  public void setup(int periodDuration, String periodDurationUnits) {
+  @Before
+  public void setup() {
     readerProperties = new Properties();
     profilerProperties = new Properties();
 
@@ -134,8 +137,6 @@ public class BatchProfilerIntegrationTest {
       put(PROFILER_HBASE_TABLE.getKey(), tableName);
       put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
       put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
-      put(PROFILER_PERIOD.getKey(), periodDuration);
-      put(PROFILER_PERIOD_UNITS.getKey(), periodDurationUnits);
     }};
 
     // create the stellar execution environment
@@ -160,47 +161,62 @@ public class BatchProfilerIntegrationTest {
    */
   @Test
   public void testBatchProfilerWithJSON() throws Exception {
-    setup(15, "MINUTES");
-
     // the input telemetry is text/json stored in the local filesystem
+    profilerProperties.put(TELEMETRY_INPUT_READER.getKey(), JSON.toString());
     profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), "src/test/resources/telemetry.json");
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "text");
 
     BatchProfiler profiler = new BatchProfiler();
     profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
 
-    validateFifteenMinuteProfiles();
+    validateProfiles();
   }
 
   @Test
   public void testBatchProfilerWithORC() throws Exception {
-    setup(15, "MINUTES");
-
-    // re-write the test data as ORC
+    // re-write the test data as column-oriented ORC
     String pathToORC = tempFolder.getRoot().getAbsolutePath();
     spark.read()
-            .format("text")
+            .format("json")
             .load("src/test/resources/telemetry.json")
-            .as(Encoders.STRING())
             .write()
             .mode("overwrite")
             .format("org.apache.spark.sql.execution.datasources.orc")
             .save(pathToORC);
 
     // tell the profiler to use the ORC input data
+    profilerProperties.put(TELEMETRY_INPUT_READER.getKey(), ORC.toString());
     profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), pathToORC);
-    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "org.apache.spark.sql.execution.datasources.orc");
 
     BatchProfiler profiler = new BatchProfiler();
     profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
 
-    validateFifteenMinuteProfiles();
+    validateProfiles();
+  }
+
+  @Test
+  public void testBatchProfilerWithParquet() throws Exception {
+    // re-write the test data as column-oriented ORC
+    String inputPath = tempFolder.getRoot().getAbsolutePath();
+    spark.read()
+            .format("json")
+            .load("src/test/resources/telemetry.json")
+            .write()
+            .mode("overwrite")
+            .format("parquet")
+            .save(inputPath);
+
+    // tell the profiler to use the ORC input data
+    profilerProperties.put(TELEMETRY_INPUT_READER.getKey(), PARQUET.toString());
+    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), inputPath);
+
+    BatchProfiler profiler = new BatchProfiler();
+    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
+
+    validateProfiles();
   }
 
   @Test
   public void testBatchProfilerWithCSV() throws Exception {
-    setup(15, "MINUTES");
-
     // re-write the test data as a CSV with a header record
     String pathToCSV = tempFolder.getRoot().getAbsolutePath();
     spark.read()
@@ -214,7 +230,9 @@ public class BatchProfilerIntegrationTest {
             .save(pathToCSV);
 
     // tell the profiler to use the CSV input data
+    // CSV is an example of needing to define both the reader and the input format
     profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), pathToCSV);
+    profilerProperties.put(TELEMETRY_INPUT_READER.getKey(), "text");
     profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "csv");
 
     // set a reader property; tell the reader to expect a header
@@ -223,35 +241,65 @@ public class BatchProfilerIntegrationTest {
     BatchProfiler profiler = new BatchProfiler();
     profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
 
-    validateFifteenMinuteProfiles();
+    validateProfiles();
   }
 
   @Test
-  public void testBatchProfilerWithCustomPeriodDuration() throws Exception {
-    int periodDuration = 1;
-    setup(periodDuration, "MINUTES");
-
+  public void testBatchProfilerWithEndTimeConstraint() throws Exception {
     // the input telemetry is text/json stored in the local filesystem
     profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), "src/test/resources/telemetry.json");
     profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "text");
 
-    profilerProperties.put(PERIOD_DURATION.getKey(), periodDuration);
-    profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "MINUTES");
+    // there are 40 messages before "2018-07-07T15:51:48Z" in the test data
+    profilerProperties.put(TELEMETRY_INPUT_BEGIN.getKey(), "");
+    profilerProperties.put(TELEMETRY_INPUT_END.getKey(), "2018-07-07T15:51:48Z");
 
     BatchProfiler profiler = new BatchProfiler();
     profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
 
-    validateFifteenMinuteProfiles();
+    // the max timestamp in the data is around July 7, 2018
+    assign("maxTimestamp", "1530978728982L");
+
+    // the 'window' looks up to 5 hours before the max timestamp
+    assign("window", "PROFILE_WINDOW('from 5 hours ago', maxTimestamp)");
+
+    assertTrue(execute("[12] == PROFILE_GET('count-by-ip', '192.168.66.1', window)", Boolean.class));
+    assertTrue(execute("[28] == PROFILE_GET('count-by-ip', '192.168.138.158', window)", Boolean.class));
+    assertTrue(execute("[40] == PROFILE_GET('total-count', 'total', window)", Boolean.class));
+  }
+
+  @Test
+  public void testBatchProfilerWithBeginTimeConstraint() throws Exception {
+    // the input telemetry is text/json stored in the local filesystem
+    profilerProperties.put(TELEMETRY_INPUT_PATH.getKey(), "src/test/resources/telemetry.json");
+    profilerProperties.put(TELEMETRY_INPUT_FORMAT.getKey(), "text");
+
+    // there are 60 messages after "2018-07-07T15:51:48Z" in the test data
+    profilerProperties.put(TELEMETRY_INPUT_BEGIN.getKey(), "2018-07-07T15:51:48Z");
+    profilerProperties.put(TELEMETRY_INPUT_END.getKey(), "");
+
+    BatchProfiler profiler = new BatchProfiler();
+    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, getProfile());
+
+    // the max timestamp in the data is around July 7, 2018
+    assign("maxTimestamp", "1530978728982L");
+
+    // the 'window' looks up to 5 hours before the max timestamp
+    assign("window", "PROFILE_WINDOW('from 5 hours ago', maxTimestamp)");
+
+    assertTrue(execute("[14] == PROFILE_GET('count-by-ip', '192.168.66.1', window)", Boolean.class));
+    assertTrue(execute("[46] == PROFILE_GET('count-by-ip', '192.168.138.158', window)", Boolean.class));
+    assertTrue(execute("[60] == PROFILE_GET('total-count', 'total', window)", Boolean.class));
   }
 
   /**
-   * Validates the profiles that were built with a 15 minute period duration.
+   * Validates the profiles that were built.
    *
    * These tests use the Batch Profiler to seed two profiles with archived telemetry.  The first profile
    * called 'count-by-ip', counts the number of messages by 'ip_src_addr'.  The second profile called
    * 'total-count', counts the total number of messages.
    */
-  private void validateFifteenMinuteProfiles() {
+  private void validateProfiles() {
     // the max timestamp in the data is around July 7, 2018
     assign("maxTimestamp", "1530978728982L");
 
@@ -259,8 +307,7 @@ public class BatchProfilerIntegrationTest {
     assign("window", "PROFILE_WINDOW('from 5 hours ago', maxTimestamp)");
 
     // there are 26 messages where ip_src_addr = 192.168.66.1
-    assign("countByIp", "PROFILE_GET('count-by-ip', '192.168.66.1', window)");
-    assertTrue(execute("[26] == countByIp", Boolean.class));
+    assertTrue(execute("[26] == PROFILE_GET('count-by-ip', '192.168.66.1', window)", Boolean.class));
 
     // there are 74 messages where ip_src_addr = 192.168.138.158
     assertTrue(execute("[74] == PROFILE_GET('count-by-ip', '192.168.138.158', window)", Boolean.class));
@@ -285,7 +332,6 @@ public class BatchProfilerIntegrationTest {
    */
   private void assign(String var, String expression) {
     executor.assign(var, expression, Collections.emptyMap());
-    LOG.debug("{} = {}", var, executor.getState().get(var));
   }
 
   /**

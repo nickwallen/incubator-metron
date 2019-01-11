@@ -19,7 +19,7 @@ import { Router } from '@angular/router';
 import { BrowserModule } from '@angular/platform-browser';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { HttpModule } from '@angular/http';
+import {HttpClientModule, HTTP_INTERCEPTORS} from '@angular/common/http';
 import { APP_INITIALIZER } from '@angular/core';
 
 import { AppComponent } from './app.component';
@@ -31,7 +31,6 @@ import {ConfigureTableService} from './service/configure-table.service';
 import {SaveSearchModule} from './alerts/save-search/save-search.module';
 import {SaveSearchService} from './service/save-search.service';
 import {SavedSearchesModule} from './alerts/saved-searches/saved-searches.module';
-import {MetronDialogBox} from './shared/metron-dialog-box';
 import {ConfigureRowsModule} from './alerts/configure-rows/configure-rows.module';
 import {SwitchModule} from './shared/switch/switch.module';
 import {ColumnNamesService} from './service/column-names.service';
@@ -46,20 +45,25 @@ import {MetaAlertService} from './service/meta-alert.service';
 import {MetaAlertsModule} from './alerts/meta-alerts/meta-alerts.module';
 import {SearchService} from './service/search.service';
 import { GlobalConfigService } from './service/global-config.service';
+import { DefaultHeadersInterceptor } from './http-interceptors/default-headers.interceptor';
+import { DialogService } from './service/dialog.service';
+import { MetronDialogComponent } from './shared/metron-dialog/metron-dialog.component';
 import {PcapModule} from './pcap/pcap.module';
+import { AppConfigService } from './service/app-config.service';
 
-export function initConfig(config: ColumnNamesService) {
-  return () => config.list();
+export function initConfig(appConfigService: AppConfigService) {
+  return () => appConfigService.loadAppConfig();
 }
 
 @NgModule({
   declarations: [
-    AppComponent
+    AppComponent,
+    MetronDialogComponent
   ],
   imports: [
     BrowserModule,
     FormsModule,
-    HttpModule,
+    HttpClientModule,
     MetronAlertsRoutingModule,
     LoginModule,
     AlertsListModule,
@@ -72,19 +76,22 @@ export function initConfig(config: ColumnNamesService) {
     SwitchModule,
     PcapModule
   ],
-  providers: [{ provide: APP_INITIALIZER, useFactory: initConfig, deps: [ColumnNamesService], multi: true },
+  providers: [{ provide: APP_INITIALIZER, useFactory: initConfig, deps: [AppConfigService], multi: true },
               { provide: DataSource, useClass: ElasticSearchLocalstorageImpl },
+              { provide: HTTP_INTERCEPTORS, useClass: DefaultHeadersInterceptor, multi: true },
+              AppConfigService,
               AuthenticationService,
               AuthGuard,
               LoginGuard,
               ConfigureTableService,
               SearchService,
               SaveSearchService,
-              MetronDialogBox,
               ColumnNamesService,
               UpdateService,
               MetaAlertService,
-              GlobalConfigService],
+              GlobalConfigService,
+              DialogService,
+            ],
   bootstrap: [AppComponent]
 })
 

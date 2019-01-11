@@ -16,8 +16,7 @@
  * limitations under the License.
  */
 import {Injectable} from '@angular/core';
-import {Observable} from 'rxjs/Rx';
-import {Http} from '@angular/http';
+import {Observable} from 'rxjs';
 
 import {ColumnNames} from '../model/column-names';
 import {DataSource} from './data-source';
@@ -58,12 +57,7 @@ export class ColumnNamesService {
     });
   }
 
-  constructor(private http: Http,
-              private dataSource: DataSource) {}
-
-  list(): Promise<ColumnNames[]> {
-    return this.dataSource.getAlertTableColumnNames().toPromise();
-  }
+  constructor(private dataSource: DataSource) {}
 
   save(columns: ColumnNames[]): Observable<{}> {
     return this.dataSource.saveAlertTableColumnNames(columns);

@@ -82,6 +82,7 @@ elasticsearch_template_installed_flag_file = metron_zookeeper_config_path + '/..
 solr_schema_installed_flag_file = metron_zookeeper_config_path + '/../metron_solr_schema_installed_flag_file'
 
 # REST
+metron_rest_host = default("/clusterHostInfo/metron_rest_hosts", [hostname])[0]
 metron_rest_port = config['configurations']['metron-rest-env']['metron_rest_port']
 rest_kafka_configured_flag_file = metron_zookeeper_config_path + '/../metron_rest_kafka_configured'
 rest_kafka_acl_configured_flag_file = metron_zookeeper_config_path + '/../metron_rest_kafka_acl_configured'
@@ -119,8 +120,14 @@ metron_principal_name = config['configurations']['metron-env']['metron_principal
 metron_keytab_path = config['configurations']['metron-env']['metron_service_keytab']
 
 # Pcap
+metron_pcap_topology = 'pcap'
+pcap_input_topic = config['configurations']['metron-pcap-env']['spout_kafka_topic_pcap']
 pcap_configured_flag_file = metron_zookeeper_config_path + '/../metron_pcap_configured'
 pcap_perm_configured_flag_file = metron_zookeeper_config_path + '/../metron_pcap_perm_configured'
+pcap_acl_configured_flag_file = metron_zookeeper_config_path + '/../metron_pcap_acl_configured'
 
 # MapReduce
 metron_user_hdfs_dir_configured_flag_file = metron_zookeeper_config_path + '/../metron_user_hdfs_dir_configured'
+
+# Knox
+metron_knox_installed_flag_file = metron_zookeeper_config_path + '/../metron_knox_installed'
