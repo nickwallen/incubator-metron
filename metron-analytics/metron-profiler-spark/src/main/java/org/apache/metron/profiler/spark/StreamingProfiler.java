@@ -50,6 +50,7 @@ import java.sql.Timestamp;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
@@ -108,12 +109,11 @@ public class StreamingProfiler {
             WINDOW_LAG_UNITS.get(profilerProps, String.class).toLowerCase());
     LOG.debug("windowLag = {}", windowLag);
 
+    // TODO how to handle any field?  put json itself in separate column?
     StructType schema = new StructType()
             .add("timestamp", DataTypes.LongType)
             .add("ip_src_addr", DataTypes.StringType)
             .add("ip_dst_addr", DataTypes.StringType);
-
-
 
     Dataset<Row> telemetry = spark
             .readStream()
@@ -127,41 +127,19 @@ public class StreamingProfiler {
             .selectExpr("topic", "offset", "json.timestamp", "json.ip_src_addr", "json.ip_dst_addr");
 
     telemetry
-            .withColumn("timestamp", telemetry.col("timestamp").divide(1000).cast(DataTypes.TimestampType))
-            .withWatermark("timestamp", "5 seconds")
-//            .groupBy(window(telemetry.col(timestampField), periodDuration))
-//            .count()
+            .withColumn("timestamp", col("timestamp").divide(1000).cast(DataTypes.TimestampType))
+            .withWatermark("timestamp", windowLag)
+            .groupBy(col("ip_src_addr"), window(col("timestamp"), periodDuration))
+            .count()
             .writeStream()
             .format("console")
+            .outputMode("append")
             .option("truncate", false)
             .option("numRows", 120)
             .start()
             .awaitTermination();
 
-    // fetch the streaming telemetry
-//    Dataset<String> telemetry = spark
-//            .readStream()
-//            .format(inputFormat)
-//            .options(Maps.fromProperties(readerProps))
-//            .load()
-//            .select("value")
-//            .as(Encoders.STRING());
 
-//
-//    Dataset<Timestamp> messages = telemetry
-//            .map(new TimestampExtractorFunction(timestampField), Encoders.TIMESTAMP());
-//
-//    Dataset<Row> messages = telemetry
-//            .map(new TimestampExtractorFunction(timestampField),
-//                    Encoders.tuple(Encoders.bean(JSONObject.class), Encoders.TIMESTAMP()))
-//            .toDF("message", "timestamp");
-
-//    messages
-//            //.withWatermark("timestamp", "5 seconds")
-//            .writeStream()
-//            .format("console")
-//            .start()
-//            .awaitTermination();
 
 //    Dataset<MessageRoute> routes = telemetry
 //            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));

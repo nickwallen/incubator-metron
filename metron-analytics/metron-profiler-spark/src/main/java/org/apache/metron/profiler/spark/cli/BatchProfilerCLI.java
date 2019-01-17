@@ -73,7 +73,7 @@ public class BatchProfilerCLI implements Serializable {
     CommandLine commandLine = parseCommandLine(args);
     profilerProps = handleProfilerProperties(commandLine);
     globals = handleGlobals(commandLine);
-    profiles = handleProfileDefinitions(commandLine);
+    ProfilerConfig profiles = handleProfileDefinitions(commandLine);
     readerProps = handleReaderProperties(commandLine);
 
     // the batch profiler must use 'event time'

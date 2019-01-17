@@ -237,7 +237,7 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
     // TODO configure writer properties
 
     // write the telemetry to the Kafka topic
-    List<String> telemetry = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
+    List<String> telemetry = FileUtils.readLines(new File("/Users/nallen/tmp/indexed/json/bro/enrichment-hdfsIndexingBolt-3-0-1530978700434.json"));
     kafkaComponent.writeMessages(inputTopic, telemetry);
 
     // setup Kafka
@@ -247,7 +247,7 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
     readerProperties.put("startingOffsets", "earliest");
 
     // setup profiler
-    profilerProperties.put(PERIOD_DURATION.getKey(), 10);
+    profilerProperties.put(PERIOD_DURATION.getKey(), 30);
     profilerProperties.put(PERIOD_DURATION_UNITS.getKey(), "seconds");
     profilerProperties.put(WINDOW_LAG.getKey(), 5);
     profilerProperties.put(WINDOW_LAG_UNITS.getKey(), "seconds");
