@@ -111,7 +111,7 @@ public class StreamingProfiler {
 
     // TODO how to handle any field?  put json itself in separate column?
     StructType schema = new StructType()
-            .add("timestamp", DataTypes.LongType)
+            .add(timestampField, DataTypes.LongType)
             .add("ip_src_addr", DataTypes.StringType)
             .add("ip_dst_addr", DataTypes.StringType);
 
@@ -127,7 +127,7 @@ public class StreamingProfiler {
             .selectExpr("topic", "offset", "json.timestamp", "json.ip_src_addr", "json.ip_dst_addr");
 
     telemetry
-            .withColumn("timestamp", col("timestamp").divide(1000).cast(DataTypes.TimestampType))
+            .withColumn(timestampField, col(timestampField).divide(1000).cast(DataTypes.TimestampType))
             .withWatermark("timestamp", windowLag)
             .groupBy(col("ip_src_addr"), window(col("timestamp"), periodDuration))
             .count()
@@ -139,40 +139,6 @@ public class StreamingProfiler {
             .start()
             .awaitTermination();
 
-
-
-//    Dataset<MessageRoute> routes = telemetry
-//            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));
-
-//    Dataset<Row> foo = telemetry.select("value").map(row -> parseJSON(row.getString(0)))
-//            .map(row -> {
-//      JSONParser parser = new JSONParser();
-//      try {
-//        JSONObject message = (JSONObject) parser.parse(row.));
-//        return message;
-//
-//      } catch(Throwable e) {
-//        LOG.warn(String.format("Unable to parse message, message will be ignored"), e);
-//        return null;
-//      }
-//    }, Encoders.STRING());
-
-    // TEMP to view results of above
-//    StreamingQuery query = routes
-//            .writeStream()
-//            .trigger(Trigger.Once())
-//            .format("console")
-//            .start();
-//    query.awaitTermination();
-//
-//            .selectExpr("CAST(value AS STRING)")
-//            .as(Encoders.STRING());
-
-
-    // TODO where do we group over a period of time, then flush???  Right now everything in one trigger is flushed together?
-    // TODO instead of relying on groupByKey after we get the routes, do we have to do that here?
-    // TODO where do we group over a period of time, then flush???  Right now everything in one trigger is flushed together?
-    // TODO or does this already work
 
     // find all routes for each message
 //    Dataset<MessageRoute> routes = telemetry
