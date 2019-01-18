@@ -21,6 +21,7 @@ package org.apache.metron.profiler.spark;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.google.common.collect.Maps;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.profiler.MessageRoute;
 import org.apache.metron.profiler.ProfileMeasurement;
@@ -30,6 +31,9 @@ import org.apache.metron.profiler.spark.function.JsonParserFunction;
 import org.apache.metron.profiler.spark.function.MessageRouterFunction;
 import org.apache.metron.profiler.spark.function.ProfileBuilderFunction;
 import org.apache.metron.profiler.spark.function.TimestampExtractorFunction;
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
@@ -40,13 +44,25 @@ import org.apache.spark.sql.streaming.Trigger;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.streaming.Duration;
+import org.apache.spark.streaming.Seconds;
+import org.apache.spark.streaming.StreamingContext;
+import org.apache.spark.streaming.api.java.JavaDStream;
+import org.apache.spark.streaming.api.java.JavaInputDStream;
+import org.apache.spark.streaming.api.java.JavaStreamingContext;
+import org.apache.spark.streaming.kafka010.ConsumerStrategies;
+import org.apache.spark.streaming.kafka010.KafkaUtils;
+import org.apache.spark.streaming.kafka010.LocationStrategies;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Tuple2;
 
 import java.lang.invoke.MethodHandles;
 import java.sql.Timestamp;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -80,7 +96,7 @@ public class StreamingProfiler {
    * @param profiles The profile definitions.
    * @return The number of profile measurements produced.
    */
-  public long run(SparkSession spark,
+  public long run(SparkConf sparkConf,
                   Properties profilerProps,
                   Properties globalProps,
                   Properties readerProps,
@@ -99,75 +115,53 @@ public class StreamingProfiler {
     // TODO need to handle if profiler using processing time
     String timestampField = profiles.getTimestampField().get();
 
-    String periodDuration = String.join(" ",
-            PERIOD_DURATION.get(profilerProps, Integer.class).toString(),
-            PERIOD_DURATION_UNITS.get(profilerProps, String.class).toLowerCase());
-    LOG.debug("periodDuration = {}", periodDuration);
+    long periodDurationMillis = TimeUnit.valueOf(PERIOD_DURATION_UNITS.get(profilerProps, String.class))
+            .toMillis(PERIOD_DURATION.get(profilerProps, Integer.class));
+    LOG.debug("periodDuration = {}", periodDurationMillis);
 
     String windowLag = String.join(" ",
             WINDOW_LAG.get(profilerProps, Integer.class).toString(),
             WINDOW_LAG_UNITS.get(profilerProps, String.class).toLowerCase());
     LOG.debug("windowLag = {}", windowLag);
 
-    // TODO how to handle any field?  put json itself in separate column?
-    StructType schema = new StructType()
-            .add(timestampField, DataTypes.LongType)
-            .add("ip_src_addr", DataTypes.StringType)
-            .add("ip_dst_addr", DataTypes.StringType);
 
-    Dataset<Row> telemetry = spark
-            .readStream()
-            .format(inputFormat)
-            .options(Maps.fromProperties(readerProps))
-            .load()
-            .select(col("topic"),
-                    col("offset"),
-                    col("timestamp").alias("kafkaTimestamp"),
-                    from_json(col("value").cast("string"), schema).alias("json"))
-            .selectExpr("topic", "offset", "json.timestamp", "json.ip_src_addr", "json.ip_dst_addr");
+    List<String> topics = Collections.singletonList("test");
 
-    telemetry
-            .withColumn(timestampField, col(timestampField).divide(1000).cast(DataTypes.TimestampType))
-            .withWatermark("timestamp", windowLag)
-            .groupBy(col("ip_src_addr"), window(col("timestamp"), periodDuration))
-            .count()
-            .writeStream()
-            .format("console")
-            .outputMode("append")
-            .option("truncate", false)
-            .option("numRows", 120)
-            .start()
-            .awaitTermination();
+    Map<String, Object> readerConf = (Map) readerProps;
+    JavaStreamingContext context = new JavaStreamingContext(sparkConf, new Duration(1000));
 
+    // TODO remove this
+    context.sparkContext().setLogLevel("ERROR");
+
+    JavaInputDStream<ConsumerRecord<String, String>> telemetry = KafkaUtils.createDirectStream(
+            context,
+            LocationStrategies.PreferConsistent(),
+            ConsumerStrategies.Subscribe(topics, readerConf));
 
     // find all routes for each message
-//    Dataset<MessageRoute> routes = telemetry
-//            .flatMap(new MessageRouterFunction(profiles, globals), Encoders.bean(MessageRoute.class));
+    JavaDStream<MessageRoute> routes = telemetry
+            .map(record -> record.value())
+            .flatMap(new MessageRouterFunction(profiles, globals));
 
     // TODO need to set the window size and lag based on profiler settings
+    routes
+            .mapToPair(route -> new Tuple2<String, MessageRoute>(route.getEntity(), route))
+            .groupByKeyAndWindow(new Duration(periodDurationMillis))
+            .map((pair) -> new ProfileBuilderFunction(profilerProps, globals).call(pair._1(), pair._2().iterator()))
+            .print(20);
 
     // build the profiles
-//    Dataset<ProfileMeasurementAdapter> measurements = routes
+//    JavaDStream<ProfileMeasurementAdapter> measurements = routes
 //            .withWatermark(timestampField, windowLag)
 //            .groupByKey(new GroupByPeriodFunction(profilerProps), Encoders.STRING())
 //            .mapGroups(new ProfileBuilderFunction(profilerProps, globals), Encoders.bean(ProfileMeasurementAdapter.class));
 
-    // TODO TELEMETRY_OUTPUT_FORMAT; outputFormat = "kafka"
-    String outputFormat = "console";
-
-    // write the profile measurements
-//    StreamingQuery profiler = measurements
-//            .writeStream()
-//            .trigger(Trigger.Once())
-//            .options(Maps.fromProperties(writerProps))
-//            .format(outputFormat)
-//            .outputMode("complete")
-//            .start();
-
-//    profiler.awaitTermination();
+    context.start();
+    context.awaitTermination();
 
     // TODO
     int count = 0;
     return count;
   }
+
 }

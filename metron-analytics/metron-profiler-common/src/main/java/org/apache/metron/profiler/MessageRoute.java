@@ -141,4 +141,14 @@ public class MessageRoute implements Serializable {
             .append(timestamp)
             .toHashCode();
   }
+
+  @Override
+  public String toString() {
+    return "MessageRoute{" +
+            "profileName=" + profileDefinition.getProfile() +
+            ", entity='" + entity + '\'' +
+            ", message=" + message +
+            ", timestamp=" + timestamp +
+            '}';
+  }
 }

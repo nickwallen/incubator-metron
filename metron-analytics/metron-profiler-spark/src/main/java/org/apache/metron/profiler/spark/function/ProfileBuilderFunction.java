@@ -81,7 +81,7 @@ public class ProfileBuilderFunction implements MapGroupsFunction<String, Message
     List<MessageRoute> routes = toStream(iterator)
             .sorted(comparing(rt -> rt.getTimestamp()))
             .collect(Collectors.toList());
-    LOG.debug("Building a profile for group '{}' from {} message(s)", group, routes.size());
+    LOG.error("Building a profile for group '{}' from {} message(s)", group, routes.size());
 
     // apply each message/route to build the profile
     for(MessageRoute route: routes) {

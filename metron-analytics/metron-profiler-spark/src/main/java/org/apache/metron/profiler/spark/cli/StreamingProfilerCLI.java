@@ -20,6 +20,7 @@
 package org.apache.metron.profiler.spark.cli;
 
 import org.apache.commons.cli.CommandLine;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.profiler.spark.BatchProfiler;
@@ -63,15 +64,21 @@ public class StreamingProfilerCLI {
     profilerProps = new Properties();
     profilerProps.put(TELEMETRY_INPUT_FORMAT.getKey(), "kafka");
     profilerProps.put(PERIOD_DURATION.getKey(), 30);
-    profilerProps.put(PERIOD_DURATION_UNITS.getKey(), "seconds");
+    profilerProps.put(PERIOD_DURATION_UNITS.getKey(), "SECONDS");
     profilerProps.put(WINDOW_LAG.getKey(), 5);
     profilerProps.put(WINDOW_LAG_UNITS.getKey(), "seconds");
 
     // TODO replace with CLI
     readerProps = new Properties();
     readerProps.put("subscribe", "test");
-    readerProps.put("kafka.bootstrap.servers", "localhost:9092");
-    readerProps.put("startingOffsets", "earliest");
+    readerProps.put("bootstrap.servers", "localhost:9092");
+    readerProps.put("auto.offset.reset", "earliest");
+    readerProps.put("group.id", "streaming-profiler");
+    readerProps.put("key.deserializer", StringDeserializer.class);
+    readerProps.put("value.deserializer", StringDeserializer.class);
+
+    // TODO auto commit = false
+    readerProps.put("enable.auto.commit", true);
 
     globals = new Properties();
 
@@ -97,16 +104,16 @@ public class StreamingProfilerCLI {
     // TODO this should be defined by user CLI
     SparkConf conf = new SparkConf();
     conf.set("spark.master", "local[*]");
+    conf.set("spark.app.name", "Streaming Profiler");
 
-    SparkSession spark = SparkSession
-            .builder()
-            .config(conf)
-            .getOrCreate();
-
-    spark.sparkContext().setLogLevel("ERROR");
+//    SparkSession spark = SparkSession
+//            .builder()
+//            .config(conf)
+//            .getOrCreate();
+//    spark.sparkContext().setLogLevel("ERROR");
 
     StreamingProfiler profiler = new StreamingProfiler();
-    long count = profiler.run(spark, profilerProps, globals, readerProps, writerProps, profiles);
+    long count = profiler.run(conf, profilerProps, globals, readerProps, writerProps, profiles);
     LOG.info("Profiler produced {} profile measurement(s)", count);
   }
 }

@@ -253,7 +253,7 @@ public class StreamingProfilerIntegrationTest extends BaseIntegrationTest {
     profilerProperties.put(WINDOW_LAG_UNITS.getKey(), "seconds");
 
     StreamingProfiler profiler = new StreamingProfiler();
-    profiler.run(spark, profilerProperties, getGlobals(), readerProperties, writerProperties, getProfile());
+    profiler.run(spark.sparkContext().getConf(), profilerProperties, getGlobals(), readerProperties, writerProperties, getProfile());
 
     validateProfiles();
   }

@@ -24,6 +24,7 @@ import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -128,5 +129,16 @@ public class ProfileMeasurementAdapter implements Serializable {
 
   public void setProfileValue(Object profileValue) {
     this.profileValue = SerDeUtils.toBytes(profileValue);
+  }
+
+  @Override
+  public String toString() {
+    return "ProfileMeasurementAdapter{" +
+            "profileName='" + profileName + '\'' +
+            ", entity='" + entity + '\'' +
+            ", periodId=" + periodId +
+            ", durationMillis=" + durationMillis +
+            ", profileValue=" + Arrays.toString(profileValue) +
+            '}';
   }
 }
