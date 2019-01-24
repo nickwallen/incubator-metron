@@ -28,10 +28,15 @@ import java.util.concurrent.TimeUnit;
 
 /*
 
+branch: PROFILER-SPARK-PHOENIX
+
 start-hbase.sh
 
 cd ~/tmp/apache-phoenix-4.14.1-HBase-1.1-bin/bin
 ./queryserver.py
+
+cd ~/tmp/zeppelin-0.7.3-bin-all
+./bin/zeppelin-daemon.sh start
 
 See https://zeppelin.apache.org/docs/0.7.3/interpreter/jdbc.html#apache-phoenix
 Create Phoenix interpreter in Zeppelin using thin client.
@@ -44,6 +49,8 @@ Create Phoenix interpreter in Zeppelin using thin client.
 Dependencies
 Artifact
 org.apache.phoenix:phoenix-queryserver-client:4.8.0-HBase-1.2		For Phoenix 4.8+
+
+Go to http://localhost:8080/#/
 
 %phoenix
 drop table profiler1;
@@ -58,6 +65,7 @@ create table profiler1 (
    constraint pk primary key (profileName, entity, periodId)
  );
 
+cd metron-analytics/metron-profiler-spark/
 spark-submit \
   --class org.apache.metron.profiler.spark.cli.BatchProfilerCLI \
   --properties-file ~/tmp/profiler.properties \
