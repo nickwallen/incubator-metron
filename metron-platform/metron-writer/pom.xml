@@ -265,7 +265,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google.common</pattern>
-                                    <shadedPattern>org.apache.metron.guava</shadedPattern>
+                                    <shadedPattern>org.apache.metron.metron-writer.guava</shadedPattern>
                                 </relocation>
                             </relocations>
                             <transformers>

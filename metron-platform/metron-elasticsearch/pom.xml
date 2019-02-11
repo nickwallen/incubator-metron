@@ -262,7 +262,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google.common</pattern>
-                                    <shadedPattern>org.apache.metron.guava.metron-elasticsearch</shadedPattern>
+                                    <shadedPattern>org.apache.metron.elasticsearch.guava</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml.jackson</pattern>

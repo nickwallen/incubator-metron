@@ -229,7 +229,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google.common</pattern>
-                                    <shadedPattern>org.apache.metron.guava</shadedPattern>
+                                    <shadedPattern>org.apache.metron.management.guava</shadedPattern>
                                 </relocation>
                             </relocations>
                             <transformers>

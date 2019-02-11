@@ -362,7 +362,7 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.google.common</pattern>
-                                    <shadedPattern>org.apache.metron.guava.metron-profiler</shadedPattern>
+                                    <shadedPattern>org.apache.metron-profiler-storm.guava</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>com.fasterxml.jackson</pattern>
