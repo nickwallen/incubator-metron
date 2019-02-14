@@ -15,30 +15,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.elasticsearch.writer;
+package org.apache.metron.common.writer;
 
-import org.apache.metron.indexing.dao.update.Document;
-import org.apache.storm.tuple.Tuple;
+import java.util.Objects;
 
-import java.util.Map;
+public class BulkWriterMessage<MESSAGE_T> {
 
-/**
- * An {@link Document} that is created from the contents of a {@link Tuple}.
- */
-public class TupleBasedDocument extends Document {
+  private String id;
+  private MESSAGE_T message;
 
-    private Tuple tuple;
+  public BulkWriterMessage(String id, MESSAGE_T message) {
+    this.id = id;
+    this.message = message;
+  }
 
-    public TupleBasedDocument(Map<String, Object> document,
-                              String guid,
-                              String sensorType,
-                              Long timestamp,
-                              Tuple tuple) {
-        super(document, guid, sensorType, timestamp);
-        this.tuple = tuple;
-    }
+  public String getId() {
+    return id;
+  }
 
-    public Tuple getTuple() {
-        return tuple;
-    }
+  public MESSAGE_T getMessage() {
+    return message;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    BulkWriterMessage<?> that = (BulkWriterMessage<?>) o;
+    return Objects.equals(id, that.id) &&
+            Objects.equals(message, that.message);
+  }
+
+  @Override
+  public int hashCode() {
+
+    return Objects.hash(id, message);
+  }
 }

@@ -18,13 +18,13 @@
 package org.apache.metron.writer.hdfs;
 
 import org.apache.metron.common.configuration.IndexingConfigurations;
+import org.apache.metron.common.writer.BulkWriterMessage;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.MapVariableResolver;
 import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.apache.metron.stellar.dsl.VariableResolver;
 import org.apache.metron.stellar.common.StellarProcessor;
 import org.apache.storm.task.TopologyContext;
-import org.apache.storm.tuple.Tuple;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.BulkWriterResponse;
@@ -38,6 +38,7 @@ import org.json.simple.JSONObject;
 
 import java.io.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class HdfsWriter implements BulkMessageWriter<JSONObject>, Serializable {
   List<RotationAction> rotationActions = new ArrayList<>();
@@ -94,29 +95,30 @@ public class HdfsWriter implements BulkMessageWriter<JSONObject>, Serializable {
   @Override
   public BulkWriterResponse write(String sourceType
                    , WriterConfiguration configurations
-                   , Iterable<Tuple> tuples
-                   , List<JSONObject> messages
+                   , List<BulkWriterMessage<JSONObject>> messages
                    ) throws Exception
   {
+    System.out.println(String.format("HDFS writer: recieved %d messages with a batch size of %d for sensor %s", messages.size(), configurations.getBatchSize(sourceType), sourceType));
     BulkWriterResponse response = new BulkWriterResponse();
 
     // Currently treating all the messages in a group for pass/failure.
+    Set<String> ids = messages.stream().map(BulkWriterMessage::getId).collect(Collectors.toSet());
     try {
       // Messages can all result in different HDFS paths, because of Stellar Expressions, so we'll need to iterate through
-      for(JSONObject message : messages) {
+      for(BulkWriterMessage<JSONObject> bulkWriterMessage : messages) {
         String path = getHdfsPathExtension(
                 sourceType,
                 (String)configurations.getSensorConfig(sourceType).getOrDefault(IndexingConfigurations.OUTPUT_PATH_FUNCTION_CONF, ""),
-                message
+                bulkWriterMessage.getMessage()
         );
         SourceHandler handler = getSourceHandler(sourceType, path, configurations);
-        handler.handle(message, sourceType, configurations, syncPolicyCreator);
+        handler.handle(bulkWriterMessage.getMessage(), sourceType, configurations, syncPolicyCreator);
       }
     } catch (Exception e) {
-      response.addAllErrors(e, tuples);
+      response.addAllErrors(e, ids);
     }
 
-    response.addAllSuccesses(tuples);
+    response.addAllSuccesses(ids);
     return response;
   }
 

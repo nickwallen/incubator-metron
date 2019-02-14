@@ -26,7 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Future;
+import java.util.stream.Collectors;
+
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -36,11 +39,11 @@ import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.utils.KafkaUtils;
 import org.apache.metron.common.utils.StringUtils;
 import org.apache.metron.common.writer.BulkMessageWriter;
+import org.apache.metron.common.writer.BulkWriterMessage;
 import org.apache.metron.common.writer.BulkWriterResponse;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.apache.metron.writer.AbstractWriter;
 import org.apache.storm.task.TopologyContext;
-import org.apache.storm.tuple.Tuple;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -151,6 +154,13 @@ public class KafkaWriter extends AbstractWriter implements BulkMessageWriter<JSO
     return Optional.ofNullable(configPrefix);
   }
 
+  /**
+   * Used only for unit testing
+   */
+  protected void setKafkaProducer(KafkaProducer kafkaProducer) {
+    this.kafkaProducer = kafkaProducer;
+  }
+
   @Override
   public void configure(String sensorName, WriterConfiguration configuration) {
     Map<String, Object> configMap = configuration.getSensorConfig(sensorName);
@@ -228,17 +238,17 @@ public class KafkaWriter extends AbstractWriter implements BulkMessageWriter<JSO
 
   @Override
   public BulkWriterResponse write(String sensorType, WriterConfiguration configurations,
-      Iterable<Tuple> tuples, List<JSONObject> messages) {
+                                  List<BulkWriterMessage<JSONObject>> messages) {
     BulkWriterResponse writerResponse = new BulkWriterResponse();
-    List<Map.Entry<Tuple, Future>> results = new ArrayList<>();
-    int i = 0;
-    for (Tuple tuple : tuples) {
-      JSONObject message = messages.get(i++);
+    List<Map.Entry<String, Future>> results = new ArrayList<>();
+    for (BulkWriterMessage<JSONObject> bulkWriterMessage: messages) {
+      String id = bulkWriterMessage.getId();
+      JSONObject message = bulkWriterMessage.getMessage();
       String jsonMessage;
       try {
          jsonMessage = message.toJSONString();
       } catch (Throwable t) {
-        writerResponse.addError(t, tuple);
+        writerResponse.addError(t, id);
         continue;
       }
       Optional<String> topic = getKafkaTopic(message);
@@ -246,22 +256,23 @@ public class KafkaWriter extends AbstractWriter implements BulkMessageWriter<JSO
         Future future = kafkaProducer
             .send(new ProducerRecord<String, String>(topic.get(), jsonMessage));
         // we want to manage the batching
-        results.add(new AbstractMap.SimpleEntry<>(tuple, future));
+        results.add(new AbstractMap.SimpleEntry<>(id, future));
       }
       else {
         LOG.debug("Dropping {} because no topic is specified.", jsonMessage);
       }
     }
 
+    Set<String> ids = messages.stream().map(BulkWriterMessage::getId).collect(Collectors.toSet());
     try {
       // ensures all Future.isDone() == true
       kafkaProducer.flush();
     } catch (InterruptException e) {
-      writerResponse.addAllErrors(e, tuples);
+      writerResponse.addAllErrors(e, ids);
       return writerResponse;
     }
 
-    for (Map.Entry<Tuple, Future> kv : results) {
+    for (Map.Entry<String, Future> kv : results) {
       try {
         kv.getValue().get();
         writerResponse.addSuccess(kv.getKey());

@@ -21,8 +21,10 @@ package org.apache.metron.parsers.bolt;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,10 @@ import org.junit.Test;
 import org.mockito.Mock;
 
 public class WriterBoltTest extends BaseBoltTest{
+
+  private static final String MESSAGE_ID_FORMAT = "messageId%d";
+  private static final String MESSAGE_FORMAT = "message%d";
+
   @Mock
   protected TopologyContext topologyContext;
 
@@ -84,32 +90,40 @@ public class WriterBoltTest extends BaseBoltTest{
   public void testBatchHappyPath() throws Exception {
     ParserConfigurations configurations = getConfigurations(5);
     String sensorType = "test";
+    WriterBolt bolt = spy(new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType));
     List<Tuple> tuples = new ArrayList<>();
+    List<String> messageIds = new ArrayList<>();
     for(int i = 0;i < 5;++i) {
       Tuple t = mock(Tuple.class);
-      when(t.getValueByField(eq("message"))).thenReturn(new JSONObject());
+      String messageId = String.format(MESSAGE_ID_FORMAT, i + 1);
+      messageIds.add(messageId);
+      JSONObject message = new JSONObject();
+      message.put("value", String.format(MESSAGE_FORMAT, i + 1));
+      when(t.getValueByField(eq("message"))).thenReturn(message);
       tuples.add(t);
     }
-    WriterBolt bolt = new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType);
+
     bolt.prepare(new HashMap(), topologyContext, outputCollector);
     verify(batchWriter, times(1)).init(any(), any(), any());
     for(int i = 0;i < 4;++i) {
       Tuple t = tuples.get(i);
+      doReturn(messageIds.get(i)).when(bolt).getMessageId();
       bolt.execute(t);
       verify(outputCollector, times(0)).ack(t);
-      verify(batchWriter, times(0)).write(eq(sensorType), any(), any(), any());
+      verify(batchWriter, times(0)).write(eq(sensorType), any(), any());
     }
 
     // Ensure the batch returns the good Tuples
     BulkWriterResponse writerResponse = new BulkWriterResponse();
-    writerResponse.addAllSuccesses(tuples);
-    when(batchWriter.write(any(), any(), any(), any())).thenReturn(writerResponse);
+    writerResponse.addAllSuccesses(messageIds);
+    when(batchWriter.write(any(), any(), any())).thenReturn(writerResponse);
 
+    doReturn(messageIds.get(4)).when(bolt).getMessageId();
     bolt.execute(tuples.get(4));
     for(Tuple t : tuples) {
       verify(outputCollector, times(1)).ack(t);
     }
-    verify(batchWriter, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(batchWriter, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(0)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
   }
@@ -125,7 +139,7 @@ public class WriterBoltTest extends BaseBoltTest{
     verify(writer, times(1)).init();
     bolt.execute(t);
     verify(outputCollector, times(1)).ack(t);
-    verify(writer, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(writer, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(0)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
   }
@@ -140,7 +154,7 @@ public class WriterBoltTest extends BaseBoltTest{
     verify(writer, times(1)).init();
     bolt.execute(t);
     verify(outputCollector, times(1)).ack(t);
-    verify(writer, times(0)).write(eq(sensorType), any(), any(), any());
+    verify(writer, times(0)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(1)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
   }
@@ -153,17 +167,17 @@ public class WriterBoltTest extends BaseBoltTest{
     when(t.getValueByField(eq("message"))).thenReturn(new JSONObject());
     WriterBolt bolt = new WriterBolt(new WriterHandler(writer), configurations, sensorType);
     bolt.prepare(new HashMap(), topologyContext, outputCollector);
-    doThrow(new Exception("write error")).when(writer).write(any(), any(), any(), any());
+    doThrow(new Exception("write error")).when(writer).write(any(), any(), any());
     verify(writer, times(1)).init();
     bolt.execute(t);
     verify(outputCollector, times(1)).ack(t);
-    verify(writer, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(writer, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(1)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
 
     MetronError error = new MetronError()
-            .withErrorType(Constants.ErrorType.DEFAULT_ERROR)
-            .withThrowable(new IllegalStateException("Unhandled bulk errors in response: {java.lang.Exception: write error=[tuple]}"))
+            .withErrorType(Constants.ErrorType.INDEXING_ERROR)
+            .withThrowable(new Exception("write error"))
             .withSensorType(Collections.singleton(sensorType))
             .addRawMessage(new JSONObject());
     verify(outputCollector, times(1)).emit(eq(Constants.ERROR_STREAM), argThat(new MetronErrorJSONMatcher(error.getJSONObject())));
@@ -173,10 +187,16 @@ public class WriterBoltTest extends BaseBoltTest{
   public void testBatchErrorPath() throws Exception {
     ParserConfigurations configurations = getConfigurations(5);
     String sensorType = "test";
+    WriterBolt bolt = spy(new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType));
     List<Tuple> tuples = new ArrayList<>();
+    List<String> messageIds = new ArrayList<>();
     for(int i = 0;i < 4;++i) {
       Tuple t = mock(Tuple.class);
-      when(t.getValueByField(eq("message"))).thenReturn(new JSONObject());
+      String messageId = String.format(MESSAGE_ID_FORMAT, i + 1);
+      messageIds.add(messageId);
+      JSONObject message = new JSONObject();
+      message.put("value", String.format(MESSAGE_FORMAT, i + 1));
+      when(t.getValueByField(eq("message"))).thenReturn(message);
       tuples.add(t);
     }
     Tuple errorTuple = mock(Tuple.class);
@@ -184,33 +204,35 @@ public class WriterBoltTest extends BaseBoltTest{
     when(goodTuple.getValueByField(eq("message"))).thenReturn(new JSONObject());
     when(errorTuple.getValueByField(eq("message"))).thenThrow(new IllegalStateException());
 
-    WriterBolt bolt = new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType);
+
     bolt.prepare(new HashMap(), topologyContext, outputCollector);
     verify(batchWriter, times(1)).init(any(), any(), any());
 
     for(int i = 0;i < 4;++i) {
       Tuple t = tuples.get(i);
+      doReturn(messageIds.get(i)).when(bolt).getMessageId();
       bolt.execute(t);
       verify(outputCollector, times(0)).ack(t);
-      verify(batchWriter, times(0)).write(eq(sensorType), any(), any(), any());
+      verify(batchWriter, times(0)).write(eq(sensorType), any(), any());
     }
 
     // Add the good tuples.  Do not add the error tuple, because this is testing an exception on access, not a failure on write.
     BulkWriterResponse writerResponse = new BulkWriterResponse();
-    writerResponse.addAllSuccesses(tuples);
-    writerResponse.addSuccess(goodTuple);
-    when(batchWriter.write(any(), any(), any(), any())).thenReturn(writerResponse);
+    writerResponse.addAllSuccesses(messageIds);
+    writerResponse.addSuccess("goodMessage");
+    when(batchWriter.write(any(), any(), any())).thenReturn(writerResponse);
 
     bolt.execute(errorTuple);
     for(Tuple t : tuples) {
       verify(outputCollector, times(0)).ack(t);
     }
+    doReturn("goodMessageId").when(bolt).getMessageId();
     bolt.execute(goodTuple);
     for(Tuple t : tuples) {
       verify(outputCollector, times(1)).ack(t);
     }
     verify(outputCollector, times(1)).ack(goodTuple);
-    verify(batchWriter, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(batchWriter, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(1)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
   }
@@ -219,46 +241,58 @@ public class WriterBoltTest extends BaseBoltTest{
   public void testBatchErrorWriteFailure() throws Exception {
     ParserConfigurations configurations = getConfigurations(6);
     String sensorType = "test";
+    WriterBolt bolt = spy(new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType));
     List<Tuple> tuples = new ArrayList<>();
+    List<String> messageIds = new ArrayList<>();
     for(int i = 0;i < 4;++i) {
       Tuple t = mock(Tuple.class);
-      when(t.getValueByField(eq("message"))).thenReturn(new JSONObject());
+      String messageId = String.format(MESSAGE_ID_FORMAT, i + 1);
+      messageIds.add(messageId);
+      JSONObject message = new JSONObject();
+      message.put("value", String.format(MESSAGE_FORMAT, i + 1));
+      when(t.getValueByField(eq("message"))).thenReturn(message);
       tuples.add(t);
     }
     Tuple errorTuple = mock(Tuple.class);
     Tuple goodTuple = mock(Tuple.class);
-    when(goodTuple.getValueByField(eq("message"))).thenReturn(new JSONObject());
-    when(errorTuple.getValueByField(eq("message"))).thenReturn(new JSONObject());
+    JSONObject goodMessage = new JSONObject();
+    goodMessage.put("value", "goodMessage");
+    JSONObject errorMessage = new JSONObject();
+    errorMessage.put("value", "errorMessage");
+    when(goodTuple.getValueByField(eq("message"))).thenReturn(goodMessage);
+    when(errorTuple.getValueByField(eq("message"))).thenReturn(errorMessage);
 
-    WriterBolt bolt = new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType);
     bolt.prepare(new HashMap(), topologyContext, outputCollector);
     verify(batchWriter, times(1)).init(any(), any(), any());
 
     for(int i = 0;i < 4;++i) {
       Tuple t = tuples.get(i);
+      doReturn(messageIds.get(i)).when(bolt).getMessageId();
       bolt.execute(t);
       verify(outputCollector, times(0)).ack(t);
-      verify(batchWriter, times(0)).write(eq(sensorType), any(), any(), any());
+      verify(batchWriter, times(0)).write(eq(sensorType), any(), any());
     }
 
     // Add both the good and error Tuples. This simulates a seemingly good Tuple that fails on write.
     BulkWriterResponse writerResponse = new BulkWriterResponse();
-    writerResponse.addAllSuccesses(tuples);
-    writerResponse.addSuccess(goodTuple);
-    writerResponse.addError(new IllegalStateException(), errorTuple);
-    when(batchWriter.write(any(), any(), any(), any())).thenReturn(writerResponse);
+    writerResponse.addAllSuccesses(messageIds);
+    writerResponse.addSuccess("goodMessageId");
+    writerResponse.addError(new IllegalStateException(), "errorMessageId");
+    when(batchWriter.write(any(), any(), any())).thenReturn(writerResponse);
+    doReturn("errorMessageId").when(bolt).getMessageId();
     bolt.execute(errorTuple);
     for(Tuple t : tuples) {
       verify(outputCollector, times(0)).ack(t);
     }
     UnitTestHelper.setLog4jLevel(BulkWriterComponent.class, Level.FATAL);
+    doReturn("goodMessageId").when(bolt).getMessageId();
     bolt.execute(goodTuple);
     UnitTestHelper.setLog4jLevel(BulkWriterComponent.class, Level.ERROR);
     for(Tuple t : tuples) {
       verify(outputCollector, times(1)).ack(t);
     }
     verify(outputCollector, times(1)).ack(goodTuple);
-    verify(batchWriter, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(batchWriter, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(1)).reportError(any());
     verify(outputCollector, times(0)).fail(any());
   }
@@ -267,32 +301,40 @@ public class WriterBoltTest extends BaseBoltTest{
   public void testBatchErrorPathExceptionInWrite() throws Exception {
     ParserConfigurations configurations = getConfigurations(5);
     String sensorType = "test";
+    WriterBolt bolt = spy(new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType));
     List<Tuple> tuples = new ArrayList<>();
+    List<String> messageIds = new ArrayList<>();
     for(int i = 0;i < 4;++i) {
       Tuple t = mock(Tuple.class);
-      when(t.getValueByField(eq("message"))).thenReturn(new JSONObject());
+      String messageId = String.format(MESSAGE_ID_FORMAT, i + 1);
+      messageIds.add(messageId);
+      JSONObject message = new JSONObject();
+      message.put("value", String.format(MESSAGE_FORMAT, i + 1));
+      when(t.getValueByField(eq("message"))).thenReturn(message);
       tuples.add(t);
     }
     Tuple goodTuple = mock(Tuple.class);
     when(goodTuple.getValueByField(eq("message"))).thenReturn(new JSONObject());
 
-    WriterBolt bolt = new WriterBolt(new WriterHandler(batchWriter), configurations, sensorType);
     bolt.prepare(new HashMap(), topologyContext, outputCollector);
-    doThrow(new Exception()).when(batchWriter).write(any(), any(), any(), any());
+    doThrow(new Exception()).when(batchWriter).write(any(), any(), any());
     verify(batchWriter, times(1)).init(any(), any(), any());
     for(int i = 0;i < 4;++i) {
       Tuple t = tuples.get(i);
+      doReturn(messageIds.get(i)).when(bolt).getMessageId();
       bolt.execute(t);
       verify(outputCollector, times(0)).ack(t);
-      verify(batchWriter, times(0)).write(eq(sensorType), any(), any(), any());
+      verify(batchWriter, times(0)).write(eq(sensorType), any(), any());
     }
     UnitTestHelper.setLog4jLevel(BulkWriterComponent.class, Level.FATAL);
+
+    doReturn("goodMessageId").when(bolt).getMessageId();
     bolt.execute(goodTuple);
     UnitTestHelper.setLog4jLevel(BulkWriterComponent.class, Level.ERROR);
     for(Tuple t : tuples) {
       verify(outputCollector, times(1)).ack(t);
     }
-    verify(batchWriter, times(1)).write(eq(sensorType), any(), any(), any());
+    verify(batchWriter, times(1)).write(eq(sensorType), any(), any());
     verify(outputCollector, times(1)).ack(goodTuple);
     verify(outputCollector, times(1)).reportError(any());
     verify(outputCollector, times(0)).fail(any());

@@ -15,17 +15,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.metron.common.writer;
+package org.apache.metron.writer;
 
-import org.apache.storm.tuple.Tuple;
-import org.apache.metron.common.configuration.Configurations;
-import org.apache.metron.common.configuration.writer.WriterConfiguration;
+import org.apache.metron.common.writer.BulkWriterResponse;
 
-import java.io.Serializable;
+/**
+ * This interface is used by the {@link org.apache.metron.writer.BulkWriterComponent} to report that a queue for a
+ * sensor type has been flushed.  Different frameworks may have different requirements for committing processed messages
+ * so this interface provides a way to pass in the appropriate commit logic for the framework in use.
+ */
+public interface BulkWriterResponseHandler {
 
-public interface MessageWriter<T> extends AutoCloseable, Serializable {
-
-  void init();
-  void write(String sensorType, WriterConfiguration configurations, BulkWriterMessage<T> message) throws Exception;
-  String getName();
+  /**
+   * Called immediately after a batch has been flushed.
+   * @param sensorType The type of sensor generating the messages
+   * @param response A response containing successes and failures within the batch
+   */
+  void handleFlush(String sensorType, BulkWriterResponse response);
 }
