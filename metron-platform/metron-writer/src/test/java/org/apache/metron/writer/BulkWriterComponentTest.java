@@ -54,7 +54,7 @@ public class BulkWriterComponentTest {
   public final ExpectedException exception = ExpectedException.none();
 
   @Mock
-  private BulkWriterResponseHandler bulkWriterResponseHandler;
+  private AckTuplesPolicy ackTuplesPolicy;
 
   @Mock
   private BulkMessageWriter<JSONObject> bulkMessageWriter;
@@ -94,11 +94,12 @@ public class BulkWriterComponentTest {
 
     when(bulkMessageWriter.write(sensorType, configurations, messages)).thenReturn(response);
 
-    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(bulkWriterResponseHandler);
+    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<JSONObject>()
+            .withFlushPolicy(ackTuplesPolicy);
     bulkWriterComponent.write(sensorType, messageId1, message1, bulkMessageWriter, configurations);
 
     verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
-    verify(bulkWriterResponseHandler, times(0)).handleFlush(any(), any());
+    verify(ackTuplesPolicy, times(0)).onFlush(any(), any());
 
     bulkWriterComponent.write(sensorType, messageId2, message2, bulkMessageWriter, configurations);
 
@@ -106,14 +107,14 @@ public class BulkWriterComponentTest {
     expectedResponse.addAllSuccesses(messageIds);
     verify(bulkMessageWriter, times(1)).write(sensorType, configurations,
             Arrays.asList(new BulkWriterMessage<>(messageId1, message1), new BulkWriterMessage<>(messageId2, message2)));
-    verify(bulkWriterResponseHandler, times(1)).handleFlush(sensorType, expectedResponse);
+    verify(ackTuplesPolicy, times(1)).onFlush(sensorType, expectedResponse);
 
-    verifyNoMoreInteractions(bulkMessageWriter, bulkWriterResponseHandler);
+    verifyNoMoreInteractions(bulkMessageWriter, ackTuplesPolicy);
   }
 
   @Test
   public void writeShouldFlushPreviousMessagesWhenDisabled() throws Exception {
-    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(bulkWriterResponseHandler);
+    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(ackTuplesPolicy);
 
     when(configurations.isEnabled(sensorType)).thenReturn(false);
 
@@ -123,9 +124,9 @@ public class BulkWriterComponentTest {
     expectedDisabledResponse.addSuccess(messageId1);
 
     verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
-    verify(bulkWriterResponseHandler, times(1)).handleFlush(sensorType, expectedDisabledResponse);
+    verify(ackTuplesPolicy, times(1)).handleFlush(sensorType, expectedDisabledResponse);
 
-    verifyNoMoreInteractions(bulkMessageWriter, bulkWriterResponseHandler);
+    verifyNoMoreInteractions(bulkMessageWriter, ackTuplesPolicy);
   }
 
   @Test
@@ -136,15 +137,15 @@ public class BulkWriterComponentTest {
 
     when(bulkMessageWriter.write(sensorType, configurations, messages)).thenReturn(response);
 
-    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(bulkWriterResponseHandler);
+    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(ackTuplesPolicy);
     bulkWriterComponent.write(sensorType, messageId1, message1, bulkMessageWriter, configurations);
     bulkWriterComponent.write(sensorType, messageId2, message2, bulkMessageWriter, configurations);
 
     BulkWriterResponse expectedErrorResponse = new BulkWriterResponse();
     expectedErrorResponse.addAllErrors(e, messageIds);
 
-    verify(bulkWriterResponseHandler, times(1)).handleFlush(sensorType, expectedErrorResponse);
-    verifyNoMoreInteractions(bulkWriterResponseHandler);
+    verify(ackTuplesPolicy, times(1)).handleFlush(sensorType, expectedErrorResponse);
+    verifyNoMoreInteractions(ackTuplesPolicy);
   }
 
   @Test
@@ -155,15 +156,15 @@ public class BulkWriterComponentTest {
 
     when(bulkMessageWriter.write(sensorType, configurations, messages)).thenThrow(e);
 
-    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(bulkWriterResponseHandler);
+    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(ackTuplesPolicy);
     bulkWriterComponent.write(sensorType, messageId1, message1, bulkMessageWriter, configurations);
     bulkWriterComponent.write(sensorType, messageId2, message2, bulkMessageWriter, configurations);
 
     BulkWriterResponse expectedErrorResponse = new BulkWriterResponse();
     expectedErrorResponse.addAllErrors(e, messageIds);
 
-    verify(bulkWriterResponseHandler, times(1)).handleFlush(sensorType, expectedErrorResponse);
-    verifyNoMoreInteractions(bulkWriterResponseHandler);
+    verify(ackTuplesPolicy, times(1)).handleFlush(sensorType, expectedErrorResponse);
+    verifyNoMoreInteractions(ackTuplesPolicy);
   }
 
   @Test
@@ -190,7 +191,7 @@ public class BulkWriterComponentTest {
 
     when(bulkMessageWriter.write(sensorType, configurations, allMessages)).thenReturn(bulkWriterResponse);
 
-    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(bulkWriterResponseHandler);
+    BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(ackTuplesPolicy);
     bulkWriterComponent.flush(sensorType, bulkMessageWriter, configurations, allMessages);
 
     BulkWriterResponse expectedResponse = new BulkWriterResponse();
@@ -198,7 +199,7 @@ public class BulkWriterComponentTest {
     expectedResponse.addError(throwable, errorId);
     expectedResponse.addSuccess(missingId);
 
-    verify(bulkWriterResponseHandler, times(1)).handleFlush(sensorType, expectedResponse);
-    verifyNoMoreInteractions(bulkWriterResponseHandler);
+    verify(ackTuplesPolicy, times(1)).handleFlush(sensorType, expectedResponse);
+    verifyNoMoreInteractions(ackTuplesPolicy);
   }
 }

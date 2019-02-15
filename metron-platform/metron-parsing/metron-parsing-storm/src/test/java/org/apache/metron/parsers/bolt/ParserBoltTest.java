@@ -24,7 +24,7 @@ import org.apache.metron.common.configuration.SensorParserConfig;
 import org.apache.metron.common.error.MetronError;
 import org.apache.metron.common.message.MessageGetStrategy;
 import org.apache.metron.common.message.metadata.RawMessage;
-import org.apache.metron.writer.StormBulkWriterResponseHandler;
+import org.apache.metron.writer.AckTuplesPolicy;
 import org.apache.metron.parsers.DefaultParserRunnerResults;
 import org.apache.metron.parsers.ParserRunnerImpl;
 import org.apache.metron.parsers.ParserRunnerResults;
@@ -86,7 +86,7 @@ public class ParserBoltTest extends BaseBoltTest {
   private Context stellarContext;
 
   @Mock
-  private StormBulkWriterResponseHandler bulkWriterResponseHandler;
+  private AckTuplesPolicy bulkWriterResponseHandler;
 
   private class MockParserRunner extends ParserRunnerImpl {
 
@@ -210,7 +210,7 @@ public class ParserBoltTest extends BaseBoltTest {
     Map<String, String> topicToSensorMap = parserBolt.getTopicToSensorMap();
     Assert.assertEquals(1, topicToSensorMap.size());
     Assert.assertEquals("yaf", topicToSensorMap.get("yafTopic"));
-    verify(writerHandler).init(eq(stormConf), eq(topologyContext), eq(outputCollector), eq(parserConfigurations), any(StormBulkWriterResponseHandler.class));
+    verify(writerHandler).init(eq(stormConf), eq(topologyContext), eq(outputCollector), eq(parserConfigurations), any(AckTuplesPolicy.class));
     verify(writerHandler).setDefaultBatchTimeout(14);
   }
 

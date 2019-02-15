@@ -18,6 +18,7 @@
 package org.apache.metron.writer;
 
 import org.apache.metron.common.Constants;
+import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.error.MetronError;
 import org.apache.metron.common.message.MessageGetStrategy;
 import org.apache.metron.common.writer.BulkWriterResponse;
@@ -34,16 +35,16 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A {@link org.apache.metron.writer.BulkWriterResponseHandler} implementation for Storm.  This class handles tuple acking and error
- * reporting by handling flush events for writer responses.
+ * A policy that acks all tuples when a flush occurs.
+ *
+ * <p>Handles tuple acking and error reporting by handling flush events for writer responses.
  */
-public class StormBulkWriterResponseHandler implements BulkWriterResponseHandler {
+public class AckTuplesPolicy implements FlushPolicy {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   // Tracks the messages from a tuple that have not been flushed
@@ -54,7 +55,7 @@ public class StormBulkWriterResponseHandler implements BulkWriterResponseHandler
   private OutputCollector collector;
   private MessageGetStrategy messageGetStrategy;
 
-  public StormBulkWriterResponseHandler(OutputCollector collector, MessageGetStrategy messageGetStrategy) {
+  public AckTuplesPolicy(OutputCollector collector, MessageGetStrategy messageGetStrategy) {
     this.collector = collector;
     this.messageGetStrategy = messageGetStrategy;
   }
@@ -80,7 +81,13 @@ public class StormBulkWriterResponseHandler implements BulkWriterResponseHandler
   }
 
   @Override
-  public void handleFlush(String sensorType, BulkWriterResponse response) {
+  public boolean shouldFlush(String sensorType, WriterConfiguration configurations, int batchSize) {
+    // this policy does not trigger a flush to occur
+    return false;
+  }
+
+  @Override
+  public void onFlush(String sensorType, BulkWriterResponse response) {
     LOG.debug("Handling flushed messages for sensor {} with response: {}", sensorType, response);
 
     // Update tuple message map.  Tuple is ready to ack when all it's messages have been flushed.

@@ -42,8 +42,9 @@ import org.apache.metron.common.utils.ErrorUtils;
 import org.apache.metron.common.utils.MessageUtils;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.MessageWriter;
-import org.apache.metron.writer.StormBulkWriterResponseHandler;
+import org.apache.metron.writer.AckTuplesPolicy;
 import org.apache.metron.writer.BulkWriterComponent;
+import org.apache.metron.writer.FlushPolicy;
 import org.apache.metron.writer.WriterToBulkWriter;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
@@ -96,7 +97,7 @@ public class BulkMessageWriterBolt<CONFIG_T extends Configurations> extends Conf
   private int requestedTickFreqSecs;
   private int defaultBatchTimeout;
   private int batchTimeoutDivisor = 1;
-  private transient StormBulkWriterResponseHandler bulkWriterResponseHandler = null;
+  private transient AckTuplesPolicy bulkWriterResponseHandler = null;
 
   public BulkMessageWriterBolt(String zookeeperUrl, String configurationStrategy) {
     super(zookeeperUrl, configurationStrategy);
@@ -223,19 +224,20 @@ public class BulkMessageWriterBolt<CONFIG_T extends Configurations> extends Conf
     else {
       configurationTransformation = x -> x;
     }
-    bulkWriterResponseHandler = new StormBulkWriterResponseHandler(collector, messageGetStrategy);
-    setWriterComponent(new BulkWriterComponent<>(bulkWriterResponseHandler));
+    BulkWriterComponent bulkWriter = new BulkWriterComponent<JSONObject>()
+            .withFlushPolicy(new AckTuplesPolicy(collector, messageGetStrategy));
+    setWriterComponent(bulkWriter);
     try {
-      WriterConfiguration writerconf = configurationTransformation
+      WriterConfiguration writerConf = configurationTransformation
           .apply(getConfigurationStrategy().createWriterConfig(bulkMessageWriter, getConfigurations()));
       if (defaultBatchTimeout == 0) {
         //This means getComponentConfiguration was never called to initialize defaultBatchTimeout,
         //probably because we are in a unit test scenario.  So calculate it here.
-        BatchTimeoutHelper timeoutHelper = new BatchTimeoutHelper(writerconf::getAllConfiguredTimeouts, batchTimeoutDivisor);
+        BatchTimeoutHelper timeoutHelper = new BatchTimeoutHelper(writerConf::getAllConfiguredTimeouts, batchTimeoutDivisor);
         defaultBatchTimeout = timeoutHelper.getDefaultBatchTimeout();
       }
       getWriterComponent().setDefaultBatchTimeout(defaultBatchTimeout);
-      bulkMessageWriter.init(stormConf, context, writerconf);
+      bulkMessageWriter.init(stormConf, context, writerConf);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

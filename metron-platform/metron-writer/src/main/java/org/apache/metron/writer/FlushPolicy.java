@@ -18,20 +18,19 @@
 package org.apache.metron.writer;
 
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
-import org.apache.metron.common.writer.BulkMessageWriter;
-import org.apache.metron.common.writer.BulkWriterMessage;
-
-import java.util.List;
+import org.apache.metron.common.writer.BulkWriterResponse;
 
 /**
- * This interface is used by the {@link org.apache.metron.writer.BulkWriterComponent} to determine if a batch should be flushed.
+ * A policy used by the {@link org.apache.metron.writer.BulkWriterComponent} to
+ * determine when to flush and how flushes are handled.
  */
 public interface FlushPolicy {
 
   /**
-   * This method is called whenever messages are passed to {@link org.apache.metron.writer.BulkWriterComponent#write(String, String, Object, BulkMessageWriter, WriterConfiguration)}.
-   * Each implementation of {@link org.apache.metron.writer.FlushPolicy#shouldFlush(String, WriterConfiguration, int)} will be called in order
-   * and the first one to return true will trigger a flush and continue on.
+   * Allows the policy to define when a flush should occur.
+   *
+   * <p>This method is called each time a message is passed to the {@link BulkWriterComponent}.
+   *
    * @param sensorType
    * @param configurations
    * @param batchSize
@@ -40,10 +39,12 @@ public interface FlushPolicy {
   boolean shouldFlush(String sensorType, WriterConfiguration configurations, int batchSize);
 
   /**
-   * This method is used to clear any internal state a {@link org.apache.metron.writer.FlushPolicy} maintains to determine if a batch should be flushed.
-   * This method is called for all {@link org.apache.metron.writer.FlushPolicy} implementations after a batch is flushed with
-   * {@link org.apache.metron.writer.BulkWriterComponent#flush(String, BulkMessageWriter, WriterConfiguration, List)}.
-   * @param sensorType
+   * Allows a policy to define what should happen when a flush occurs.
+   *
+   * <p>This method is called immediately after a batch has been flushed.
+   *
+   * @param sensorType The type of sensor generating the messages
+   * @param response A response containing successes and failures within the batch
    */
-  void reset(String sensorType);
+  void onFlush(String sensorType, BulkWriterResponse response);
 }

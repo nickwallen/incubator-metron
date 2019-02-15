@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.bolt.ConfiguredParserBolt;
@@ -42,8 +41,7 @@ import org.apache.metron.common.message.MessageGetters;
 import org.apache.metron.common.message.metadata.RawMessage;
 import org.apache.metron.common.message.metadata.RawMessageUtil;
 import org.apache.metron.common.utils.ErrorUtils;
-import org.apache.metron.common.utils.HashUtils;
-import org.apache.metron.writer.StormBulkWriterResponseHandler;
+import org.apache.metron.writer.AckTuplesPolicy;
 import org.apache.metron.parsers.ParserRunner;
 import org.apache.metron.parsers.ParserRunnerResults;
 import org.apache.metron.stellar.common.CachingStellarProcessor;
@@ -76,7 +74,7 @@ public class ParserBolt extends ConfiguredParserBolt implements Serializable {
   private int requestedTickFreqSecs;
   private int defaultBatchTimeout;
   private int batchTimeoutDivisor = 1;
-  private transient StormBulkWriterResponseHandler bulkWriterResponseHandler;
+  private transient AckTuplesPolicy bulkWriterResponseHandler;
 
   public ParserBolt( String zookeeperUrl
                    , ParserRunner parserRunner
@@ -157,7 +155,7 @@ public class ParserBolt extends ConfiguredParserBolt implements Serializable {
   /**
    * Used only for unit testing
    */
-  public void setBulkWriterResponseHandler(StormBulkWriterResponseHandler bulkWriterResponseHandler) {
+  public void setBulkWriterResponseHandler(AckTuplesPolicy bulkWriterResponseHandler) {
     this.bulkWriterResponseHandler = bulkWriterResponseHandler;
   }
 
@@ -205,7 +203,7 @@ public class ParserBolt extends ConfiguredParserBolt implements Serializable {
     this.collector = collector;
     this.parserRunner.init(this::getConfigurations, initializeStellar());
 
-    bulkWriterResponseHandler = new StormBulkWriterResponseHandler(collector, messageGetStrategy);
+    bulkWriterResponseHandler = new AckTuplesPolicy(collector, messageGetStrategy);
 
     // Need to prep all sensors
     for (Map.Entry<String, WriterHandler> entry: sensorToWriterMap.entrySet()) {

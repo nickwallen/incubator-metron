@@ -30,8 +30,9 @@ import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.message.MessageGetStrategy;
 import org.apache.metron.common.writer.BulkMessageWriter;
 import org.apache.metron.common.writer.MessageWriter;
-import org.apache.metron.writer.StormBulkWriterResponseHandler;
+import org.apache.metron.writer.AckTuplesPolicy;
 import org.apache.metron.writer.BulkWriterComponent;
+import org.apache.metron.writer.FlushPolicy;
 import org.apache.metron.writer.WriterToBulkWriter;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -65,7 +66,7 @@ public class WriterHandler implements Serializable {
     return messageWriter;
   }
 
-  public void init(Map stormConf, TopologyContext topologyContext, OutputCollector collector, ParserConfigurations configurations, StormBulkWriterResponseHandler stormBulkWriterResponseHandler) {
+  public void init(Map stormConf, TopologyContext topologyContext, OutputCollector collector, ParserConfigurations configurations, AckTuplesPolicy ackTuplesPolicy) {
     if(isBulk) {
       writerTransformer = config -> configStrategy.createWriterConfig(messageWriter, config);
     }
@@ -77,7 +78,9 @@ public class WriterHandler implements Serializable {
     } catch (Exception e) {
       throw new IllegalStateException("Unable to initialize message writer", e);
     }
-    this.writerComponent = new BulkWriterComponent<JSONObject>(stormBulkWriterResponseHandler);
+
+    this.writerComponent = new BulkWriterComponent<JSONObject>()
+            .withFlushPolicy(ackTuplesPolicy);
   }
 
   public void write( String sensorType

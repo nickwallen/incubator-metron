@@ -29,8 +29,7 @@ import org.apache.metron.common.error.MetronError;
 import org.apache.metron.common.message.MessageGetStrategy;
 import org.apache.metron.common.message.MessageGetters;
 import org.apache.metron.common.utils.ErrorUtils;
-import org.apache.metron.common.utils.HashUtils;
-import org.apache.metron.writer.StormBulkWriterResponseHandler;
+import org.apache.metron.writer.AckTuplesPolicy;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -45,7 +44,7 @@ public class WriterBolt extends BaseRichBolt {
   private Constants.ErrorType errorType = Constants.ErrorType.DEFAULT_ERROR;
   private transient MessageGetStrategy messageGetStrategy;
   private transient OutputCollector collector;
-  private transient StormBulkWriterResponseHandler bulkWriterResponseHandler;
+  private transient AckTuplesPolicy bulkWriterResponseHandler;
   public WriterBolt(WriterHandler handler, ParserConfigurations configuration, String sensorType) {
     this.handler = handler;
     this.configuration = configuration;
@@ -61,7 +60,7 @@ public class WriterBolt extends BaseRichBolt {
   public void prepare(Map stormConf, TopologyContext context, OutputCollector collector) {
     this.collector = collector;
     messageGetStrategy = MessageGetters.DEFAULT_JSON_FROM_FIELD.get();
-    bulkWriterResponseHandler = new StormBulkWriterResponseHandler(collector, messageGetStrategy);
+    bulkWriterResponseHandler = new AckTuplesPolicy(collector, messageGetStrategy);
     handler.init(stormConf, context, collector, configuration, bulkWriterResponseHandler);
   }
 

@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 /**
  * This component manages an internal cache of messages to be written in batch.  A separate cache is used for each sensor.
  * Each time a message is written to this component, flush policies are applied to determine if a batch of messages should
- * be flushed.  When a flush does happen, this component calls the supplied {@link org.apache.metron.writer.BulkWriterResponseHandler}
+ * be flushed.  When a flush does happen, this component calls the supplied ..,
  * so that the calling class can handle any necessary message acknowledgement.  This component also ensures all messages
  * in a batch are included in the response as either a success or failure.
  *
@@ -47,16 +47,19 @@ import java.util.stream.Collectors;
 public class BulkWriterComponent<MESSAGE_T> {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private Map<String, List<BulkWriterMessage<MESSAGE_T>>> sensorMessageCache = new HashMap<>();
-  private BulkWriterResponseHandler bulkWriterResponseHandler;
   private BatchTimeoutPolicy batchTimeoutPolicy;
   private List<FlushPolicy> flushPolicies;
 
-  public BulkWriterComponent(BulkWriterResponseHandler bulkWriterResponseHandler) {
-    this.bulkWriterResponseHandler = bulkWriterResponseHandler;
+  public BulkWriterComponent() {
     flushPolicies = new ArrayList<>();
     flushPolicies.add(new BatchSizePolicy());
     batchTimeoutPolicy = new BatchTimeoutPolicy();
     flushPolicies.add(batchTimeoutPolicy);
+  }
+
+  public BulkWriterComponent<MESSAGE_T> withFlushPolicy(FlushPolicy policy) {
+    this.flushPolicies.add(policy);
+    return this;
   }
 
   /**
@@ -88,20 +91,21 @@ public class BulkWriterComponent<MESSAGE_T> {
     if (!configurations.isEnabled(sensorType)) {
       BulkWriterResponse response = new BulkWriterResponse();
       response.addSuccess(messageId);
-      bulkWriterResponseHandler.handleFlush(sensorType, response);
-      return;
+      for(FlushPolicy policy: flushPolicies) {
+        policy.onFlush(sensorType, response);
+      }
+
+    } else {
+      List<BulkWriterMessage<MESSAGE_T>> messages = sensorMessageCache.getOrDefault(sensorType, new ArrayList<>());
+      sensorMessageCache.put(sensorType, messages);
+      messages.add(new BulkWriterMessage<>(messageId, message));
+
+      applyFlushPolicies(sensorType, bulkMessageWriter, configurations, sensorMessageCache.get(sensorType));
     }
-
-    List<BulkWriterMessage<MESSAGE_T>> messages = sensorMessageCache.getOrDefault(sensorType, new ArrayList<>());
-    sensorMessageCache.put(sensorType, messages);
-    messages.add(new BulkWriterMessage<>(messageId, message));
-
-    applyFlushPolicies(sensorType, bulkMessageWriter, configurations, sensorMessageCache.get(sensorType));
   }
 
   /**
    * Flushes a batch for a sensor type by writing messages with the supplied {@link org.apache.metron.common.writer.BulkMessageWriter}.
-   * Ensures all message ids in a batch are included in the response passed to the {@link org.apache.metron.writer.BulkWriterResponseHandler}.
    * After messages are written the cache is cleared and flush policies are reset for that sensor type.
    * @param sensorType sensor type
    * @param bulkMessageWriter writer that will do the actual writing
@@ -129,9 +133,10 @@ public class BulkWriterComponent<MESSAGE_T> {
       response.addAllErrors(e, ids);
     }
     finally {
-      bulkWriterResponseHandler.handleFlush(sensorType, response);
       sensorMessageCache.remove(sensorType);
-      flushPolicies.forEach(flushPolicy -> flushPolicy.reset(sensorType));
+      for(FlushPolicy policy: flushPolicies) {
+        policy.onFlush(sensorType, response);
+      }
     }
     long endTime = System.currentTimeMillis();
     long elapsed = endTime - startTime;
