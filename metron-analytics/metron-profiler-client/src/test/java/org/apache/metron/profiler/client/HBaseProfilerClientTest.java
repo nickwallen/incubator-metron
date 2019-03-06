@@ -22,6 +22,7 @@ package org.apache.metron.profiler.client;
 
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.profiler.ProfileMeasurement;
+import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
@@ -33,12 +34,13 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.metron.profiler.client.TestUtility.copy;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests the HBaseProfilerClient.
@@ -60,7 +62,6 @@ public class HBaseProfilerClientTest {
   private HBaseProfilerClient client;
   private StellarStatefulExecutor executor;
   private MockHTable table;
-  private ProfileWriter profileWriter;
 
   @Before
   public void setup() throws Exception {
@@ -71,18 +72,16 @@ public class HBaseProfilerClientTest {
     long periodDurationMillis = periodUnits.toMillis(periodDuration);
     RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder();
     ColumnBuilder columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-    profileWriter = new ProfileWriter(rowKeyBuilder, columnBuilder, table, periodDurationMillis);
-
     client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder, periodDurationMillis);
   }
 
   @After
-  public void tearDown() throws Exception {
+  public void tearDown() {
     table.clear();
   }
 
   @Test
-  public void Should_ReturnMeasurements_When_DataExistsForAGroup() throws Exception {
+  public void shouldFetchMeasurement() {
     final String profile = "profile1";
     final String entity = "entity1";
     final int expectedValue = 2302;
@@ -90,13 +89,23 @@ public class HBaseProfilerClientTest {
     final int count = hours * periodsPerHour + 1;
     final long startTime = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(hours);
 
-    // setup - write two groups of measurements - 'weekends' and 'weekdays'
-    ProfileMeasurement prototype = new ProfileMeasurement()
+    // create measurements in the group 'weekdays'
+    ProfileMeasurement weekday = new ProfileMeasurement()
             .withProfileName(profile)
             .withEntity(entity)
-            .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(prototype, count, Arrays.asList("weekdays"), val -> expectedValue);
-    profileWriter.write(prototype, count, Arrays.asList("weekends"), val -> 0);
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekdays"));
+    List<ProfileMeasurement> weekdays = copy(weekday, count, val -> expectedValue);
+    client.put(weekdays);
+
+    // create measurements in the group 'weekends'
+    ProfileMeasurement weekend = new ProfileMeasurement()
+            .withProfileName(profile)
+            .withEntity(entity)
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekends"));
+    List<ProfileMeasurement> weekends = copy(weekend, count, val -> 0);
+    client.put(weekends);
 
     long end = System.currentTimeMillis();
     long start = end - TimeUnit.HOURS.toMillis(2);
@@ -127,7 +136,7 @@ public class HBaseProfilerClientTest {
   }
 
   @Test
-  public void Should_ReturnResultFromGroup_When_MultipleGroupsExist() throws Exception {
+  public void shouldReturnResultFromGroup() throws Exception {
     final String profile = "profile1";
     final String entity = "entity1";
     final int periodsPerHour = 4;
@@ -137,24 +146,34 @@ public class HBaseProfilerClientTest {
     final long endTime = System.currentTimeMillis();
     final long startTime = endTime - TimeUnit.HOURS.toMillis(hours);
 
-    // setup - write two groups of measurements - 'weekends' and 'weekdays'
-    ProfileMeasurement m = new ProfileMeasurement()
-            .withProfileName("profile1")
-            .withEntity("entity1")
-            .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, Arrays.asList("weekdays"), val -> expectedValue);
-    profileWriter.write(m, count, Arrays.asList("weekends"), val -> 0);
+    // create measurements in the group 'weekdays'
+    ProfileMeasurement weekday = new ProfileMeasurement()
+            .withProfileName(profile)
+            .withEntity(entity)
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekdays"));
+    List<ProfileMeasurement> weekdays = copy(weekday, count, val -> expectedValue);
+    client.put(weekdays);
 
-    List<Object> weekdays = Arrays.asList("weekdays");
-    List<ProfileMeasurement> results = client.fetch(Integer.class, profile, entity, weekdays, startTime, endTime, Optional.empty());
+    // create measurements in the group 'weekends'
+    ProfileMeasurement weekend = new ProfileMeasurement()
+            .withProfileName(profile)
+            .withEntity(entity)
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekends"));
+    List<ProfileMeasurement> weekends = copy(weekend, count, val -> 0);
+    client.put(weekends);
+
+    List<Object> groups = Arrays.asList("weekdays");
+    List<ProfileMeasurement> results = client.fetch(Integer.class, profile, entity, groups, startTime, endTime, Optional.empty());
 
     // should only return results from 'weekdays' group
     assertEquals(count, results.size());
-    results.forEach(actual -> assertEquals(weekdays, actual.getGroups()));
+    results.forEach(actual -> assertEquals("weekdays", actual.getGroups().get(0)));
   }
 
   @Test
-  public void Should_ReturnNoResults_When_GroupDoesNotExist() {
+  public void shouldReturnNothingWhenNoGroup() {
     final String profile = "profile1";
     final String entity = "entity1";
     final int periodsPerHour = 4;
@@ -164,13 +183,23 @@ public class HBaseProfilerClientTest {
     final long endTime = System.currentTimeMillis();
     final long startTime = endTime - TimeUnit.HOURS.toMillis(hours);
 
-    // create two groups of measurements - one on weekdays and one on weekends
-    ProfileMeasurement m = new ProfileMeasurement()
-            .withProfileName("profile1")
-            .withEntity("entity1")
-            .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, Arrays.asList("weekdays"), val -> expectedValue);
-    profileWriter.write(m, count, Arrays.asList("weekends"), val -> 0);
+    // create measurements in the group 'weekdays'
+    ProfileMeasurement weekday = new ProfileMeasurement()
+            .withProfileName(profile)
+            .withEntity(entity)
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekdays"));
+    List<ProfileMeasurement> weekdays = copy(weekday, count, val -> expectedValue);
+    client.put(weekdays);
+
+    // create measurements in the group 'weekends'
+    ProfileMeasurement weekend = new ProfileMeasurement()
+            .withProfileName(profile)
+            .withEntity(entity)
+            .withPeriod(startTime, periodDuration, periodUnits)
+            .withGroups(Arrays.asList("weekends"));
+    List<ProfileMeasurement> weekends = copy(weekend, count, val -> 0);
+    client.put(weekends);
 
     // should return no results when the group does not exist
     List<Object> groups = Arrays.asList("does-not-exist");
@@ -179,7 +208,7 @@ public class HBaseProfilerClientTest {
   }
 
   @Test
-  public void Should_ReturnNoResults_When_NoDataInStartToEnd() throws Exception {
+  public void shouldReturnNothingWhenNoData() {
     final String profile = "profile1";
     final String entity = "entity1";
     final int hours = 2;
@@ -191,13 +220,38 @@ public class HBaseProfilerClientTest {
     ProfileMeasurement prototype = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(measurementTime, periodDuration, periodUnits);
-    profileWriter.write(prototype, numberToWrite, group, val -> 1000);
+    List<ProfileMeasurement> copies = copy(prototype, numberToWrite, val -> 1000);
+    client.put(copies);
 
     // should return no results when [start,end] is long after when test data was written
     final long endFetchAt = System.currentTimeMillis();
     final long startFetchAt = endFetchAt - TimeUnit.MILLISECONDS.toMillis(30);
     List<ProfileMeasurement> results = client.fetch(Integer.class, profile, entity, group, startFetchAt, endFetchAt, Optional.empty());
     assertEquals(0, results.size());
+  }
+
+  @Test
+  public void shouldPutMeasurement() {
+    final long measurementTime = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1);
+    ProfileMeasurement expected = new ProfileMeasurement()
+            .withProfileName("profile1")
+            .withEntity("entity1")
+            .withPeriod(measurementTime, periodDuration, periodUnits)
+            .withProfileValue(2342);
+
+    // write the measurement
+    int count = client.put(Collections.singletonList(expected));
+    assertEquals(1, count);
+
+    // read the measurement
+    List<Object> groups = Collections.emptyList();
+    List<ProfilePeriod> periods = Collections.singletonList(expected.getPeriod());
+    List<ProfileMeasurement> actuals = client.fetch(Integer.class, "profile1", "entity1", groups, periods, Optional.empty());
+
+    // validate
+    assertEquals(1, actuals.size());
+    assertEquals(expected, actuals.get(0));
   }
 }

@@ -66,15 +66,25 @@ public class HBaseClient implements Closeable {
   private HTableInterface table;
 
   public HBaseClient(TableProvider provider, final Configuration configuration, final String tableName) {
-    this.mutations = new ArrayList<>();
-    this.gets = new ArrayList<>();
+    HTableInterface table;
     try {
-      this.table = provider.getTable(configuration, tableName);
+      table = provider.getTable(configuration, tableName);
     } catch (Exception e) {
       String msg = String.format("Unable to open connection to HBase for table '%s'", tableName);
       LOG.error(msg, e);
       throw new RuntimeException(msg, e);
     }
+    init(table);
+  }
+
+  public HBaseClient(HTableInterface table) {
+    init(table);
+  }
+
+  private void init(HTableInterface table) {
+    this.mutations = new ArrayList<>();
+    this.gets = new ArrayList<>();
+    this.table = table;
   }
 
   /**

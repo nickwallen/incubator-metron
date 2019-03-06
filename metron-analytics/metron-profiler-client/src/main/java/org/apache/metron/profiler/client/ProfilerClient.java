@@ -70,4 +70,12 @@ public interface ProfilerClient {
                                      List<Object> groups,
                                      Iterable<ProfilePeriod> periods,
                                      Optional<T> defaultValue);
+
+  /**
+   * Write a series of profile measurements to a stored profile.
+   *
+   * @param measurements The profile measurements to store.
+   * @return The number of profile measurements written.
+   */
+  int put(List<ProfileMeasurement> measurements);
 }

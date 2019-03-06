@@ -18,18 +18,10 @@
 
 package org.apache.metron.profiler.client.stellar;
 
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
-import org.apache.metron.profiler.client.HBaseProfilerClient;
+import org.apache.metron.profiler.client.HBaseProfilerClientBuilder;
 import org.apache.metron.profiler.client.ProfilerClient;
-import org.apache.metron.profiler.hbase.ColumnBuilder;
-import org.apache.metron.profiler.hbase.RowKeyBuilder;
-import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
-import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -37,7 +29,6 @@ import org.apache.metron.stellar.dsl.StellarFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,15 +36,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_DEFAULT_VALUE;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
 import static org.apache.metron.profiler.client.stellar.Util.getArg;
-import static org.apache.metron.profiler.client.stellar.Util.getPeriodDurationInMillis;
 import static org.apache.metron.stellar.dsl.Context.Capabilities.GLOBAL_CONFIG;
 
 /**
@@ -128,11 +113,9 @@ public class VerboseProfile implements StellarFunction {
 
     // lazily create the profiler client, if needed
     if (client == null) {
-      RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(globals);
-      ColumnBuilder columnBuilder = getColumnBuilder(globals);
-      HTableInterface table = getTable(globals);
-      long periodDuration = getPeriodDurationInMillis(globals);
-      client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder, periodDuration);
+      client = new HBaseProfilerClientBuilder()
+              .withGlobals(globals)
+              .build();
     }
 
     // is there a default value?
@@ -165,58 +148,5 @@ public class VerboseProfile implements StellarFunction {
     view.put(VALUE_KEY, measurement.getProfileValue());
     view.put(GROUPS_KEY, measurement.getGroups());
     return view;
-  }
-
-  /**
-   * Creates the ColumnBuilder to use in accessing the profile data.
-   * @param global The global configuration.
-   */
-  private ColumnBuilder getColumnBuilder(Map<String, Object> global) {
-    String columnFamily = PROFILER_COLUMN_FAMILY.get(global, String.class);
-    return new ValueOnlyColumnBuilder(columnFamily);
-  }
-
-  /**
-   * Creates the ColumnBuilder to use in accessing the profile data.
-   * @param global The global configuration.
-   */
-  private RowKeyBuilder getRowKeyBuilder(Map<String, Object> global) {
-    Integer saltDivisor = PROFILER_SALT_DIVISOR.get(global, Integer.class);
-    return new SaltyRowKeyBuilder(saltDivisor, getPeriodDurationInMillis(global), TimeUnit.MILLISECONDS);
-  }
-
-  /**
-   * Create an HBase table used when accessing HBase.
-   * @param global The global configuration.
-   * @return
-   */
-  private HTableInterface getTable(Map<String, Object> global) {
-    String tableName = PROFILER_HBASE_TABLE.get(global, String.class);
-    TableProvider provider = getTableProvider(global);
-    try {
-      return provider.getTable(HBaseConfiguration.create(), tableName);
-
-    } catch (IOException e) {
-      throw new IllegalArgumentException(String.format("Unable to access table: %s", tableName), e);
-    }
-  }
-
-  /**
-   * Create the TableProvider to use when accessing HBase.
-   * @param global The global configuration.
-   */
-  private TableProvider getTableProvider(Map<String, Object> global) {
-    String clazzName = PROFILER_HBASE_TABLE_PROVIDER.get(global, String.class);
-    TableProvider provider;
-    try {
-      @SuppressWarnings("unchecked")
-      Class<? extends TableProvider> clazz = (Class<? extends TableProvider>) Class.forName(clazzName);
-      provider = clazz.getConstructor().newInstance();
-
-    } catch (Exception e) {
-      provider = new HTableProvider();
-    }
-
-    return provider;
   }
 }

@@ -20,11 +20,14 @@
 
 package org.apache.metron.profiler.client;
 
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.utils.SerDeUtils;
+import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
@@ -68,21 +71,14 @@ public class HBaseProfilerClient implements ProfilerClient {
     this.periodDurationMillis = periodDurationMillis;
   }
 
-  /**
-   * Fetch the values stored in a profile based on a start and end timestamp.
-   *
-   * @param clazz   The type of values stored by the profile.
-   * @param profile The name of the profile.
-   * @param entity  The name of the entity.
-   * @param groups  The groups used to sort the profile data.
-   * @param start   The start time in epoch milliseconds.
-   * @param end     The end time in epoch milliseconds.
-   * @param defaultValue The default value to specify.  If empty, the result will be sparse.
-   * @param <T>     The type of values stored by the profile.
-   * @return A list of values.
-   */
   @Override
-  public <T> List<ProfileMeasurement> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, long start, long end, Optional<T> defaultValue) {
+  public <T> List<ProfileMeasurement> fetch(Class<T> clazz,
+                                            String profile,
+                                            String entity,
+                                            List<Object> groups,
+                                            long start,
+                                            long end,
+                                            Optional<T> defaultValue) {
     List<ProfilePeriod> periods = ProfilePeriod.visitPeriods(
             start,
             end,
@@ -93,19 +89,13 @@ public class HBaseProfilerClient implements ProfilerClient {
     return fetch(clazz, profile, entity, groups, periods, defaultValue);
   }
 
-  /**
-   * Fetch the values stored in a profile based on a set of timestamps.
-   *
-   * @param clazz      The type of values stored by the profile.
-   * @param profile    The name of the profile.
-   * @param entity     The name of the entity.
-   * @param groups     The groups used to sort the profile data.
-   * @param periods    The set of profile measurement periods
-   * @param defaultValue The default value to specify.  If empty, the result will be sparse.
-   * @return A list of values.
-   */
   @Override
-  public <T> List<ProfileMeasurement> fetch(Class<T> clazz, String profile, String entity, List<Object> groups, Iterable<ProfilePeriod> periods, Optional<T> defaultValue) {
+  public <T> List<ProfileMeasurement> fetch(Class<T> clazz,
+                                            String profile,
+                                            String entity,
+                                            List<Object> groups,
+                                            Iterable<ProfilePeriod> periods,
+                                            Optional<T> defaultValue) {
     // create a list of profile measurements that need fetched
     List<ProfileMeasurement> toFetch = new ArrayList<>();
     for(ProfilePeriod period: periods) {
@@ -120,7 +110,22 @@ public class HBaseProfilerClient implements ProfilerClient {
     return doFetch(toFetch, clazz, defaultValue);
   }
 
-  private <T> List<ProfileMeasurement> doFetch(List<ProfileMeasurement> measurements, Class<T> clazz, Optional<T> defaultValue) {
+  @Override
+  public int put(List<ProfileMeasurement> measurements) {
+    HBaseClient hbaseClient = new HBaseClient(table);
+
+    for(ProfileMeasurement measurement: measurements) {
+      byte[] rowKey = rowKeyBuilder.rowKey(measurement);
+      ColumnList columnList = columnBuilder.columns(measurement);
+      hbaseClient.addMutation(rowKey, columnList, Durability.SYNC_WAL);
+    }
+
+    return hbaseClient.mutate();
+  }
+
+  private <T> List<ProfileMeasurement> doFetch(List<ProfileMeasurement> measurements,
+                                               Class<T> clazz,
+                                               Optional<T> defaultValue) {
     List<ProfileMeasurement> values = new ArrayList<>();
 
     // build the gets for HBase

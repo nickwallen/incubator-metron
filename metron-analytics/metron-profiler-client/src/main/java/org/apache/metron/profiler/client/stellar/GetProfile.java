@@ -27,6 +27,7 @@ import org.apache.metron.hbase.TableProvider;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.client.HBaseProfilerClient;
+import org.apache.metron.profiler.client.HBaseProfilerClientBuilder;
 import org.apache.metron.profiler.client.ProfilerClient;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
@@ -168,11 +169,9 @@ public class GetProfile implements StellarFunction {
     Object defaultValue = null;
     //lazily create new profiler client if needed
     if (client == null || !cachedConfigMap.equals(effectiveConfig)) {
-      RowKeyBuilder rowKeyBuilder = getRowKeyBuilder(effectiveConfig);
-      ColumnBuilder columnBuilder = getColumnBuilder(effectiveConfig);
-      HTableInterface table = getTable(effectiveConfig);
-      long periodDuration = getPeriodDurationInMillis(effectiveConfig);
-      client = new HBaseProfilerClient(table, rowKeyBuilder, columnBuilder, periodDuration);
+      client = new HBaseProfilerClientBuilder()
+              .withGlobals(effectiveConfig)
+              .build();
       cachedConfigMap = effectiveConfig;
     }
     if(cachedConfigMap != null) {

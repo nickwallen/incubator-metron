@@ -23,11 +23,8 @@ package org.apache.metron.profiler.client.stellar;
 import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.profiler.ProfileMeasurement;
-import org.apache.metron.profiler.client.ProfileWriter;
-import org.apache.metron.profiler.hbase.ColumnBuilder;
-import org.apache.metron.profiler.hbase.RowKeyBuilder;
-import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
-import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
+import org.apache.metron.profiler.client.HBaseProfilerClient;
+import org.apache.metron.profiler.client.HBaseProfilerClientBuilder;
 import org.apache.metron.stellar.common.DefaultStellarStatefulExecutor;
 import org.apache.metron.stellar.common.StellarStatefulExecutor;
 import org.apache.metron.stellar.dsl.Context;
@@ -46,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.metron.profiler.client.TestUtility.copy;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
@@ -65,11 +63,11 @@ public class GetProfileTest {
   private static final String columnFamily = "P";
   private StellarStatefulExecutor executor;
   private Map<String, Object> state;
-  private ProfileWriter profileWriter;
   // different values of period and salt divisor, used to test config_overrides feature
   private static final long periodDuration2 = 1;
   private static final TimeUnit periodUnits2 = TimeUnit.HOURS;
   private static final int saltDivisor2 = 2050;
+  private HBaseProfilerClient profilerClient;
 
   private <T> T run(String expression, Class<T> clazz) {
     return executor.execute(expression, state, clazz);
@@ -89,13 +87,6 @@ public class GetProfileTest {
   @Before
   public void setup() {
     state = new HashMap<>();
-    final HTableInterface table = MockHBaseTableProvider.addToCache(tableName, columnFamily);
-
-    // used to write values to be read during testing
-    long periodDurationMillis = TimeUnit.MINUTES.toMillis(15);
-    RowKeyBuilder rowKeyBuilder = new SaltyRowKeyBuilder();
-    ColumnBuilder columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-    profileWriter = new ProfileWriter(rowKeyBuilder, columnBuilder, table, periodDurationMillis);
 
     // global properties
     Map<String, Object> global = new HashMap<String, Object>() {{
@@ -106,6 +97,12 @@ public class GetProfileTest {
       put(PROFILER_PERIOD_UNITS.getKey(), periodUnits.toString());
       put(PROFILER_SALT_DIVISOR.getKey(), Integer.toString(saltDivisor));
     }};
+
+    final HTableInterface table = MockHBaseTableProvider.addToCache(tableName, columnFamily);
+    profilerClient = new HBaseProfilerClientBuilder()
+            .withGlobals(global)
+            .withTable(table)
+            .build();
 
     // create the stellar execution environment
     executor = new DefaultStellarStatefulExecutor(
@@ -179,8 +176,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, count, val -> expectedValue);
+    profilerClient.put(values);
 
     // execute - read the profile values - no groups
     String expr = "PROFILE_GET('profile1', 'entity1', PROFILE_FIXED(4, 'HOURS'))";
@@ -208,8 +207,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, count, val -> expectedValue);
+    profilerClient.put(values);
 
     // create a variable that contains the groups to use
     state.put("groups", group);
@@ -247,8 +248,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, count, val -> expectedValue);
+    profilerClient.put(values);
 
     // create a variable that contains the groups to use
     state.put("groups", group);
@@ -303,8 +306,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, 1, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, 1, val -> expectedValue);
+    profilerClient.put(values);
 
     // create a variable that contains the groups to use
     state.put("groups", group);
@@ -363,8 +368,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, count, val -> expectedValue);
+    profilerClient.put(values);
 
     // now change the executor configuration
     Context context2 = setup2();
@@ -416,8 +423,10 @@ public class GetProfileTest {
     ProfileMeasurement m = new ProfileMeasurement()
             .withProfileName("profile1")
             .withEntity("entity1")
+            .withGroups(group)
             .withPeriod(startTime, periodDuration, periodUnits);
-    profileWriter.write(m, count, group, val -> expectedValue);
+    List<ProfileMeasurement> values = copy(m, count, val -> expectedValue);
+    profilerClient.put(values);
 
     // create a variable that contains the groups to use
     state.put("groups", group);
