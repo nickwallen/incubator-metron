@@ -26,11 +26,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.function.Supplier;
 
 public interface TableProvider extends Serializable {
-
   HTableInterface getTable(Configuration config, String tableName) throws IOException;
-
-  static TableProvider create(String impl, Supplier<TableProvider> defaultSupplier)
-          throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
+  static TableProvider create(String impl, Supplier<TableProvider> defaultSupplier) throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
     if(impl == null) {
       return defaultSupplier.get();
     }
