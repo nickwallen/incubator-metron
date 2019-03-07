@@ -17,29 +17,29 @@
  */
 package org.apache.metron.rest.controller;
 
-import static org.apache.metron.rest.MetronRestConstants.SECURITY_ROLE_ADMIN;
-import static org.apache.metron.rest.MetronRestConstants.SECURITY_ROLE_PREFIX;
-
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import io.swagger.annotations.ApiResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
 import io.swagger.annotations.ApiResponses;
 import org.apache.metron.rest.RestException;
+import org.apache.metron.rest.config.Roles;
 import org.apache.metron.rest.model.AlertsUIUserSettings;
 import org.apache.metron.rest.service.AlertsUIService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.annotation.Secured;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * The API resource that is used for alert-related operations.
@@ -53,6 +53,12 @@ public class AlertsUIController {
    */
   @Autowired
   private AlertsUIService alertsUIService;
+
+  /**
+   * Defines the roles available for authorization.
+   */
+  @Autowired
+  private Roles roles;
 
   @ApiOperation(value = "Escalates a list of alerts by producing it to the Kafka escalate topic")
   @ApiResponse(message = "Alerts were escalated", code = 200)
@@ -75,9 +81,10 @@ public class AlertsUIController {
     }
   }
 
-  @Secured({SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN})
+  //@Secured({"#roles.rolePrefix" + "#roles.adminRole"})
+  @Secured({"ROLE_ADMIN"})
   @ApiOperation(value = "Retrieves all users' settings.  Only users that are part of "
-          + "the \"ROLE_ADMIN\" role are allowed to get all user settings.")
+          + "the admin role are allowed to get all user settings.")
   @ApiResponses(value = {@ApiResponse(message = "List of all user settings", code = 200),
           @ApiResponse(message =
                   "The current user does not have permission to get all user settings", code = 403)})
@@ -104,9 +111,10 @@ public class AlertsUIController {
     return responseEntity;
   }
 
-  @Secured({SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN})
+  @Secured({"ROLE_ADMIN"})
+  //@Secured({"#roles.adminRole"})
   @ApiOperation(value = "Deletes a user's settings.  Only users that are part of "
-          + "the \"ROLE_ADMIN\" role are allowed to delete user settings.")
+          + "the admin role are allowed to delete user settings.")
   @ApiResponses(value = {@ApiResponse(message = "User settings were deleted", code = 200),
           @ApiResponse(message = "The current user does not have permission to delete user settings",
                   code = 403),

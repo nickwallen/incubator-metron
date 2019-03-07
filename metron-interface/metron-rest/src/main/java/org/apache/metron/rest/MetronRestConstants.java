@@ -18,6 +18,7 @@
 package org.apache.metron.rest;
 
 import org.apache.metron.parsers.GrokParser;
+import org.springframework.beans.factory.annotation.Value;
 
 public class MetronRestConstants {
 
@@ -71,10 +72,6 @@ public class MetronRestConstants {
 
   public static final String META_DAO_IMPL = "meta.dao.impl";
   public static final String META_DAO_SORT = "meta.dao.sort";
-
-  public static final String SECURITY_ROLE_PREFIX = "ROLE_";
-  public static final String SECURITY_ROLE_USER = "USER";
-  public static final String SECURITY_ROLE_ADMIN = "ADMIN";
 
   public static final String USER_SETTINGS_HBASE_TABLE_SPRING_PROPERTY = "user.settings.table";
   public static final String USER_SETTINGS_HBASE_CF_SPRING_PROPERTY = "user.settings.cf";

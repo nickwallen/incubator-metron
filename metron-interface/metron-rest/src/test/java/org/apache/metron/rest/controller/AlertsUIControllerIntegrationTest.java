@@ -17,6 +17,27 @@
  */
 package org.apache.metron.rest.controller;
 
+import org.adrianwalker.multilinestring.Multiline;
+import org.apache.metron.integration.ComponentRunner;
+import org.apache.metron.integration.UnableToStartException;
+import org.apache.metron.integration.components.KafkaComponent;
+import org.apache.metron.rest.RestException;
+import org.apache.metron.rest.service.AlertsUIService;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.junit4.SpringRunner;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.RequestBuilder;
+import org.springframework.test.web.servlet.ResultMatcher;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+
 import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -28,23 +49,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-import org.adrianwalker.multilinestring.Multiline;
-import org.apache.metron.integration.ComponentRunner;
-import org.apache.metron.integration.UnableToStartException;
-import org.apache.metron.integration.components.KafkaComponent;
-import org.apache.metron.rest.service.AlertsUIService;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.junit4.SpringRunner;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.context.WebApplicationContext;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -145,26 +149,55 @@ public class AlertsUIControllerIntegrationTest {
 
   @Test
   public void testSecurity() throws Exception {
-    this.mockMvc.perform(post(alertUrl + "/escalate").with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(alerts))
-            .andExpect(status().isUnauthorized());
-    this.mockMvc.perform(get(alertUrl + "/settings"))
-            .andExpect(status().isUnauthorized());
-    this.mockMvc.perform(get(alertUrl + "/settings/all"))
-            .andExpect(status().isUnauthorized());
-    this.mockMvc.perform(post(alertUrl + "/settings").with(csrf())
-            .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
-            .content(user1AlertUserSettingsJson))
-            .andExpect(status().isUnauthorized());
-    this.mockMvc.perform(get(alertUrl + "/settings/all").with(httpBasic(user1, password)).with(csrf()))
-            .andExpect(status().isForbidden());
-    this.mockMvc.perform(delete(alertUrl + "/settings/user1").with(httpBasic(user1, password)).with(csrf()))
-            .andExpect(status().isForbidden());
+    {
+      RequestBuilder escalate = post(alertUrl + "/escalate")
+              .with(csrf())
+              .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
+              .content(alerts);
+      this.mockMvc.perform(escalate)
+              .andExpect(status().isUnauthorized());
+    }
+    {
+      this.mockMvc.perform(get(alertUrl + "/settings"))
+              .andExpect(status().isUnauthorized());
+    }
+    {
+      this.mockMvc.perform(get(alertUrl + "/settings/all"))
+              .andExpect(status().isUnauthorized());
+    }
+    {
+      RequestBuilder getSettings = post(alertUrl + "/settings")
+              .with(csrf())
+              .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
+              .content(user1AlertUserSettingsJson);
+      this.mockMvc.perform(getSettings)
+              .andExpect(status().isUnauthorized());
+    }
+    {
+      RequestBuilder getAllSettings = get(alertUrl + "/settings/all")
+              .with(httpBasic(user1, password))
+              .with(csrf());
+      this.mockMvc.perform(getAllSettings)
+              .andExpect(status().isForbidden());
+    }
+    {
+      RequestBuilder deleteUser = delete(alertUrl + "/settings/user1")
+              .with(httpBasic(user1, password))
+              .with(csrf());
+      this.mockMvc.perform(deleteUser)
+              .andExpect(status().isForbidden());
+    }
   }
 
   @Test
   public void escalateShouldEscalateAlerts() throws Exception {
     startKafka();
-    this.mockMvc.perform(post(alertUrl + "/escalate").with(httpBasic(user1, password)).with(csrf()).contentType(MediaType.parseMediaType("application/json;charset=UTF-8")).content(alerts))
+    RequestBuilder escalate = post(alertUrl + "/escalate")
+            .with(httpBasic(user1, password))
+            .with(csrf())
+            .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
+            .content(alerts);
+    this.mockMvc.perform(escalate)
             .andExpect(status().isOk());
     stopKafka();
   }
@@ -174,6 +207,28 @@ public class AlertsUIControllerIntegrationTest {
     emptyProfileShouldReturnNotFound();
     alertsProfilesShouldBeCreatedOrUpdated();
     alertsProfilesShouldBeProperlyDeleted();
+  }
+
+  @Test
+  @WithMockUser(username = "admin", roles = { "ADMIN" })
+  public void testRoles() throws Exception {
+
+    // user1 creates their alerts profile
+    RequestBuilder create = post(alertUrl + "/settings")
+            .with(httpBasic(user1, password))
+            .with(csrf())
+            .contentType(MediaType.parseMediaType("application/json;charset=UTF-8"))
+            .content(user1AlertUserSettingsJson);
+    this.mockMvc.perform(create).andExpect(status().isCreated());
+
+    // getting all alerts profiles should only return user1's
+   RequestBuilder request = delete(alertUrl + "/settings/user1");
+//           .with(httpBasic(admin, password));
+    this.mockMvc.perform(request)
+            .andExpect(status().isOk())
+            .andExpect(
+                    content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
+            .andExpect(content().json("{\"" + user1 + "\": " + user1AlertUserSettingsJson + "}"));
   }
 
   /** Ensures a 404 is returned when an alerts profile cannot be found.  In the case of an admin getting
@@ -261,11 +316,16 @@ public class AlertsUIControllerIntegrationTest {
             .andExpect(content().json(user2AlertUserSettingsJson));
 
     // getting all alerts profiles should return both
+    ResultMatcher expected = content()
+            .json("{\"" +
+                    user1 + "\": " + user1AlertUserSettingsJson + ",\"" +
+                    user2 + "\": " + user2AlertUserSettingsJson +
+                    "}");
     this.mockMvc.perform(get(alertUrl + "/settings/all").with(httpBasic(admin, password)))
             .andExpect(status().isOk())
             .andExpect(
                     content().contentType(MediaType.parseMediaType("application/json;charset=UTF-8")))
-            .andExpect(content().json("{\"" + user1 + "\": " + user1AlertUserSettingsJson + ",\"" + user2 + "\": " + user2AlertUserSettingsJson + "}"));
+            .andExpect(expected);
   }
 
   /** Ensures users can delete their profiles independently of other users.  When user1 deletes an

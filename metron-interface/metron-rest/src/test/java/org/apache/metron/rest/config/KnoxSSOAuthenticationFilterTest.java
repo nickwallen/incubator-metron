@@ -27,6 +27,8 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.apache.commons.io.FileUtils;
 import org.apache.metron.rest.security.SecurityUtils;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -75,17 +77,26 @@ public class KnoxSSOAuthenticationFilterTest {
   @Rule
   public final ExpectedException exception = ExpectedException.none();
 
+  private Roles roles;
+
+  @BeforeClass
+  public void setup() {
+    roles = new Roles();
+    roles.setRolePrefix("METRON_");
+    roles.setUserRole("USR");
+    roles.setAdminRole("ROOT");
+  }
+
   @Test
   public void shouldThrowExceptionOnMissingLdapTemplate() {
     exception.expect(IllegalStateException.class);
     exception.expectMessage("KnoxSSO requires LDAP. You must add 'ldap' to the active profiles.");
-
     new KnoxSSOAuthenticationFilter("userSearchBase",
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            null
-            );
+            null,
+            roles);
   }
 
   @Test
@@ -94,7 +105,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
     HttpServletRequest request = mock(HttpServletRequest.class);
     ServletResponse response = mock(ServletResponse.class);
@@ -127,7 +139,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
     HttpServletRequest request = mock(HttpServletRequest.class);
     ServletResponse response = mock(ServletResponse.class);
@@ -148,7 +161,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
     HttpServletRequest request = mock(HttpServletRequest.class);
     ServletResponse response = mock(ServletResponse.class);
@@ -173,7 +187,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
     HttpServletRequest request = mock(HttpServletRequest.class);
     ServletResponse response = mock(ServletResponse.class);
@@ -201,7 +216,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
 
     SignedJWT jwtToken = mock(SignedJWT.class);
@@ -248,7 +264,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
 
     SignedJWT jwtToken = mock(SignedJWT.class);
@@ -311,7 +328,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            mock(LdapTemplate.class)
+            mock(LdapTemplate.class),
+            roles
     ));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -344,7 +362,8 @@ public class KnoxSSOAuthenticationFilterTest {
               mock(Path.class),
               "knoxKeyString",
               "knoxCookie",
-              mock(LdapTemplate.class)
+              mock(LdapTemplate.class),
+              roles
       ));
 
       assertEquals("knoxKeyString", knoxSSOAuthenticationFilter.getKnoxKey());
@@ -356,7 +375,8 @@ public class KnoxSSOAuthenticationFilterTest {
               Paths.get("./target/knoxKeyFile"),
               null,
               "knoxCookie",
-              mock(LdapTemplate.class)
+              mock(LdapTemplate.class),
+              roles
       ));
 
       assertEquals("knoxKeyFileKeyString", knoxSSOAuthenticationFilter.getKnoxKey());
@@ -371,7 +391,8 @@ public class KnoxSSOAuthenticationFilterTest {
             mock(Path.class),
             "knoxKeyString",
             "knoxCookie",
-            ldapTemplate
+            ldapTemplate,
+            roles
     ));
 
     HttpServletRequest request = mock(HttpServletRequest.class);
@@ -384,5 +405,4 @@ public class KnoxSSOAuthenticationFilterTest {
     assertEquals("ROLE_ADMIN", grantedAuthorities[1].toString());
     assertEquals("userName", authentication.getName());
   }
-
 }

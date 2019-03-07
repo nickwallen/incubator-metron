@@ -54,7 +54,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static org.apache.metron.rest.MetronRestConstants.SECURITY_ROLE_PREFIX;
 import static org.springframework.ldap.query.LdapQueryBuilder.query;
 
 /**
@@ -71,12 +70,14 @@ public class KnoxSSOAuthenticationFilter implements Filter {
   private String knoxKeyString;
   private String knoxCookie;
   private LdapTemplate ldapTemplate;
+  private Roles roles;
 
   public KnoxSSOAuthenticationFilter(String userSearchBase,
                                      Path knoxKeyFile,
                                      String knoxKeyString,
                                      String knoxCookie,
-                                     LdapTemplate ldapTemplate) {
+                                     LdapTemplate ldapTemplate,
+                                     Roles roles) {
     this.userSearchBase = userSearchBase;
     this.knoxKeyFile = knoxKeyFile;
     this.knoxKeyString = knoxKeyString;
@@ -85,6 +86,7 @@ public class KnoxSSOAuthenticationFilter implements Filter {
       throw new IllegalStateException("KnoxSSO requires LDAP. You must add 'ldap' to the active profiles.");
     }
     this.ldapTemplate = ldapTemplate;
+    this.roles = roles;
   }
 
   @Override
@@ -264,8 +266,9 @@ public class KnoxSSOAuthenticationFilter implements Filter {
             .and("member")
             .is(ldapName), (AttributesMapper<String>) attrs -> (String) attrs.get("cn").get())
             .stream()
-            .map(group -> String.format("%s%s", SECURITY_ROLE_PREFIX, group.toUpperCase()))
-            .map(SimpleGrantedAuthority::new).collect(Collectors.toList());
+            .map(group -> String.format("%s%s", roles.getRolePrefix(), group.toUpperCase()))
+            .map(SimpleGrantedAuthority::new)
+            .collect(Collectors.toList());
 
     final UserDetails principal = new User(userName, "", grantedAuths);
     final UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

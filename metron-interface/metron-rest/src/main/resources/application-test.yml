@@ -59,3 +59,9 @@ meta:
   dao:
   # By default, we use the InMemoryMetaAlertDao for our tests
     impl: org.apache.metron.indexing.dao.InMemoryMetaAlertDao
+
+authorization:
+  rolePrefix: "ROLE_"
+  roles:
+    admin: "ADMIN"
+    user: "USER"
