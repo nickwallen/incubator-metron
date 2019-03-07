@@ -26,10 +26,7 @@ import org.apache.metron.stellar.dsl.BaseStellarFunction;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +36,7 @@ import static org.apache.metron.stellar.dsl.Context.Capabilities.GLOBAL_CONFIG;
 @Stellar(
         namespace="PROFILE",
         name="PUT",
-        description="Writes a series of values to a stored profile in HBase.",
+        description="Writes a series of values to a stored profile in HBase. Can be used to ",
         params={
                 "values - The profile measurement values to write.",
         },
@@ -47,7 +44,6 @@ import static org.apache.metron.stellar.dsl.Context.Capabilities.GLOBAL_CONFIG;
 )
 public class PutProfile extends BaseStellarFunction {
 
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private Context context;
 
   @Override

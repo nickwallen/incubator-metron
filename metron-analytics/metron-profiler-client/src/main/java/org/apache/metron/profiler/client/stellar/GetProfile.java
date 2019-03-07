@@ -139,7 +139,6 @@ public class GetProfile implements StellarFunction {
    */
   @Override
   public Object apply(List<Object> args, Context context) throws ParseException {
-
     String profile = getArg(0, String.class, args);
     String entity = getArg(1, String.class, args);
     Optional<List<ProfilePeriod>> periods = Optional.ofNullable(getArg(2, List.class, args));
@@ -209,78 +208,5 @@ public class GetProfile implements StellarFunction {
     }
 
     return groups;
-  }
-
-  /**
-   * Creates the ColumnBuilder to use in accessing the profile data.
-   * @param global The global configuration.
-   */
-  private ColumnBuilder getColumnBuilder(Map<String, Object> global) {
-    ColumnBuilder columnBuilder;
-
-    String columnFamily = PROFILER_COLUMN_FAMILY.get(global, String.class);
-    columnBuilder = new ValueOnlyColumnBuilder(columnFamily);
-
-    return columnBuilder;
-  }
-
-  /**
-   * Creates the ColumnBuilder to use in accessing the profile data.
-   * @param global The global configuration.
-   */
-  private RowKeyBuilder getRowKeyBuilder(Map<String, Object> global) {
-
-    // how long is the profile period?
-    long duration = PROFILER_PERIOD.get(global, Long.class);
-    LOG.debug("profiler client: {}={}", PROFILER_PERIOD, duration);
-
-    // which units are used to define the profile period?
-    String configuredUnits = PROFILER_PERIOD_UNITS.get(global, String.class);
-    TimeUnit units = TimeUnit.valueOf(configuredUnits);
-    LOG.debug("profiler client: {}={}", PROFILER_PERIOD_UNITS, units);
-
-    // what is the salt divisor?
-    Integer saltDivisor = PROFILER_SALT_DIVISOR.get(global, Integer.class);
-    LOG.debug("profiler client: {}={}", PROFILER_SALT_DIVISOR, saltDivisor);
-
-    return new SaltyRowKeyBuilder(saltDivisor, duration, units);
-  }
-
-  /**
-   * Create an HBase table used when accessing HBase.
-   * @param global The global configuration.
-   * @return
-   */
-  private HTableInterface getTable(Map<String, Object> global) {
-
-    String tableName = PROFILER_HBASE_TABLE.get(global, String.class);
-    TableProvider provider = getTableProvider(global);
-
-    try {
-      return provider.getTable(HBaseConfiguration.create(), tableName);
-
-    } catch (IOException e) {
-      throw new IllegalArgumentException(String.format("Unable to access table: %s", tableName), e);
-    }
-  }
-
-  /**
-   * Create the TableProvider to use when accessing HBase.
-   * @param global The global configuration.
-   */
-  private TableProvider getTableProvider(Map<String, Object> global) {
-    String clazzName = PROFILER_HBASE_TABLE_PROVIDER.get(global, String.class);
-
-    TableProvider provider;
-    try {
-      @SuppressWarnings("unchecked")
-      Class<? extends TableProvider> clazz = (Class<? extends TableProvider>) Class.forName(clazzName);
-      provider = clazz.getConstructor().newInstance();
-
-    } catch (Exception e) {
-      provider = new HTableProvider();
-    }
-
-    return provider;
   }
 }

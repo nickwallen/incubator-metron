@@ -101,14 +101,14 @@ This section describes how to get started using the Profiler in the Stellar REPL
 	[Stellar]>>> PROFILER_APPLY(msg, profiler)
 	Profiler{1 profile(s), 2 messages(s), 2 route(s)}
 	```
-    ```
-    [Stellar]>>> PROFILER_APPLY(msg, profiler)
-    Profiler{1 profile(s), 3 messages(s), 3 route(s)}
-    ```
+  ```
+  [Stellar]>>> PROFILER_APPLY(msg, profiler)
+  Profiler{1 profile(s), 3 messages(s), 3 route(s)}
+  ```
 
 1. Flush the Profiler.  
 
-	A flush is what occurs at the end of each 15 minute period in the Profiler.  The result is a list of Profile Measurements. Each measurement is a map containing detailed information about the profile data that has been generated. The `value` field is what is written to HBase when running the Profiler in either Storm or Spark.
+	A flush is what occurs at the end of each 15 minute period in the Profiler.  The result is a list of profile measurements. Each measurement is a map containing detailed information about the profile data that has been generated. The `value` field is what is written to HBase when running the Profiler in either Storm or Spark.
 
 	There will always be one measurement for each [profile, entity] pair.  This profile simply counts the number of messages by IP source address. Notice that the value is '3' for the entity '10.0.0.1' as we applied 3 messages with an 'ip_src_addr' of ’10.0.0.1'.
 
@@ -118,6 +118,19 @@ This section describes how to get started using the Profiler in the Stellar REPL
 	[{period={duration=900000, period=1669628, start=1502665200000, end=1502666100000},
 	profile=hello-world, groups=[], value=3, entity=10.0.0.1}]
 	```
+
+1. So far these measurements have not yet been written to a stored profile.  They exist only in memory in the current session.  To mimic how the Streaming Profiler behaves with a live stream of telemetry, these measurements can be written to HBase using `PROFILE_PUT`.
+
+    ```
+    [Stellar]>>> PROFILE_PUT(values)
+    1
+    ```
+
+    Now that these measurements have been stored they can be retrieved using `PROFILE_GET` or `PROFILE_VERBOSE` in the same manner that you might retrieve the values as part of your Enrichment or Threat Triage processing.
+
+    ```
+    [Stellar]>>> PROFILE_GET("hello-world", "10.0.0.1", PROFILE_FIXED(1, "HOUR"))
+    ```
 
 1. In addition to testing with mock data, you can also apply real, live telemetry to your profile. This can be useful to test your profile against the complexities that exist in real data.  
 
@@ -130,7 +143,7 @@ This section describes how to get started using the Profiler in the Stellar REPL
 	Now apply those 10 messages to your profile.
 	```
 	[Stellar]>>> PROFILER_APPLY(msgs, profiler)
-	  Profiler{1 profile(s), 10 messages(s), 10 route(s)}
+	 Profiler{1 profile(s), 10 messages(s), 10 route(s)}
 	```
 
 1. After you are satisfied with your profile, the next step is to deploy the profile against the live stream of telemetry being capture by Metron. This involves deploying the profile to either the [Storm Profiler](../metron-profiler-storm/README.md) or the [Spark Profiler](../metron-profiler-spark/README.md).
