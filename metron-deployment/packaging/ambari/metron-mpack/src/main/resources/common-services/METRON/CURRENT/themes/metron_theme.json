@@ -425,7 +425,7 @@
             "name": "security",
             "display-name": "Security",
             "layout": {
-              "tab-columns": "3",
+              "tab-columns": "1",
               "tab-rows": "3",
               "sections": [
                 {
@@ -1673,6 +1673,18 @@
       },
       {
         "config": "metron-alerts-ui-env/metron_alerts_ui_port",
+        "widget": {
+          "type": "text-field"
+        }
+      },
+      {
+        "config": "metron-security-env/metron_admin_role",
+        "widget": {
+          "type": "text-field"
+        }
+      },
+      {
+        "config": "metron-security-env/metron_user_role",
         "widget": {
           "type": "text-field"
         }
