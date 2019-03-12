@@ -45,26 +45,29 @@ public class MetronAuthoritiesMapper implements GrantedAuthoritiesMapper {
   /**
    * The name of the role at the authentication provider that maps to ROLE_USER.
    */
-  @Value("${authorities.user}")
+  @Value("${authorities.user:" + SECURITY_ROLE_USER + "}")
   private String userRole;
 
   /**
    * The name of the role at the authentication provider that maps to ROLE_ADMIN.
    */
-  @Value("${authorities.admin}")
+  @Value("${authorities.admin:" + SECURITY_ROLE_ADMIN + "}")
   private String adminRole;
 
-  public MetronAuthoritiesMapper() {
-    // by default, assume the roles used at the authentication provider are the same as those defined by Metron
-    userRole = SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER;
-    adminRole = SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN;
-  }
+  /**
+   * The prefix that is appended to each role after they are retrieved
+   * from the authorization provider.
+   *
+   * <p>This prefix needs to be considered when mapping roles to authorities.
+   */
+  @Value("${authorities.prefix:" + SECURITY_ROLE_PREFIX + "}")
+  private String prefix;
 
   @Override
   public Collection<? extends GrantedAuthority> mapAuthorities(Collection<? extends GrantedAuthority> authorities) {
-    LOG.debug("Mapping authorities to roles; {}={}, {}={}",
-            SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER, userRole,
-            SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN, adminRole);
+    LOG.debug("Mapping roles to authorities; '{}'->'{}', '{}'->'{}'",
+            prefix + userRole, SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER,
+            prefix + adminRole, SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN);
 
     HashSet<GrantedAuthority> mapped = new HashSet(authorities.size());
     Iterator<? extends GrantedAuthority> iterator = authorities.iterator();
@@ -76,12 +79,12 @@ public class MetronAuthoritiesMapper implements GrantedAuthoritiesMapper {
     return mapped;
   }
 
-  public GrantedAuthority mapAuthority(String authority) {
+  public GrantedAuthority mapAuthority(final String authority) {
     GrantedAuthority grantedAuthority;
-    if(StringUtils.equals(authority, userRole)) {
+    if(StringUtils.equals(authority, prefix + userRole)) {
       grantedAuthority = new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER);
 
-    } else if(StringUtils.equals(authority, adminRole)) {
+    } else if(StringUtils.equals(authority, prefix + adminRole)) {
       grantedAuthority = new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN);
 
     } else {
@@ -89,7 +92,7 @@ public class MetronAuthoritiesMapper implements GrantedAuthoritiesMapper {
       grantedAuthority = new SimpleGrantedAuthority(authority);
     }
 
-    LOG.debug("Mapped authority {} to {}", authority, grantedAuthority.getAuthority());
+    LOG.debug("Mapped authority '{}' to '{}'", authority, grantedAuthority.getAuthority());
     return grantedAuthority;
   }
 
@@ -107,5 +110,13 @@ public class MetronAuthoritiesMapper implements GrantedAuthoritiesMapper {
 
   public void setAdminRole(String adminRole) {
     this.adminRole = adminRole;
+  }
+
+  public String getPrefix() {
+    return prefix;
+  }
+
+  public void setPrefix(String prefix) {
+    this.prefix = prefix;
   }
 }

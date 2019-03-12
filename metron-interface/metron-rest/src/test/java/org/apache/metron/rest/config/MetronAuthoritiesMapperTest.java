@@ -35,46 +35,67 @@ public class MetronAuthoritiesMapperTest {
   private MetronAuthoritiesMapper mapper;
 
   @Test
-  public void shouldMapUserGroup() {
+  public void shouldMapUserRole() {
     mapper = new MetronAuthoritiesMapper();
-    mapper.setUserRole("ACME_METRON_USER");
-    mapper.setAdminRole("ACME_METRON_ADMIN");
+    mapper.setUserRole("ACME_USER");
+    mapper.setAdminRole("ACME_ADMIN");
+    mapper.setPrefix("ROLE_");
 
+    // spring will prefix the roles retrieved from the authorization provider with "ROLE_" by default
     List<GrantedAuthority> input = new ArrayList<>();
-    input.add(new SimpleGrantedAuthority("ACME_METRON_USER"));
+    input.add(new SimpleGrantedAuthority("ROLE_" + "ACME_USER"));
 
-    // ROLE_USER == ACME_METRON_USER
+    // should map "ACME_METRON_USER" to "ROLE_USER"
     Collection<? extends GrantedAuthority> actuals = mapper.mapAuthorities(input);
     Assert.assertEquals(1, actuals.size());
     Assert.assertEquals(SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER, actuals.iterator().next().getAuthority());
   }
 
   @Test
-  public void shouldMapAdminGroup() {
+  public void shouldMapAdminRole() {
     mapper = new MetronAuthoritiesMapper();
-    mapper.setUserRole("ACME_METRON_USER");
-    mapper.setAdminRole("ACME_METRON_ADMIN");
+    mapper.setUserRole("ACME_USER");
+    mapper.setAdminRole("ACME_ADMIN");
+    mapper.setPrefix("ROLE_");
 
     List<GrantedAuthority> input = new ArrayList<>();
-    input.add(new SimpleGrantedAuthority("ACME_METRON_ADMIN"));
+    input.add(new SimpleGrantedAuthority("ROLE_" + "ACME_ADMIN"));
 
-    // ROLE_ADMIN == ACME_METRON_ADMIN
+    // should map "ACME_ADMIN" to "ROLE_ADMIN"
     Collection<? extends GrantedAuthority> actuals = mapper.mapAuthorities(input);
     Assert.assertEquals(1, actuals.size());
     Assert.assertEquals(SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN, actuals.iterator().next().getAuthority());
   }
 
   @Test
-  public void shouldNotMapOtherGroups() {
+  public void shouldNotMapOtherRoles() {
     mapper = new MetronAuthoritiesMapper();
-    mapper.setUserRole("ACME_METRON_USER");
-    mapper.setAdminRole("ACME_METRON_ADMIN");
+    mapper.setUserRole("ACME_USER");
+    mapper.setAdminRole("ACME_ADMIN");
+    mapper.setPrefix("ROLE_");
 
     List<GrantedAuthority> input = new ArrayList<>();
-    input.add(new SimpleGrantedAuthority("ANOTHER_GROUP"));
+    input.add(new SimpleGrantedAuthority("ROLE_" + "ANOTHER_GROUP"));
 
     Collection<? extends GrantedAuthority> actuals = mapper.mapAuthorities(input);
     Assert.assertEquals(1, actuals.size());
-    Assert.assertEquals("ANOTHER_GROUP", actuals.iterator().next().getAuthority());
+    Assert.assertEquals("ROLE_" + "ANOTHER_GROUP", actuals.iterator().next().getAuthority());
+  }
+
+  @Test
+  public void shouldMapRolesWithNoPrefix() {
+    // change the prefix
+    mapper = new MetronAuthoritiesMapper();
+    mapper.setUserRole("ACME_USER");
+    mapper.setAdminRole("ACME_ADMIN");
+    mapper.setPrefix("");
+
+    List<GrantedAuthority> input = new ArrayList<>();
+    input.add(new SimpleGrantedAuthority("ACME_ADMIN"));
+
+    // should map "ACME_ADMIN" to "ROLE_ADMIN"
+    Collection<? extends GrantedAuthority> actuals = mapper.mapAuthorities(input);
+    Assert.assertEquals(1, actuals.size());
+    Assert.assertEquals(SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN, actuals.iterator().next().getAuthority());
   }
 }
