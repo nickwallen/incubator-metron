@@ -30,6 +30,7 @@ import java.lang.invoke.MethodHandles;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Optional;
 
 import static org.apache.metron.rest.MetronRestConstants.SECURITY_ROLE_ADMIN;
 import static org.apache.metron.rest.MetronRestConstants.SECURITY_ROLE_PREFIX;
@@ -73,27 +74,29 @@ public class MetronAuthoritiesMapper implements GrantedAuthoritiesMapper {
     Iterator<? extends GrantedAuthority> iterator = authorities.iterator();
     while(iterator.hasNext()) {
       GrantedAuthority authority = iterator.next();
-      mapped.add(mapAuthority(authority.getAuthority()));
+      mapAuthority(authority.getAuthority()).ifPresent(auth -> mapped.add(auth));
     }
 
     return mapped;
   }
 
-  public GrantedAuthority mapAuthority(final String authority) {
-    GrantedAuthority grantedAuthority;
+  public Optional<GrantedAuthority> mapAuthority(final String authority) {
+    Optional<GrantedAuthority> result;
     if(StringUtils.equals(authority, prefix + userRole)) {
-      grantedAuthority = new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER);
+      result = Optional.of(new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_USER));
+      LOG.debug("Mapped '{}' to '{}'", authority, result.get().getAuthority());
 
     } else if(StringUtils.equals(authority, prefix + adminRole)) {
-      grantedAuthority = new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN);
+      result = Optional.of(new SimpleGrantedAuthority(SECURITY_ROLE_PREFIX + SECURITY_ROLE_ADMIN));
+      LOG.debug("Mapped '{}' to '{}'", authority, result.get().getAuthority());
 
     } else {
-      // otherwise, no mapping required
-      grantedAuthority = new SimpleGrantedAuthority(authority);
+      // otherwise, we do not care about the role
+      LOG.debug("Ignoring unused role; role={}", authority);
+      result = Optional.empty();
     }
 
-    LOG.debug("Mapped authority '{}' to '{}'", authority, grantedAuthority.getAuthority());
-    return grantedAuthority;
+    return result;
   }
 
   public String getUserRole() {

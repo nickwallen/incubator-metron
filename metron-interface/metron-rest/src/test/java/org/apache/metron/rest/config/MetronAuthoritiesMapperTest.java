@@ -68,18 +68,18 @@ public class MetronAuthoritiesMapperTest {
   }
 
   @Test
-  public void shouldNotMapOtherRoles() {
+  public void shouldIgnoreOtherRoles() {
     mapper = new MetronAuthoritiesMapper();
     mapper.setUserRole("ACME_USER");
     mapper.setAdminRole("ACME_ADMIN");
     mapper.setPrefix("ROLE_");
 
     List<GrantedAuthority> input = new ArrayList<>();
-    input.add(new SimpleGrantedAuthority("ROLE_" + "ANOTHER_GROUP"));
+    input.add(new SimpleGrantedAuthority("ROLE_" + "ANOTHER_ROLE"));
+    input.add(new SimpleGrantedAuthority("ROLE_" + "YET_ANOTHER_ROLE"));
 
     Collection<? extends GrantedAuthority> actuals = mapper.mapAuthorities(input);
-    Assert.assertEquals(1, actuals.size());
-    Assert.assertEquals("ROLE_" + "ANOTHER_GROUP", actuals.iterator().next().getAuthority());
+    Assert.assertEquals(0, actuals.size());
   }
 
   @Test
