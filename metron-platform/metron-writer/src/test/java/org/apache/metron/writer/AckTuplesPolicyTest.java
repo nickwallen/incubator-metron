@@ -100,7 +100,7 @@ public class AckTuplesPolicyTest {
     ackTuplesPolicy.addTupleMessageIds(tuple2, Collections.singleton(messageId2));
     ackTuplesPolicy.addTupleMessageIds(tuple3, Collections.singleton(messageId3));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
 
     assertEquals(0, ackTuplesPolicy.getTupleMessageMap().size());
     assertEquals(0, ackTuplesPolicy.getTupleErrorMap().size());
@@ -153,7 +153,7 @@ public class AckTuplesPolicyTest {
     BulkWriterResponse response = new BulkWriterResponse();
     response.addError(e1, new MessageId(messageId1));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
 
     assertEquals(2, ackTuplesPolicy.getTupleMessageMap().size());
     assertEquals(1, ackTuplesPolicy.getTupleErrorMap().size());
@@ -165,7 +165,7 @@ public class AckTuplesPolicyTest {
     response.addError(e2, new MessageId(messageId2));
     response.addError(e1, new MessageId(messageId3));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
 
     assertEquals(0, ackTuplesPolicy.getTupleMessageMap().size());
     assertEquals(0, ackTuplesPolicy.getTupleErrorMap().size());
@@ -187,7 +187,7 @@ public class AckTuplesPolicyTest {
     response.addSuccess(new MessageId("message1"));
     response.addSuccess(new MessageId("message2"));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
 
     assertEquals(0, ackTuplesPolicy.getTupleMessageMap().size());
     verify(collector, times(1)).ack(tuple1);
@@ -203,13 +203,13 @@ public class AckTuplesPolicyTest {
     response.addSuccess(new MessageId("message1"));
     response.addSuccess(new MessageId("message2"));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
     verify(collector, times(0)).ack(any());
 
     response = new BulkWriterResponse();
     response.addSuccess(new MessageId("message3"));
 
-    ackTuplesPolicy.onFlush(sensorType, response);
+    ackTuplesPolicy.postFlush(sensorType, response);
 
     assertEquals(0, ackTuplesPolicy.getTupleMessageMap().size());
     verify(collector, times(1)).ack(tuple1);

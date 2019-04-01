@@ -18,7 +18,6 @@
 package org.apache.metron.writer;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
@@ -89,18 +88,18 @@ public class BulkWriterComponentTest {
   }
 
   @Test
-  public void writeShouldProperlyAckTuplesInBatch() throws Exception {
+  public void writeShouldNotifyFlushPolicy() throws Exception {
     BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(Collections.singletonList(flushPolicy));
+
     BulkWriterResponse response = new BulkWriterResponse();
     response.addAllSuccesses(messageIds);
-
     when(bulkMessageWriter.write(sensorType, configurations, messages)).thenReturn(response);
 
     bulkWriterComponent.write(sensorType, messages.get(0), bulkMessageWriter, configurations);
 
     verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages.subList(0, 1));
-    verify(flushPolicy, times(0)).onFlush(any(), any());
+    verify(flushPolicy, times(0)).postFlush(any(), any());
 
     reset(flushPolicy);
 
@@ -113,7 +112,7 @@ public class BulkWriterComponentTest {
     verify(bulkMessageWriter, times(1)).write(sensorType, configurations,
             Arrays.asList(new BulkMessage<>(messageId1, message1), new BulkMessage<>(messageId2, message2)));
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages);
-    verify(flushPolicy, times(1)).onFlush(sensorType, expectedResponse);
+    verify(flushPolicy, times(1)).postFlush(sensorType, expectedResponse);
 
     verifyNoMoreInteractions(bulkMessageWriter, flushPolicy);
   }
@@ -134,15 +133,15 @@ public class BulkWriterComponentTest {
 
     verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages.subList(0, 1));
-    verify(flushPolicy, times(0)).onFlush(any(), any());
+    verify(flushPolicy, times(0)).postFlush(any(), any());
 
     when(configurations.isEnabled(sensorType)).thenReturn(false);
 
     bulkWriterComponent.write(sensorType, messages.get(1), bulkMessageWriter, configurations);
 
     verify(bulkMessageWriter, times(1)).write(sensorType, configurations, Collections.singletonList(messages.get(0)));
-    verify(flushPolicy, times(1)).onFlush(sensorType, beforeDisabledResponse);
-    verify(flushPolicy, times(1)).onFlush(sensorType, afterDisabledResponse);
+    verify(flushPolicy, times(1)).postFlush(sensorType, beforeDisabledResponse);
+    verify(flushPolicy, times(1)).postFlush(sensorType, afterDisabledResponse);
 
     verifyNoMoreInteractions(bulkMessageWriter, flushPolicy);
   }
@@ -160,7 +159,7 @@ public class BulkWriterComponentTest {
 
     verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages.subList(0, 1));
-    verify(flushPolicy, times(0)).onFlush(any(), any());
+    verify(flushPolicy, times(0)).postFlush(any(), any());
 
     reset(flushPolicy);
 
@@ -173,39 +172,47 @@ public class BulkWriterComponentTest {
 
     verify(bulkMessageWriter, times(1)).write(sensorType, configurations, messages);
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages);
-    verify(flushPolicy, times(1)).onFlush(sensorType, expectedErrorResponse);
+    verify(flushPolicy, times(1)).postFlush(sensorType, expectedErrorResponse);
 
     verifyNoMoreInteractions(bulkMessageWriter, flushPolicy);
   }
 
   @Test
-  public void writeShouldProperlyHandleWriterException() throws Exception {
+  public void shouldHandleWriteFailures() throws Exception {
     BulkWriterComponent<JSONObject> bulkWriterComponent = new BulkWriterComponent<>(Collections.singletonList(flushPolicy));
+
+    // the writer will throw an exception
     Throwable e = new Exception("test exception");
-    BulkWriterResponse response = new BulkWriterResponse();
-    response.addAllErrors(e, messageIds);
-
     when(bulkMessageWriter.write(sensorType, configurations, messages)).thenThrow(e);
-
     bulkWriterComponent.write(sensorType, messages.get(0), bulkMessageWriter, configurations);
 
-    verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
+    // the policy should be consulted
     verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages.subList(0, 1));
-    verify(flushPolicy, times(0)).onFlush(any(), any());
 
+    // the first message should be batched and not written
+    verify(bulkMessageWriter, times(0)).write(eq(sensorType), eq(configurations), any());
+
+    // preFlush and postFlush are only called when a flush occurs
+    verify(flushPolicy, times(0)).preFlush(sensorType, configurations, messages.subList(0, 1));
+    verify(flushPolicy, times(0)).postFlush(any(), any());
+
+    verifyNoMoreInteractions(flushPolicy);
     reset(flushPolicy);
 
+    // ensure the next write will succeed and trigger a flush
     when(flushPolicy.shouldFlush(sensorType, configurations, messages)).thenReturn(true);
-
     bulkWriterComponent.write(sensorType, messages.get(1), bulkMessageWriter, configurations);
 
-    BulkWriterResponse expectedErrorResponse = new BulkWriterResponse();
-    expectedErrorResponse.addAllErrors(e, messageIds);
+    BulkWriterResponse expected = new BulkWriterResponse();
+    expected.addAllErrors(e, messageIds);
 
+    // the batch should flush and the messages written
     verify(bulkMessageWriter, times(1)).write(sensorType, configurations, messages);
-    verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages);
-    verify(flushPolicy, times(1)).onFlush(sensorType, expectedErrorResponse);
 
+    // the flush policy should be notified
+    verify(flushPolicy, times(1)).shouldFlush(sensorType, configurations, messages);
+    verify(flushPolicy, times(1)).preFlush(sensorType, configurations, messages);
+    verify(flushPolicy, times(1)).postFlush(sensorType, expected);
     verifyNoMoreInteractions(flushPolicy);
   }
 
@@ -241,7 +248,7 @@ public class BulkWriterComponentTest {
     expectedResponse.addError(throwable, errorId);
     expectedResponse.addSuccess(missingId);
 
-    verify(flushPolicy, times(1)).onFlush(sensorType, expectedResponse);
+    verify(flushPolicy, times(1)).postFlush(sensorType, expectedResponse);
     verifyNoMoreInteractions(flushPolicy);
   }
 

@@ -76,7 +76,7 @@ public class BatchTimeoutPolicyTest {
     when(clock.currentTimeMillis()).thenReturn(0L); // initial check
     assertFalse(batchTimeoutPolicy.shouldFlush(sensor1, configurations, messages));
 
-    batchTimeoutPolicy.onFlush(sensor1, new BulkWriterResponse());
+    batchTimeoutPolicy.postFlush(sensor1, new BulkWriterResponse());
 
     when(clock.currentTimeMillis()).thenReturn(1000L); // sensor was reset so shouldn't timeout
     assertFalse(batchTimeoutPolicy.shouldFlush(sensor1, configurations, messages));

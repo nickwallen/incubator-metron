@@ -46,7 +46,6 @@ public class BatchTimeoutPolicy<MESSAGE_T> implements FlushPolicy<MESSAGE_T> {
     this.maxBatchTimeout = maxBatchTimeout;
   }
 
-
   public BatchTimeoutPolicy(int maxBatchTimeout, Clock clock) {
     this(maxBatchTimeout);
     this.clock = clock;
@@ -80,13 +79,18 @@ public class BatchTimeoutPolicy<MESSAGE_T> implements FlushPolicy<MESSAGE_T> {
     return shouldFlush;
   }
 
+  @Override
+  public void preFlush(String sensorType, WriterConfiguration configurations, List<BulkMessage<MESSAGE_T>> bulkMessages) {
+    // nothing to do
+  }
+
   /**
    * Removes the timeout value for a sensor type.  The next call to {@link org.apache.metron.writer.BatchTimeoutPolicy#shouldFlush(String, WriterConfiguration, List)}
    * will set a new timeout.
    * @param sensorType
    */
   @Override
-  public void onFlush(String sensorType, BulkWriterResponse response) {
+  public void postFlush(String sensorType, BulkWriterResponse response) {
     timeouts.remove(sensorType);
   }
 

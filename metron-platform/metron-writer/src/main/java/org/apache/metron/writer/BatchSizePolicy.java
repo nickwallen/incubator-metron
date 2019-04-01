@@ -52,7 +52,12 @@ public class BatchSizePolicy<MESSAGE_T> implements FlushPolicy<MESSAGE_T> {
   }
 
   @Override
-  public void onFlush(String sensorType, BulkWriterResponse response) {
+  public void preFlush(String sensorType, WriterConfiguration configurations, List<BulkMessage<MESSAGE_T>> bulkMessages) {
+    // nothing to do
+  }
 
+  @Override
+  public void postFlush(String sensorType, BulkWriterResponse response) {
+    // nothing to do
   }
 }

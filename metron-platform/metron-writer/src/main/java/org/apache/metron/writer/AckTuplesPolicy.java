@@ -78,7 +78,12 @@ public class AckTuplesPolicy<MESSAGE_T> implements FlushPolicy<MESSAGE_T> {
   }
 
   @Override
-  public void onFlush(String sensorType, BulkWriterResponse response) {
+  public void preFlush(String sensorType, WriterConfiguration configurations, List<BulkMessage<MESSAGE_T>> bulkMessages) {
+    // nothing to do
+  }
+
+  @Override
+  public void postFlush(String sensorType, BulkWriterResponse response) {
     LOG.debug("Handling flushed messages for sensor {} with response: {}", sensorType, response);
 
     // Update tuple message map.  Tuple is ready to ack when all it's messages have been flushed.
