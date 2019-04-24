@@ -43,14 +43,8 @@
         <description>Service User for Metron</description>
         <display-name>Metron User Name</display-name>
         <value-attributes>
-          <type>user</type>
-          <overridable>false</overridable>
-          <user-groups>
-              <property>
-                  <type>metron-env</type>
-                  <name>metron_group</name>
-              </property>
-          </user-groups>
+            <type>user</type>
+            <overridable>false</overridable>
         </value-attributes>
     </property>
     <property>
@@ -58,7 +52,11 @@
         <value>metron</value>
         <property-type>GROUP</property-type>
         <description>Service Group for Metron</description>
-        <display-name>Metron Service Group</display-name>
+        <display-name>Metron Group Name</display-name>
+        <value-attributes>
+            <type>user</type>
+            <overridable>false</overridable>
+        </value-attributes>
     </property>
     <property>
         <name>metron_log_dir</name>
