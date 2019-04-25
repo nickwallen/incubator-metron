@@ -15,25 +15,4 @@
 #  limitations under the License.
 #
 ---
-- include_vars: "{{ cluster_type }}.yml"
-
-- include_tasks: "dependencies-{{ansible_distribution}}-{{ansible_distribution_major_version}}.yml"
-
-- name : Wait for Ambari to start; http://{{ ambari_host }}:{{ ambari_port }}
-  wait_for :
-    host: "{{ ambari_host }}"
-    port: "{{ ambari_port }}"
-    timeout: 600
-
-- name: Deploy cluster with Ambari; http://{{ ambari_host }}:{{ ambari_port }}
-  ambari_cluster_state:
-    host: "{{ ambari_host }}"
-    port: "{{ ambari_port }}"
-    username: "{{ ambari_user }}"
-    password: "{{ ambari_password }}"
-    cluster_name: "{{ cluster_name }}"
-    cluster_state: present
-    blueprint_name: "{{ blueprint_name }}"
-    configurations: "{{ configurations }}"
-    wait_for_complete: True
-    blueprint_var: "{{ blueprint }}"
+# nothing to do
