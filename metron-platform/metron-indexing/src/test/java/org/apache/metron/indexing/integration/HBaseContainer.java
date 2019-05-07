@@ -27,39 +27,13 @@ import org.testcontainers.utility.Base58;
 import javax.annotation.Nonnull;
 import java.util.stream.Stream;
 
-import static org.apache.metron.indexing.integration.HBaseContainer.HBasePort.*;
-
 public class HBaseContainer extends GenericContainer<HBaseContainer> {
 
-  protected enum HBasePort {
-    MASTER("hbase.master.port", 16000, true),
-    MASTER_INFO("hbase.master.info.port", 16010, true),
-    REGION_SERVER("hbase.regionserver.port", 16020, true),
-    REGION_SERVER_INFO("hbase.regionserver.info.port", 16030, true),
-    ZOOKEEPER("hbase.zookeeper.property.clientPort", 2181, false);
-
-    final String name;
-    final int originalPort;
-    final boolean dynamic;
-
-    HBasePort(String name, int originalPort, boolean dynamic) {
-      this.name = name;
-      this.originalPort = originalPort;
-      this.dynamic = dynamic;
-    }
-
-    public String getName() {
-      return name;
-    }
-
-    public int getOriginalPort() {
-      return originalPort;
-    }
-
-    public boolean isDynamic() {
-      return dynamic;
-    }
-  }
+  private static final int MASTER_PORT = 16000;
+  private static final int MASTER_INFO_PORT = 16010;
+  private static final int REGION_SERVER_PORT = 16020;
+  private static final int REGION_SERVER_INFO_PORT = 16030;
+  private static final int ZOOKEEPER_PORT = 2181;
 
   protected SocatContainer proxy;
 
@@ -74,30 +48,25 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
     // start the proxy container
     String networkAlias = getNetworkAliases().get(0);
     proxy = new SocatContainer()
-            .withNetwork(getNetwork());
-
-    for (HBasePort port : HBasePort.values()) {
-      if (port.isDynamic()) {
-        proxy.withTarget(port.getOriginalPort(), networkAlias);
-      } else {
-        proxy.addExposedPort(port.getOriginalPort());
-      }
-    }
-    proxy.setWaitStrategy(null);
+            .withNetwork(getNetwork())
+            .withTarget(MASTER_PORT, networkAlias)
+            .withTarget(MASTER_INFO_PORT, networkAlias)
+            .withTarget(REGION_SERVER_PORT, networkAlias)
+            .withTarget(REGION_SERVER_INFO_PORT, networkAlias)
+            .withTarget(ZOOKEEPER_PORT, networkAlias);
     proxy.start();
 
-    for (HBasePort port : HBasePort.values()) {
-      exposePortThroughProxy(networkAlias, port.getOriginalPort(), getMappedPort(port.getOriginalPort()));
-    }
-//    proxy = new SocatContainer()
-//            .withNetwork(getNetwork())
-//            .withTarget(HBasePort.MASTER.originalPort, networkAlias)
-//            .withTarget(MASTER_WEB_PORT, networkAlias)
-//            .withTarget(REGION_SERVER_PORT, networkAlias)
-//            .withTarget(REGION_SERVER_WEB_PORT, networkAlias);
-//            //.withTarget(ZOOKEEPER_PORT, networkAlias);
-//    proxy.addExposedPort(ZOOKEEPER_PORT);
-//    proxy.start();
+    exposePortThroughProxy(networkAlias, getMasterPort());
+    exposePortThroughProxy(networkAlias, getMasterInfoPort());
+    exposePortThroughProxy(networkAlias, getRegionServerPort());
+    exposePortThroughProxy(networkAlias, getRegionServerInfoPort());
+    exposePortThroughProxy(networkAlias, getZookeeperPort());
+//
+//    proxy.addExposedPort(getZookeeperPort());
+//    proxy.addExposedPort(getMasterPort());
+//    proxy.addExposedPort(getMasterInfoPort());
+//    proxy.addExposedPort(getRegionServerPort());
+//    proxy.addExposedPort(getRegionServerInfoPort());
 
 //    exposePortThroughProxy(networkAlias, MASTER_PORT, proxy.getMappedPort(MASTER_PORT));
 //    exposePortThroughProxy(networkAlias, MASTER_WEB_PORT, proxy.getMappedPort(MASTER_WEB_PORT));
@@ -105,17 +74,18 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
 //    exposePortThroughProxy(networkAlias, REGION_SERVER_WEB_PORT, proxy.getMappedPort(REGION_SERVER_WEB_PORT));
 //    exposePortThroughProxy(networkAlias, ZOOKEEPER_PORT, proxy.getMappedPort(ZOOKEEPER_PORT));
 
-//    int masterPort = getMasterPort();
-//    int masterWebPort = getMasterWebPort();
-//    int regionServerPort = getRegionServerPort();
-//    int regionServerWebPort = getRegionServerWebPort();
-//    int zookeeperPort = getZookeeperPort();
-//
-//    System.out.println(String.format("HBase Master @ %s:%s", getMasterHostname(), masterPort));
-//    System.out.println(String.format("HBase Master Info @ http://%s:%s", getMasterHostname(), masterWebPort));
-//    System.out.println(String.format("HBase Region @ %s:%s", getRegionServerHostname(), regionServerPort));
-//    System.out.println(String.format("HBase Region Info @ http://%s:%s", getRegionServerHostname(), regionServerWebPort));
-//    System.out.println(String.format("Zookeeper @ %s:%s", getZookeeperQuorum(), zookeeperPort));
+    int masterPort = getMasterPort();
+    int masterWebPort = getMasterInfoPort();
+    int regionServerPort = getRegionServerPort();
+    int regionServerWebPort = getRegionServerInfoPort();
+    int zookeeperPort = getZookeeperPort();
+
+    System.out.println(String.format("HBaseContainer: %s", proxy));
+    System.out.println(String.format("HBaseContainer: HBase Master @ %s:%s", getMasterHostname(), masterPort));
+    System.out.println(String.format("HBaseContainer: HBase Master Info @ http://%s:%s", getMasterHostname(), masterWebPort));
+    System.out.println(String.format("HBaseContainer: HBase Region @ %s:%s", getRegionServerHostname(), regionServerPort));
+    System.out.println(String.format("HBaseContainer: HBase Region Info @ http://%s:%s", getRegionServerHostname(), regionServerWebPort));
+    System.out.println(String.format("HBaseContainer: Zookeeper @ %s:%s", getZookeeperQuorum(), zookeeperPort));
 
 //    withExposedPorts(masterPort);
 //    withExposedPorts(masterWebPort);
@@ -123,23 +93,14 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
 //    withExposedPorts(regionServerWebPort);
 //    withExposedPorts(zookeeperPort);
 
-//    withEnv("HBASE_MASTER_HOSTNAME", getMasterHostname());
-//    withEnv("HBASE_MASTER_PORT", Integer.toString(masterPort));
-//    withEnv("HBASE_MASTER_WEB_PORT", Integer.toString(masterWebPort));
-//    withEnv("HBASE_REGION_SERVER_HOSTNAME", getRegionServerHostname());
-//    withEnv("HBASE_REGION_SERVER_PORT", Integer.toString(regionServerPort));
-//    withEnv("HBASE_REGION_SERVER_WEB_PORT", Integer.toString(regionServerWebPort));
-//    withEnv("HBASE_ZOOKEEPER_QUORUM", getZookeeperQuorum());
-//    withEnv("HBASE_ZOOKEEPER_PORT", Integer.toString(zookeeperPort));
-
-//    withEnv("HBASE_MASTER_HOSTNAME", proxy.getContainerIpAddress());
-//    withEnv("HBASE_MASTER_PORT", Integer.toString(MASTER_PORT));
-//    withEnv("HBASE_MASTER_WEB_PORT", Integer.toString(MASTER_WEB_PORT));
-//    withEnv("HBASE_REGION_SERVER_HOSTNAME", getRegionServerHostname());
-//    withEnv("HBASE_REGION_SERVER_PORT", Integer.toString(REGION_SERVER_PORT));
-//    withEnv("HBASE_REGION_SERVER_WEB_PORT", Integer.toString(REGION_SERVER_WEB_PORT));
-//    withEnv("HBASE_ZOOKEEPER_QUORUM", getZookeeperQuorum());
-//    withEnv("HBASE_ZOOKEEPER_PORT", Integer.toString(ZOOKEEPER_PORT));
+    withEnv("HBASE_MASTER_HOSTNAME", getMasterHostname());
+    withEnv("HBASE_MASTER_PORT", Integer.toString(masterPort));
+    withEnv("HBASE_MASTER_WEB_PORT", Integer.toString(masterWebPort));
+    withEnv("HBASE_REGION_SERVER_HOSTNAME", getRegionServerHostname());
+    withEnv("HBASE_REGION_SERVER_PORT", Integer.toString(regionServerPort));
+    withEnv("HBASE_REGION_SERVER_WEB_PORT", Integer.toString(regionServerWebPort));
+    withEnv("HBASE_ZOOKEEPER_QUORUM", getZookeeperQuorum());
+    withEnv("HBASE_ZOOKEEPER_PORT", Integer.toString(zookeeperPort));
 
     super.doStart();
   }
@@ -147,6 +108,10 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
   @Override
   public Integer getMappedPort(int originalPort) {
     return proxy.getMappedPort(originalPort);
+  }
+
+  private void exposePortThroughProxy(String networkAlias, int port) {
+    exposePortThroughProxy(networkAlias, port, port);
   }
 
   private void exposePortThroughProxy(String networkAlias, int originalPort, int mappedPort) {
@@ -164,11 +129,11 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
   }
 
   public int getMasterPort() {
-    return proxy.getMappedPort(MASTER.getOriginalPort());
+    return proxy.getMappedPort(MASTER_PORT);
   }
 
-  public int getMasterWebPort() {
-    return proxy.getMappedPort(MASTER_INFO.getOriginalPort());
+  public int getMasterInfoPort() {
+    return proxy.getMappedPort(MASTER_INFO_PORT);
   }
 
   public String getRegionServerHostname() {
@@ -176,11 +141,11 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
   }
 
   public int getRegionServerPort() {
-    return proxy.getMappedPort(REGION_SERVER.getOriginalPort());
+    return proxy.getMappedPort(REGION_SERVER_PORT);
   }
 
-  public int getRegionServerWebPort() {
-    return proxy.getMappedPort(REGION_SERVER_INFO.getOriginalPort());
+  public int getRegionServerInfoPort() {
+    return proxy.getMappedPort(REGION_SERVER_INFO_PORT);
   }
 
   public String getZookeeperQuorum() {
@@ -188,7 +153,7 @@ public class HBaseContainer extends GenericContainer<HBaseContainer> {
   }
 
   public int getZookeeperPort() {
-    return ZOOKEEPER.getOriginalPort();
+    return ZOOKEEPER_PORT;
 //    return proxy.getMappedPort(ZOOKEEPER.getOriginalPort());
   }
 

@@ -77,15 +77,16 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
 //  public static GenericContainer hbase = new GenericContainer<>("hdp-hbase")
 //          .withExposedPorts(2181, 16000, 16010);
 
-//  @ClassRule
-//  public static GenericContainer hbase = new FixedHostPortGenericContainer("hdp-hbase")
-//          .withFixedExposedPort(16000, 16000)
-//          .withFixedExposedPort(16020, 16020)
-//          //.withFixedExposedPort(2181, 2181);
-//          .withExposedPorts(2181, 16010, 16030);
-
   @ClassRule
-  public static HBaseContainer hbase = new HBaseContainer("hdp-hbase");
+  public static GenericContainer hbase = new FixedHostPortGenericContainer("hdp-hbase")
+          .withFixedExposedPort(16000, 16000)
+          .withFixedExposedPort(16010, 16010)
+          .withFixedExposedPort(16020, 16020)
+          .withFixedExposedPort(16030, 16030)
+          .withFixedExposedPort(2181, 2181);
+
+//  @ClassRule
+//  public static HBaseContainer hbase = new HBaseContainer("hdp-hbase");
 
   @BeforeClass
   public static void setupHBase() throws Exception {
@@ -113,26 +114,41 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
 
   private static void create(String tableName, String family) throws Exception {
     System.out.println(String.format("HBaseDaoIntegrationTest: Creating table=%s", tableName));
-    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Master Web @ http://%s:%s", hbase.getMasterHostname(), hbase.getMasterWebPort()));
-    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Region Web @ http://%s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerWebPort()));
-    System.out.println(String.format("HBaseDaoIntegrationTest: Zookeeper @ %s:%s", hbase.getZookeeperQuorum(), hbase.getZookeeperPort()));
-    System.out.println(String.format("HBaseDaoIntegrationTest: Master @ %s:%s", hbase.getMasterHostname(), hbase.getMasterPort()));
-    System.out.println(String.format("HBaseDaoIntegrationTest: Regionserver @ %s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerPort()));
+    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Master Web @ http://%s:%s", hbase.getContainerIpAddress(), 16010));
+    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Region Web @ http://%s:%s", hbase.getContainerIpAddress(), 16030));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Zookeeper @ %s:%s", hbase.getContainerIpAddress(), hbase.getMappedPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Master @ %s:%s", hbase.getContainerIpAddress(), hbase.getMasterPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Regionserver @ %s:%s", hbase.getContainerIpAddress(), hbase.getRegionServerPort()));
 
     Configuration conf = HBaseConfiguration.create();
-    conf.set("hbase.zookeeper.quorum", hbase.getZookeeperQuorum());
-    conf.set("hbase.zookeeper.property.clientPort", Integer.toString(hbase.getZookeeperPort()));
-    conf.set("hbase.master.hostname", hbase.getMasterHostname());
-    conf.set("hbase.master.port", Integer.toString(hbase.getMasterPort()));
-    conf.set("hbase.regionserver.hostname", hbase.getRegionServerHostname());
-    conf.set("hbase.regionserver.port", Integer.toString(hbase.getRegionServerPort()));
+    conf.set("hbase.zookeeper.quorum", hbase.getContainerIpAddress());
+    conf.set("hbase.zookeeper.property.clientPort", Integer.toString(2181));
+//    conf.set("hbase.master.hostname", hbase.getContainerIpAddress());
+//    conf.set("hbase.master.port", Integer.toString(16000));
+//    conf.set("hbase.regionserver.hostname", hbase.getContainerIpAddress());
+//    conf.set("hbase.regionserver.port", Integer.toString(16020));
+
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Creating table=%s", tableName));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Master Web @ http://%s:%s", hbase.getMasterHostname(), hbase.getMasterInfoPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Region Web @ http://%s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerInfoPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Zookeeper @ %s:%s", hbase.getZookeeperQuorum(), hbase.getZookeeperPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Master @ %s:%s", hbase.getMasterHostname(), hbase.getMasterPort()));
+//    System.out.println(String.format("HBaseDaoIntegrationTest: Regionserver @ %s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerPort()));
+//
+//    Configuration conf = HBaseConfiguration.create();
+//    conf.set("hbase.zookeeper.quorum", hbase.getZookeeperQuorum());
+//    conf.set("hbase.zookeeper.property.clientPort", Integer.toString(hbase.getZookeeperPort()));
+//    conf.set("hbase.master.hostname", hbase.getMasterHostname());
+//    conf.set("hbase.master.port", Integer.toString(hbase.getMasterPort()));
+//    conf.set("hbase.regionserver.hostname", hbase.getRegionServerHostname());
+//    conf.set("hbase.regionserver.port", Integer.toString(hbase.getRegionServerPort()));
     //conf.set("hbase.client.retries.number", "5");
     //conf.set("hbase.rpc.timeout", "10000");
     //conf.set("hbase.rpc.shortoperation.timeout", "5000");
 
-    System.out.println("About to check HBase availability...");
-    HBaseAdmin.checkHBaseAvailable(conf);
-    System.out.println("HBase is available!!");
+//    System.out.println("About to check HBase availability...");
+//    HBaseAdmin.checkHBaseAvailable(conf);
+//    System.out.println("HBase is available!!");
 
     HBaseAdmin admin = new HBaseAdmin(conf);
     HTableDescriptor table = new HTableDescriptor(tableName);
