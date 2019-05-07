@@ -30,6 +30,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.metron.hbase.TableProvider;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.AccessConfig;
@@ -42,7 +50,12 @@ import org.apache.metron.indexing.dao.update.Document;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.ClassRule;
+import org.junit.Rule;
 import org.junit.Test;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.GenericContainer;
 
 public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
 
@@ -60,6 +73,26 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
           0x54,0x79,0x70,0x65
   };
 
+//  @ClassRule
+//  public static GenericContainer hbase = new GenericContainer<>("hdp-hbase")
+//          .withExposedPorts(2181, 16000, 16010);
+
+//  @ClassRule
+//  public static GenericContainer hbase = new FixedHostPortGenericContainer("hdp-hbase")
+//          .withFixedExposedPort(16000, 16000)
+//          .withFixedExposedPort(16020, 16020)
+//          //.withFixedExposedPort(2181, 2181);
+//          .withExposedPorts(2181, 16010, 16030);
+
+  @ClassRule
+  public static HBaseContainer hbase = new HBaseContainer("hdp-hbase");
+
+  @BeforeClass
+  public static void setupHBase() throws Exception {
+    // create the test tables
+    create(TABLE_NAME, COLUMN_FAMILY);
+  }
+
   @Before
   public void startHBase() throws Exception {
     AccessConfig accessConfig = new AccessConfig();
@@ -69,16 +102,54 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
       put(HBASE_TABLE, TABLE_NAME);
       put(HBASE_CF, COLUMN_FAMILY);
     }});
-    MockHBaseTableProvider.addToCache(TABLE_NAME, COLUMN_FAMILY);
-    accessConfig.setTableProvider(new MockHBaseTableProvider());
+    //MockHBaseTableProvider.addToCache(TABLE_NAME, COLUMN_FAMILY);
+
+    TableProvider tableProvider = new org.apache.metron.hbase.HTableProvider();
+    accessConfig.setTableProvider(tableProvider);
 
     hbaseDao = new HBaseDao();
     hbaseDao.init(accessConfig);
   }
 
+  private static void create(String tableName, String family) throws Exception {
+    System.out.println(String.format("HBaseDaoIntegrationTest: Creating table=%s", tableName));
+    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Master Web @ http://%s:%s", hbase.getMasterHostname(), hbase.getMasterWebPort()));
+    System.out.println(String.format("HBaseDaoIntegrationTest: HBase Region Web @ http://%s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerWebPort()));
+    System.out.println(String.format("HBaseDaoIntegrationTest: Zookeeper @ %s:%s", hbase.getZookeeperQuorum(), hbase.getZookeeperPort()));
+    System.out.println(String.format("HBaseDaoIntegrationTest: Master @ %s:%s", hbase.getMasterHostname(), hbase.getMasterPort()));
+    System.out.println(String.format("HBaseDaoIntegrationTest: Regionserver @ %s:%s", hbase.getRegionServerHostname(), hbase.getRegionServerPort()));
+
+    Configuration conf = HBaseConfiguration.create();
+    conf.set("hbase.zookeeper.quorum", hbase.getZookeeperQuorum());
+    conf.set("hbase.zookeeper.property.clientPort", Integer.toString(hbase.getZookeeperPort()));
+    conf.set("hbase.master.hostname", hbase.getMasterHostname());
+    conf.set("hbase.master.port", Integer.toString(hbase.getMasterPort()));
+    conf.set("hbase.regionserver.hostname", hbase.getRegionServerHostname());
+    conf.set("hbase.regionserver.port", Integer.toString(hbase.getRegionServerPort()));
+    //conf.set("hbase.client.retries.number", "5");
+    //conf.set("hbase.rpc.timeout", "10000");
+    //conf.set("hbase.rpc.shortoperation.timeout", "5000");
+
+    System.out.println("About to check HBase availability...");
+    HBaseAdmin.checkHBaseAvailable(conf);
+    System.out.println("HBase is available!!");
+
+    HBaseAdmin admin = new HBaseAdmin(conf);
+    HTableDescriptor table = new HTableDescriptor(tableName);
+    table.addFamily(new HColumnDescriptor(family));
+    admin.createTable(table);
+    admin.flush(table.getTableName());
+    admin.close();
+
+    System.out.println(String.format("Done creating table %s", tableName));
+  }
+
   @After
   public void clearTable() throws Exception {
-    MockHBaseTableProvider.clear();
+    HBaseConfiguration conf = new HBaseConfiguration();
+    HBaseAdmin admin = new HBaseAdmin(conf);
+    admin.truncateTable(TableName.valueOf(TABLE_NAME), false);
+    admin.close();
   }
 
   /**
@@ -94,7 +165,6 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
     byte[] raw = k.toBytes();
     Assert.assertArrayEquals(raw, expectedKeySerialization);
   }
-
 
   @Test
   public void testKeySerialization() throws Exception {
