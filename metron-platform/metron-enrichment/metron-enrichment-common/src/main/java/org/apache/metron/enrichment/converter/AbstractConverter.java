@@ -31,7 +31,11 @@ import org.apache.metron.enrichment.lookup.LookupValue;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
 
 
 public abstract class AbstractConverter<KEY_T extends LookupKey, VALUE_T extends LookupValue> implements HbaseConverter<KEY_T,VALUE_T> {
@@ -40,7 +44,7 @@ public abstract class AbstractConverter<KEY_T extends LookupKey, VALUE_T extends
     @Nullable
     @Override
     public Map.Entry<byte[], byte[]> apply(@Nullable Cell cell) {
-      return new AbstractMap.SimpleEntry<>(cell.getQualifier(), cell.getValue());
+      return new AbstractMap.SimpleEntry<>(cell.getQualifierArray(), cell.getValueArray());
     }
   };
   @Override
@@ -48,7 +52,7 @@ public abstract class AbstractConverter<KEY_T extends LookupKey, VALUE_T extends
     Put put = new Put(key.toBytes());
     byte[] cf = Bytes.toBytes(columnFamily);
     for(Map.Entry<byte[], byte[]> kv : values.toColumns()) {
-      put.add(cf, kv.getKey(), kv.getValue());
+      put.addColumn(cf, kv.getKey(), kv.getValue());
     }
     return put;
   }

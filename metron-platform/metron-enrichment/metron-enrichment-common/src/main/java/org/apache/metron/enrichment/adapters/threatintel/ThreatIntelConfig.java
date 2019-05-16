@@ -18,8 +18,7 @@
 package org.apache.metron.enrichment.adapters.threatintel;
 
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.Serializable;
 
@@ -32,7 +31,7 @@ public class ThreatIntelConfig implements Serializable {
   private String trackerHBaseTable;
   private String trackerHBaseCF;
   private long millisecondsBetweenPersists = 2*MS_IN_HOUR;
-  private TableProvider provider = new HTableProvider();
+  private HBaseConnectionFactory connectionFactory;
 
   public String getHBaseTable() {
     return hBaseTable;
@@ -62,12 +61,12 @@ public class ThreatIntelConfig implements Serializable {
     return hBaseCF;
   }
 
-  public TableProvider getProvider() {
-    return provider;
+  public HBaseConnectionFactory getConnectionFactory() {
+    return connectionFactory;
   }
 
   public ThreatIntelConfig withProviderImpl(String connectorImpl) {
-    provider = EnrichmentUtils.getTableProvider(connectorImpl, new HTableProvider());
+    connectionFactory = EnrichmentUtils.getConnectionFactory(connectorImpl, new HBaseConnectionFactory());
     return this;
   }
 

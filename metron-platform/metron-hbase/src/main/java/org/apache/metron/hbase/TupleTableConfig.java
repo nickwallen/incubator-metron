@@ -18,6 +18,14 @@
 package org.apache.metron.hbase;
 
 import com.google.common.base.Joiner;
+import org.apache.hadoop.hbase.client.Durability;
+import org.apache.hadoop.hbase.client.Increment;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.storm.tuple.Tuple;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
@@ -26,13 +34,6 @@ import java.util.HashSet;
 import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
-import org.apache.hadoop.hbase.client.Durability;
-import org.apache.hadoop.hbase.client.Increment;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.storm.tuple.Tuple;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Configuration for Storm {@link Tuple} to HBase serialization.
@@ -162,9 +163,9 @@ public class TupleTableConfig extends TableConfig implements Serializable {
           byte[] val = tuple.getBinaryByField(cq);
           
           if (ts > 0) {
-            p.add(cfBytes, cqBytes, ts, val);
+            p.addColumn(cfBytes, cqBytes, ts, val);
           } else {
-            p.add(cfBytes, cqBytes, val);
+            p.addColumn(cfBytes, cqBytes, val);
           }
         }
       }

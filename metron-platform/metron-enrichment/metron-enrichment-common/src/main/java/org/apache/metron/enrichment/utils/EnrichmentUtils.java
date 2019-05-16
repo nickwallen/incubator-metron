@@ -21,18 +21,19 @@ import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
-import java.lang.reflect.InvocationTargetException;
-import java.util.HashMap;
-import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.handler.KeyWithContext;
-import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.json.simple.JSONObject;
+
+import javax.annotation.Nullable;
+import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class EnrichmentUtils {
 
@@ -45,8 +46,8 @@ public class EnrichmentUtils {
   public static class TypeToKey implements Function<String, KeyWithContext<EnrichmentKey, EnrichmentLookup.HBaseContext>> {
     private final String indicator;
     private final EnrichmentConfig config;
-    private final HTableInterface table;
-    public TypeToKey(String indicator, HTableInterface table, EnrichmentConfig config) {
+    private final Table table;
+    public TypeToKey(String indicator, Table table, EnrichmentConfig config) {
       this.indicator = indicator;
       this.config = config;
       this.table = table;
@@ -95,13 +96,13 @@ public class EnrichmentUtils {
     return Iterables.getLast(Splitter.on('.').split(field));
   }
 
-  public static TableProvider getTableProvider(String connectorImpl, TableProvider defaultImpl) {
-    if(connectorImpl == null || connectorImpl.length() == 0 || connectorImpl.charAt(0) == '$') {
+  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl, HBaseConnectionFactory defaultImpl) {
+    if(factoryImpl == null || factoryImpl.length() == 0 || factoryImpl.charAt(0) == '$') {
       return defaultImpl;
-    }
-    else {
+    } else {
       try {
-        Class<? extends TableProvider> clazz = (Class<? extends TableProvider>) Class.forName(connectorImpl);
+        Class<? extends HBaseConnectionFactory> clazz =
+                (Class<? extends HBaseConnectionFactory>) Class.forName(factoryImpl);
         return clazz.getConstructor().newInstance();
       } catch (InstantiationException e) {
         throw new IllegalStateException("Unable to instantiate connector.", e);

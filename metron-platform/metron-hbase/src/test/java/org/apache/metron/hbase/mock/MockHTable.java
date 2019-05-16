@@ -24,6 +24,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
@@ -33,7 +34,6 @@ import org.apache.hadoop.hbase.client.Append;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -41,17 +41,17 @@ import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Row;
 import org.apache.hadoop.hbase.client.RowMutations;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
+import org.apache.hadoop.hbase.client.metrics.ScanMetrics;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.hbase.TableProvider;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -65,8 +65,7 @@ import java.util.TreeMap;
  *
  * This implementation is a selected excerpt from https://gist.github.com/agaoglu/613217
  */
-public class MockHTable implements HTableInterface {
-
+public class MockHTable implements Table {
 
   private final String tableName;
   private final List<String> columnFamilies = new ArrayList<>();
@@ -124,11 +123,6 @@ public class MockHTable implements HTableInterface {
   }
 
   @Override
-  public byte[] getTableName() {
-    return Bytes.toBytes(tableName);
-  }
-
-  @Override
   public TableName getName() {
     return TableName.valueOf(tableName);
   }
@@ -139,8 +133,8 @@ public class MockHTable implements HTableInterface {
   }
 
   @Override
-  public HTableDescriptor getTableDescriptor() throws IOException {
-    HTableDescriptor ret = new HTableDescriptor(tableName);
+  public TableDescriptor getDescriptor() {
+    HTableDescriptor ret = new HTableDescriptor(TableName.valueOf(tableName));
     for(HColumnDescriptor c : descriptors) {
       ret.addFamily(c);
     }
@@ -191,8 +185,8 @@ public class MockHTable implements HTableInterface {
   }
 
   @Override
-  public Boolean[] exists(List<Get> list) throws IOException {
-    Boolean[] ret = new Boolean[list.size()];
+  public boolean[] exists(List<Get> list) throws IOException {
+    boolean[] ret = new boolean[list.size()];
     int i = 0;
     for(Get g : list) {
       ret[i++] = exists(g);
@@ -211,8 +205,7 @@ public class MockHTable implements HTableInterface {
    * @deprecated
    */
   @Deprecated
-  @Override
-  public Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
+  private Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
     List<Result> results = new ArrayList<Result>();
     for (Row r : actions) {
       if (r instanceof Delete) {
@@ -231,19 +224,13 @@ public class MockHTable implements HTableInterface {
   }
 
   @Override
-  public <R> void batchCallback(List<? extends Row> list, Object[] objects, Batch.Callback<R> callback) throws IOException, InterruptedException {
+  public <R> void batchCallback(List<? extends Row> list, Object[] objects, Batch.Callback<R> callback) {
     throw new UnsupportedOperationException();
 
   }
 
-  /**
-   * @param list
-   * @param callback
-   * @deprecated
-   */
   @Deprecated
-  @Override
-  public <R> Object[] batchCallback(List<? extends Row> list, Batch.Callback<R> callback) throws IOException, InterruptedException {
+  private <R> Object[] batchCallback(List<? extends Row> list, Batch.Callback<R> callback) {
     throw new UnsupportedOperationException();
   }
 
@@ -252,7 +239,7 @@ public class MockHTable implements HTableInterface {
     if (!data.containsKey(get.getRow()))
       return new Result();
     byte[] row = get.getRow();
-    List<KeyValue> kvs = new ArrayList<KeyValue>();
+    List<KeyValue> kvs = new ArrayList<>();
     if (!get.hasFamilies()) {
       kvs = toKeyValue(row, data.get(row), get.getMaxVersions());
     } else {
@@ -296,7 +283,9 @@ public class MockHTable implements HTableInterface {
       kvs = nkvs;
     }
 
-    return new Result(kvs);
+    List<Cell> cells = new ArrayList<>();
+    cells.addAll(kvs);
+    return Result.create(cells);
   }
 
   @Override
@@ -309,14 +298,8 @@ public class MockHTable implements HTableInterface {
     return ret;
   }
 
-  /**
-   * @param bytes
-   * @param bytes1
-   * @deprecated
-   */
   @Deprecated
-  @Override
-  public Result getRowOrBefore(byte[] bytes, byte[] bytes1) throws IOException {
+  private Result getRowOrBefore(byte[] bytes, byte[] bytes1) throws IOException {
     throw new UnsupportedOperationException();
   }
 
@@ -395,12 +378,22 @@ public class MockHTable implements HTableInterface {
         kvs = nkvs;
       }
       if (!kvs.isEmpty()) {
-        ret.add(new Result(kvs));
+        List<Cell> cells = new ArrayList<>();
+        cells.addAll(kvs);
+        ret.add(Result.create(cells));
       }
     }
 
     return new ResultScanner() {
       private final Iterator<Result> iterator = ret.iterator();
+      @Override
+      public boolean renewLease() {
+        return false;
+      }
+      @Override
+      public ScanMetrics getScanMetrics() {
+        return null;
+      }
       @Override
       public Iterator<Result> iterator() {
         return iterator;
@@ -469,14 +462,15 @@ public class MockHTable implements HTableInterface {
     addToPutLog(put);
 
     byte[] row = put.getRow();
-    NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> rowData = forceFind(data, row, new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR));
-    for (byte[] family : put.getFamilyMap().keySet()){
-      NavigableMap<byte[], NavigableMap<Long, byte[]>> familyData = forceFind(rowData, family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
-      for (KeyValue kv : put.getFamilyMap().get(family)){
-        kv.updateLatestStamp(Bytes.toBytes(System.currentTimeMillis()));
-        byte[] qualifier = kv.getQualifier();
-        NavigableMap<Long, byte[]> qualifierData = forceFind(familyData, qualifier, new TreeMap<Long, byte[]>());
-        qualifierData.put(kv.getTimestamp(), kv.getValue());
+    NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> rowData = forceFind(data, row, new TreeMap<>(Bytes.BYTES_COMPARATOR));
+    for (byte[] family : put.getFamilyCellMap().keySet()) {
+      NavigableMap<byte[], NavigableMap<Long, byte[]>> familyData = forceFind(rowData, family, new TreeMap<>(Bytes.BYTES_COMPARATOR));
+      for (Cell cell : put.getFamilyCellMap().get(family)){
+        // TODO what the hell to do about this?
+        //cell.updateLatestStamp(Bytes.toBytes(System.currentTimeMillis()));
+        byte[] qualifier = cell.getQualifierArray();
+        NavigableMap<Long, byte[]> qualifierData = forceFind(familyData, qualifier, new TreeMap<>());
+        qualifierData.put(cell.getTimestamp(), cell.getValueArray());
       }
     }
   }
@@ -607,19 +601,15 @@ public class MockHTable implements HTableInterface {
    * @deprecated
    */
   @Deprecated
-  @Override
   public long incrementColumnValue(byte[] bytes, byte[] bytes1, byte[] bytes2, long l, boolean b) throws IOException {
     throw new UnsupportedOperationException();
   }
 
-  @Override
   public boolean isAutoFlush() {
     return autoflush;
   }
 
-  @Override
   public void flushCommits() throws IOException {
-
   }
 
   @Override
@@ -644,33 +634,24 @@ public class MockHTable implements HTableInterface {
 
   boolean autoflush = true;
 
-  /**
-   * @param b
-   * @deprecated
-   */
   @Deprecated
-  @Override
   public void setAutoFlush(boolean b) {
     autoflush = b;
   }
 
-  @Override
   public void setAutoFlush(boolean b, boolean b1) {
     autoflush = b;
   }
 
-  @Override
   public void setAutoFlushTo(boolean b) {
     autoflush = b;
   }
 
   long writeBufferSize = 0;
-  @Override
   public long getWriteBufferSize() {
     return writeBufferSize;
   }
 
-  @Override
   public void setWriteBufferSize(long l) throws IOException {
     writeBufferSize = l;
   }

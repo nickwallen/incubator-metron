@@ -17,23 +17,22 @@
  */
 package org.apache.metron.enrichment.lookup.accesstracker;
 
-
-import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.IOException;
 import java.util.Map;
 
 public enum AccessTrackers implements AccessTrackerCreator {
-   NOOP((config, provider) -> new NoopAccessTracker())
-  ,PERSISTENT_BLOOM( new PersistentBloomTrackerCreator());
+  NOOP((config, provider) -> new NoopAccessTracker()),
+  PERSISTENT_BLOOM( new PersistentBloomTrackerCreator());
+
   AccessTrackerCreator creator;
   AccessTrackers(AccessTrackerCreator creator) {
     this.creator = creator;
   }
 
-
   @Override
-  public AccessTracker create(Map<String, Object> config, TableProvider provider) throws IOException {
-    return creator.create(config, provider);
+  public AccessTracker create(Map<String, Object> config, HBaseConnectionFactory connectionFactory) throws IOException {
+    return creator.create(config, connectionFactory);
   }
 }

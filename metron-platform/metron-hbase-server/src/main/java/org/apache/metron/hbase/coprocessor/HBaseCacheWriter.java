@@ -25,8 +25,9 @@ import java.lang.invoke.MethodHandles;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.TableProvider;
-import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.SyncHBaseClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,11 +60,11 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
   @Override
   public void write(@Nonnull String key, @Nonnull String value) {
     LOG.debug("Calling hbase cache writer with key='{}', value='{}'", key, value);
-    try (HBaseClient hbClient = new HBaseClient(this.tableProvider, this.config, this.tableName)) {
-      LOG.debug("rowKey={}, columnFamily={}, columnQualifier={}, value={}", key, columnFamily,
-          columnQualifier, value);
-      hbClient.put(key, columnFamily, columnQualifier, value);
-      LOG.debug("Done with put");
+    try (SyncHBaseClient hbaseClient = new SyncHBaseClient(this.tableProvider, this.config, this.tableName)) {
+      LOG.debug("rowKey={}, columnFamily={}, columnQualifier={}, value={}", key, columnFamily, columnQualifier, value);
+      hbaseClient.addPut(Bytes.toBytes(key), columnFamily, columnQualifier, value);
+      hbaseClient.mutate();
+
     } catch (IOException e) {
       throw new RuntimeException("Error writing to HBase table", e);
     }

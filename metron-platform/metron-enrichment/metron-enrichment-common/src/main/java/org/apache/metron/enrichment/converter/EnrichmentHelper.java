@@ -17,8 +17,8 @@
  */
 package org.apache.metron.enrichment.converter;
 
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.enrichment.lookup.LookupKV;
 
 import java.io.IOException;
@@ -27,7 +27,7 @@ public enum EnrichmentHelper {
     INSTANCE;
     EnrichmentConverter converter = new EnrichmentConverter();
 
-    public void load(HTableInterface table, String cf, Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> results) throws IOException {
+    public void load(Table table, String cf, Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> results) throws IOException {
         for(LookupKV<EnrichmentKey, EnrichmentValue> result : results) {
             Put put = converter.toPut(cf, result.getKey(), result.getValue());
             table.put(put);

@@ -20,12 +20,18 @@ package org.apache.metron.enrichment.adapters.simplehbase;
 
 import com.google.common.collect.ImmutableMap;
 import org.adrianwalker.multilinestring.Multiline;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.ClusterConnection;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.converter.EnrichmentHelper;
+import org.apache.metron.hbase.TableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.enrichment.lookup.LookupKV;
@@ -103,8 +109,11 @@ public class SimpleHBaseAdapterTest {
 
   @Before
   public void setup() throws Exception {
-    final MockHTable trackerTable = (MockHTable) MockHBaseTableProvider.addToCache(atTableName, cf);
-    final MockHTable hbaseTable = (MockHTable) MockHBaseTableProvider.addToCache(hbaseTableName, cf);
+
+    MockHBaseTableProvider provider = new MockHBaseTableProvider();
+    final Table trackerTable = provider.addToCache(atTableName, cf);
+    final Table hbaseTable = provider.addToCache(hbaseTableName, cf);
+
     EnrichmentHelper.INSTANCE.load(hbaseTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
       add(new LookupKV<>(new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3")
                       , new EnrichmentValue(PLAYFUL_ENRICHMENT)
@@ -118,8 +127,12 @@ public class SimpleHBaseAdapterTest {
       );
     }});
     BloomAccessTracker bat = new BloomAccessTracker(hbaseTableName, 100, 0.03);
-    PersistentAccessTracker pat = new PersistentAccessTracker(hbaseTableName, "0", trackerTable, cf, bat, 0L);
-    lookup = new EnrichmentLookup(hbaseTable, cf, pat);
+
+
+    PersistentAccessTracker pat = new PersistentAccessTracker(hbaseTableName, "0", conf, atTableName, provider, cf, bat, 0L);
+
+    lookup = new EnrichmentLookup(provider, hbaseTableName, cf, pat);
+
     JSONParser jsonParser = new JSONParser();
     expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
   }

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
@@ -41,9 +42,11 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   protected ThreatIntelConfig config;
   protected EnrichmentLookup lookup;
+  private Connection connection;
 
   public ThreatIntelAdapter() {
   }
+
   public ThreatIntelAdapter(ThreatIntelConfig config) {
     withConfig(config);
   }
@@ -62,7 +65,6 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
       }
     }
   }
-
 
   @Override
   public JSONObject enrich(CacheKey value) {
@@ -120,12 +122,14 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
     BloomAccessTracker bat = new BloomAccessTracker(hbaseTable, expectedInsertions, falsePositives);
     Configuration hbaseConfig = HBaseConfiguration.create();
     try {
+      connection = config.getConnectionFactory().createConnection(hbaseConfig);
       accessTracker = new PersistentAccessTracker( hbaseTable
               , UUID.randomUUID().toString()
-              , config.getProvider().getTable(hbaseConfig, trackerHBaseTable)
               , trackerHBaseCF
               , bat
               , millisecondsBetweenPersist
+              , config.getConnectionFactory()
+              , hbaseConfig
       );
       lookup = new EnrichmentLookup(config.getProvider().getTable(hbaseConfig, hbaseTable), config.getHBaseCF(), accessTracker);
     } catch (IOException e) {

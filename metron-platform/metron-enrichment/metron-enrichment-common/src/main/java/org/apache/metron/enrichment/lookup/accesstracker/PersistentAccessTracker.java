@@ -17,19 +17,25 @@
  */
 package org.apache.metron.enrichment.lookup.accesstracker;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.client.Durability;
+import org.apache.metron.enrichment.lookup.LookupKey;
+import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.lang.invoke.MethodHandles;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.metron.enrichment.lookup.LookupKey;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class PersistentAccessTracker implements AccessTracker {
     private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -101,34 +107,44 @@ public class PersistentAccessTracker implements AccessTracker {
         }
     }
 
-    final Object sync = new Object();
-    HTableInterface accessTrackerTable;
-    String accessTrackerColumnFamily;
-    AccessTracker underlyingTracker;
-    long timestamp = System.currentTimeMillis();
-    String name;
-    String containerName;
+    private final Object sync = new Object();
+    public String accessTrackerColumn = "v";
+    private String accessTrackerColumnFamily;
+    private AccessTracker underlyingTracker;
+    private long timestamp = System.currentTimeMillis();
+    private String tableName;
+    private String containerName;
     private Timer timer;
-    long maxMillisecondsBetweenPersists;
+    private long maxMillisecondsBetweenPersists;
+    private HBaseClient hbaseClient;
 
-    public PersistentAccessTracker( String name
-                                  , String containerName
-                                  , HTableInterface accessTrackerTable
-                                  , String columnFamily
-                                  , AccessTracker underlyingTracker
-                                  , long maxMillisecondsBetweenPersists
-                                  )
-    {
+    public PersistentAccessTracker( String tableName,
+                                    String containerName,
+                                    String columnFamily,
+                                    AccessTracker underlyingTracker,
+                                    long maxMillisecondsBetweenPersists,
+                                    HBaseConnectionFactory connectionFactory,
+                                    Configuration configuration) {
         this.containerName = containerName;
-        this.accessTrackerTable = accessTrackerTable;
-        this.name = name;
+        this.tableName = tableName;
         this.accessTrackerColumnFamily = columnFamily;
         this.underlyingTracker = underlyingTracker;
         this.maxMillisecondsBetweenPersists = maxMillisecondsBetweenPersists;
-        timer = new Timer();
+        this.timer = new Timer();
         if(maxMillisecondsBetweenPersists > 0) {
-            timer.scheduleAtFixedRate(new Persister(this), maxMillisecondsBetweenPersists, maxMillisecondsBetweenPersists);
+            this.timer.scheduleAtFixedRate(new Persister(this), maxMillisecondsBetweenPersists, maxMillisecondsBetweenPersists);
         }
+        this.hbaseClient = HBaseClient.createSyncClient(connectionFactory, configuration, tableName);
+    }
+
+    public PersistentAccessTracker( String tableName,
+                                    String containerName,
+                                    String columnFamily,
+                                    AccessTracker underlyingTracker,
+                                    long maxMillisecondsBetweenPersists,
+                                    Configuration hbaseConf,
+                                    String accessTrackerTableName) {
+        this(tableName, containerName, columnFamily, underlyingTracker, maxMillisecondsBetweenPersists, new HBaseConnectionFactory(), hbaseConf);
     }
 
     public void persist(boolean force) {
@@ -136,7 +152,8 @@ public class PersistentAccessTracker implements AccessTracker {
             if(force || (System.currentTimeMillis() - timestamp) >= maxMillisecondsBetweenPersists) {
                 //persist
                 try {
-                    AccessTrackerUtil.INSTANCE.persistTracker(accessTrackerTable, accessTrackerColumnFamily, new AccessTrackerKey(name, containerName, timestamp), underlyingTracker);
+                    AccessTrackerKey key = new AccessTrackerKey(tableName, containerName, timestamp);
+                    persistTracker(key, underlyingTracker);
                     timestamp = System.currentTimeMillis();
                     reset();
                 } catch (IOException e) {
@@ -144,6 +161,24 @@ public class PersistentAccessTracker implements AccessTracker {
                 }
             }
         }
+    }
+
+    private void persistTracker(PersistentAccessTracker.AccessTrackerKey key,
+                                AccessTracker underlyingTracker) throws IOException {
+
+        byte[] value = serializeTracker(underlyingTracker);
+        ColumnList columns = new ColumnList().addColumn(accessTrackerColumnFamily, accessTrackerColumn, value);
+        hbaseClient.addMutation(key.toRowKey(), columns, Durability.USE_DEFAULT);
+        hbaseClient.mutate();
+    }
+
+    private byte[] serializeTracker(AccessTracker tracker) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(bos);
+        oos.writeObject(tracker);
+        oos.flush();
+        oos.close();
+        return bos.toByteArray();
     }
 
     @Override
@@ -169,8 +204,8 @@ public class PersistentAccessTracker implements AccessTracker {
     }
 
     @Override
-    public String getName() {
-        return underlyingTracker.getName();
+    public String getTableName() {
+        return underlyingTracker.getTableName();
     }
 
     @Override
@@ -204,7 +239,7 @@ public class PersistentAccessTracker implements AccessTracker {
                 LOG.error("Unable to persist underlying tracker", t);
             }
             underlyingTracker.cleanup();
-            accessTrackerTable.close();
+            hbaseClient.close();
         }
     }
 }

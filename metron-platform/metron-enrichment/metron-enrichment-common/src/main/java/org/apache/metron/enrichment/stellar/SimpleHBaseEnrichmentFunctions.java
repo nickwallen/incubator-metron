@@ -19,22 +19,15 @@ package org.apache.metron.enrichment.stellar;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTableInterface;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -42,13 +35,20 @@ import org.apache.metron.stellar.dsl.StellarFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
 public class SimpleHBaseEnrichmentFunctions {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String ACCESS_TRACKER_TYPE_CONF = "accessTracker";
-  public static final String TABLE_PROVIDER_TYPE_CONF = "tableProviderImpl";
+  //public static final String TABLE_PROVIDER_TYPE_CONF = "tableProviderImpl";
+  public static final String CONNECTION_FACTORY_IMPL_CONF = "connectionFactoryImpl";
   private static AccessTracker tracker;
-  private static TableProvider provider;
-
+  private static HBaseConnectionFactory connectionFactory;
 
   private static class Table {
     String name;
@@ -92,30 +92,40 @@ public class SimpleHBaseEnrichmentFunctions {
     return (Map<String, Object>) context.getCapability(Context.Capabilities.GLOBAL_CONFIG).orElse(new HashMap<>());
   }
 
-  private static synchronized void initializeTracker(Map<String, Object> config, TableProvider provider) throws IOException {
+  private static synchronized void initializeTracker(Map<String, Object> config, HBaseConnectionFactory connectionFactory) throws IOException {
     if(tracker == null) {
       String accessTrackerType = (String) config.getOrDefault(ACCESS_TRACKER_TYPE_CONF, AccessTrackers.NOOP.toString());
       AccessTrackers trackers = AccessTrackers.valueOf(accessTrackerType);
-      tracker = trackers.create(config, provider);
+      tracker = trackers.create(config, connectionFactory);
     }
   }
 
-  private static TableProvider createProvider(String tableProviderClass) {
-    try {
-      Class<? extends TableProvider> providerClazz = (Class<? extends TableProvider>) Class.forName(tableProviderClass);
-      return providerClazz.getConstructor().newInstance();
-    } catch (Exception e) {
-      return new HTableProvider();
+  private static synchronized void initializeConnectionFactory( Map<String, Object> config) {
+    if(connectionFactory == null) {
+      String connectionFactoryImpl = (String) config.getOrDefault(CONNECTION_FACTORY_IMPL_CONF, HBaseConnectionFactory.class.getName());
+      connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectionFactoryImpl, new HBaseConnectionFactory());
     }
   }
 
-  private static synchronized void initializeProvider( Map<String, Object> config) {
-    if(provider != null) {
-      return ;
-    }
-    else {
-      String tableProviderClass = (String) config.getOrDefault(TABLE_PROVIDER_TYPE_CONF, HTableProvider.class.getName());
-      provider = createProvider(tableProviderClass);
+  private static Cache<Table, EnrichmentLookup> createCache() {
+    return CacheBuilder
+            .newBuilder()
+            .removalListener(new CloseEnrichmentLookup())
+            .build();
+  }
+
+  /**
+   * Closes the {@link EnrichmentLookup} after it has been removed from the cache.  This
+   * ensures that the underlying resources are cleaned up.
+   */
+  private static class CloseEnrichmentLookup implements RemovalListener<Table, EnrichmentLookup> {
+    @Override
+    public void onRemoval(RemovalNotification<Table, EnrichmentLookup> notification) {
+      try {
+        notification.getValue().close();
+      } catch(Exception e) {
+        LOG.error("Failed to close EnrichmentLookup; cause={}", notification.getCause(), e);
+      }
     }
   }
 
@@ -133,8 +143,8 @@ public class SimpleHBaseEnrichmentFunctions {
           )
   public static class EnrichmentExists implements StellarFunction {
     boolean initialized = false;
-    private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = CacheBuilder.newBuilder()
-                                                                                        .build();
+    private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = createCache();
+
     @Override
     public Object apply(List<Object> args, Context context) throws ParseException {
       if(!initialized) {
@@ -154,11 +164,9 @@ public class SimpleHBaseEnrichmentFunctions {
       final Table key = new Table(table, cf);
       EnrichmentLookup lookup = null;
       try {
-        lookup = enrichmentCollateralCache.get(key, () -> {
-            HTableInterface hTable = provider.getTable(HBaseConfiguration.create(), key.name);
-            return new EnrichmentLookup(hTable, key.columnFamily, tracker);
-          }
-        );
+        lookup = enrichmentCollateralCache.get(key,
+                () -> new EnrichmentLookup(connectionFactory, key.name, key.columnFamily, tracker));
+
       } catch (ExecutionException e) {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return false;
@@ -176,8 +184,8 @@ public class SimpleHBaseEnrichmentFunctions {
     public void initialize(Context context) {
       try {
         Map<String, Object> config = getConfig(context);
-        initializeProvider(config);
-        initializeTracker(config, provider);
+        initializeConnectionFactory(config);
+        initializeTracker(config, connectionFactory);
       } catch (IOException e) {
         LOG.error("Unable to initialize ENRICHMENT.EXISTS: {}", e.getMessage(), e);
       }
@@ -194,8 +202,6 @@ public class SimpleHBaseEnrichmentFunctions {
 
   }
 
-
-
   @Stellar(name="GET"
           ,namespace="ENRICHMENT"
           ,description="Interrogates the HBase table holding the simple hbase enrichment data and retrieves the " +
@@ -210,8 +216,8 @@ public class SimpleHBaseEnrichmentFunctions {
           )
   public static class EnrichmentGet implements StellarFunction {
     boolean initialized = false;
-    private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = CacheBuilder.newBuilder()
-                                                                                        .build();
+    private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = createCache();
+
     @Override
     public Object apply(List<Object> args, Context context) throws ParseException {
       if(!initialized) {
@@ -231,11 +237,8 @@ public class SimpleHBaseEnrichmentFunctions {
       final Table key = new Table(table, cf);
       EnrichmentLookup lookup = null;
       try {
-        lookup = enrichmentCollateralCache.get(key, () -> {
-                  HTableInterface hTable = provider.getTable(HBaseConfiguration.create(), key.name);
-                  return new EnrichmentLookup(hTable, key.columnFamily, tracker);
-                }
-        );
+        lookup = enrichmentCollateralCache.get(key,
+                () -> new EnrichmentLookup(connectionFactory, key.name, key.columnFamily, tracker));
       } catch (ExecutionException e) {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return new HashMap<String, Object>();
@@ -257,8 +260,8 @@ public class SimpleHBaseEnrichmentFunctions {
     public void initialize(Context context) {
       try {
         Map<String, Object> config = getConfig(context);
-        initializeProvider(config);
-        initializeTracker(config, provider);
+        initializeConnectionFactory(config);
+        initializeTracker(config, connectionFactory);
       } catch (IOException e) {
         LOG.error("Unable to initialize ENRICHMENT.GET: {}", e.getMessage(), e);
       }

@@ -18,15 +18,20 @@
 package org.apache.metron.enrichment.lookup;
 
 import com.google.common.collect.Iterables;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.metron.enrichment.converter.HbaseConverter;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
+import org.apache.metron.enrichment.converter.HbaseConverter;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.handler.KeyWithContext;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -38,15 +43,21 @@ import java.util.List;
 public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, EnrichmentKey, LookupKV<EnrichmentKey,EnrichmentValue>> implements AutoCloseable {
 
   public static class HBaseContext {
-    private HTableInterface table;
+    private Table table;
     private String columnFamily;
-    public HBaseContext(HTableInterface table, String columnFamily) {
+
+    public HBaseContext(Table table, String columnFamily) {
       this.table = table;
       this.columnFamily = columnFamily;
     }
 
-    public HTableInterface getTable() { return table; }
-    public String getColumnFamily() { return columnFamily; }
+    public Table getTable() {
+      return table;
+    }
+
+    public String getColumnFamily() {
+      return columnFamily;
+    }
   }
 
   public static class Handler implements org.apache.metron.enrichment.lookup.handler.Handler<HBaseContext,EnrichmentKey,LookupKV<EnrichmentKey,EnrichmentValue>> {
@@ -84,7 +95,7 @@ public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, Enri
       if(Iterables.isEmpty(key)) {
         return Collections.emptyList();
       }
-      HTableInterface table = Iterables.getFirst(key, null).getContext().getTable();
+      Table table = Iterables.getFirst(key, null).getContext().getTable();
       for(boolean b : table.existsAll(keysToGets(key))) {
         ret.add(b);
       }
@@ -99,7 +110,7 @@ public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, Enri
       if(Iterables.isEmpty(keys)) {
         return Collections.emptyList();
       }
-      HTableInterface table = Iterables.getFirst(keys, null).getContext().getTable();
+      Table table = Iterables.getFirst(keys, null).getContext().getTable();
       List<LookupKV<EnrichmentKey, EnrichmentValue>> ret = new ArrayList<>();
       Iterator<KeyWithContext<EnrichmentKey, HBaseContext>> keyWithContextIterator = keys.iterator();
       for(Result result : table.get(keysToGets(keys))) {
@@ -115,20 +126,41 @@ public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, Enri
 
     }
   }
-  private HTableInterface table;
-  public EnrichmentLookup(HTableInterface table, String columnFamily, AccessTracker tracker) {
-    this.table = table;
+
+  private Table table;
+  private Connection connection;
+
+  public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
+                          String tableName,
+                          String columnFamily,
+                          AccessTracker tracker) throws IOException {
+    this(connectionFactory, tableName, columnFamily, tracker, HBaseConfiguration.create());
+
+  }
+
+  public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
+                          String tableName,
+                          String columnFamily,
+                          AccessTracker tracker,
+                          Configuration conf) throws IOException {
+    this.connection = connectionFactory.createConnection(conf);
+    this.table = connection.getTable(TableName.valueOf(tableName));
     this.setLookupHandler(new Handler(columnFamily));
     this.setAccessTracker(tracker);
   }
 
-  public HTableInterface getTable() {
+  public Table getTable() {
     return table;
   }
 
   @Override
   public void close() throws Exception {
     super.close();
-    table.close();
+    if(table != null) {
+      table.close();
+    }
+    if(connection != null) {
+      connection.close();
+    }
   }
 }

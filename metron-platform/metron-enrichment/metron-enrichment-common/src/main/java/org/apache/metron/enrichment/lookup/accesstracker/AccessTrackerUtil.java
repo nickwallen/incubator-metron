@@ -19,11 +19,19 @@ package org.apache.metron.enrichment.lookup.accesstracker;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
-import org.apache.hadoop.hbase.client.*;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import javax.annotation.Nullable;
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 
 public enum AccessTrackerUtil {
     INSTANCE;
@@ -34,23 +42,9 @@ public enum AccessTrackerUtil {
         ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
         return (AccessTracker) ois.readObject();
     }
-    public byte[] serializeTracker(AccessTracker tracker) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream oos = new ObjectOutputStream(bos);
-        oos.writeObject(tracker);
-        oos.flush();
-        oos.close();
-        return bos.toByteArray();
-    }
 
 
-    public void persistTracker(HTableInterface accessTrackerTable, String columnFamily, PersistentAccessTracker.AccessTrackerKey key, AccessTracker underlyingTracker) throws IOException {
-        Put put = new Put(key.toRowKey());
-        put.add(Bytes.toBytes(columnFamily), COLUMN, serializeTracker(underlyingTracker));
-        accessTrackerTable.put(put);
-    }
-
-    public Iterable<AccessTracker> loadAll(HTableInterface accessTrackerTable, final String columnFamily, final String name, final long earliest) throws IOException {
+    public Iterable<AccessTracker> loadAll(Table accessTrackerTable, final String columnFamily, final String name, final long earliest) throws IOException {
         Scan scan = new Scan(PersistentAccessTracker.AccessTrackerKey.getTimestampScanKey(name, earliest));
         ResultScanner scanner = accessTrackerTable.getScanner(scan);
         return Iterables.transform(scanner, new Function<Result, AccessTracker>() {

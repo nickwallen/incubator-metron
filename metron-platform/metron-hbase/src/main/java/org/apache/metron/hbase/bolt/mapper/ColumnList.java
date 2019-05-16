@@ -20,6 +20,8 @@
 
 package org.apache.metron.hbase.bolt.mapper;
 
+import org.apache.hadoop.hbase.util.Bytes;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -121,6 +123,14 @@ public class ColumnList {
   public ColumnList addColumn(byte[] family, byte[] qualifier, byte[] value){
     columns().add(new Column(family, qualifier, -1, value));
     return this;
+  }
+
+  public ColumnList addColumn(String family, String qualifier, byte[] value){
+    return addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), value);
+  }
+
+  public ColumnList addColumn(String family, String qualifier, String value){
+    return addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), Bytes.toBytes(value));
   }
 
   /**

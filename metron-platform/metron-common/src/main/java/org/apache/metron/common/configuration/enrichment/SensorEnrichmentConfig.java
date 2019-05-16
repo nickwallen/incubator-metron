@@ -58,8 +58,6 @@ public class SensorEnrichmentConfig {
     this.threatIntel = threatIntel;
   }
 
-
-
   @Override
   public String toString() {
     return "SensorEnrichmentConfig{" +

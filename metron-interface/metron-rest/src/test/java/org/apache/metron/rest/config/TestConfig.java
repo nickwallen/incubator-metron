@@ -46,7 +46,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.zookeeper.ConfigurationsCache;
 import org.apache.metron.common.zookeeper.ZKConfigurationsCache;
-import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.SyncHBaseClient;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.UnableToStartException;
@@ -198,7 +198,7 @@ public class TestConfig {
   }
 
   @Bean()
-  public HBaseClient hBaseClient() throws RestException, IOException {
+  public SyncHBaseClient hBaseClient() throws RestException, IOException {
     final String cf = "t";
     final String cq = "v";
     HTableInterface table = MockHBaseTableProvider.addToCache("enrichment_list", cf);
@@ -212,7 +212,7 @@ public class TestConfig {
       put.addColumn(Bytes.toBytes(cf), Bytes.toBytes(cq), "{}".getBytes(StandardCharsets.UTF_8));
       table.put(put);
     }
-    return new HBaseClient(new MockHBaseTableProvider(), HBaseConfiguration.create(),
+    return new SyncHBaseClient(new MockHBaseTableProvider(), HBaseConfiguration.create(),
         "enrichment_list");
   }
 

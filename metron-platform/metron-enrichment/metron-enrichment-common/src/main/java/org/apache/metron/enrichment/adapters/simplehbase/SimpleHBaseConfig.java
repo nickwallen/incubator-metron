@@ -17,9 +17,7 @@
  */
 package org.apache.metron.enrichment.adapters.simplehbase;
 
-import org.apache.metron.enrichment.utils.EnrichmentUtils;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.Serializable;
 
@@ -27,7 +25,7 @@ import java.io.Serializable;
 public class SimpleHBaseConfig implements Serializable {
   private String hBaseTable;
   private String hBaseCF;
-  private TableProvider provider = new HTableProvider();
+  private HBaseConnectionFactory connectionFactory = new HBaseConnectionFactory();
   public String getHBaseTable() {
     return hBaseTable;
   }
@@ -35,14 +33,15 @@ public class SimpleHBaseConfig implements Serializable {
     return hBaseCF;
   }
 
-  public TableProvider getProvider() {
-    return provider;
+  public HBaseConnectionFactory getConnectionFactory() {
+    return connectionFactory;
   }
 
-  public SimpleHBaseConfig withProviderImpl(String connectorImpl) {
-    provider = EnrichmentUtils.getTableProvider(connectorImpl, new HTableProvider());
+  public SimpleHBaseConfig withConnectionFactoryImpl(String connectorImpl) {
+    connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectorImpl, new HBaseConnectionFactory());
     return this;
   }
+
   public SimpleHBaseConfig withHBaseTable(String hBaseTable) {
     this.hBaseTable = hBaseTable;
     return this;
