@@ -34,6 +34,7 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -112,18 +113,18 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
 
   @Override
   public boolean initializeAdapter(Map<String, Object> configuration) {
-    PersistentAccessTracker accessTracker;
     String hbaseTable = config.getHBaseTable();
     int expectedInsertions = config.getExpectedInsertions();
     double falsePositives = config.getFalsePositiveRate();
-    String trackerHBaseTable = config.getTrackerHBaseTable();
-    String trackerHBaseCF = config.getTrackerHBaseCF();
     long millisecondsBetweenPersist = config.getMillisecondsBetweenPersists();
     BloomAccessTracker bat = new BloomAccessTracker(hbaseTable, expectedInsertions, falsePositives);
     Configuration hbaseConfig = HBaseConfiguration.create();
+    HBaseConnectionFactory connectionFactory = config.getConnectionFactory();
     try {
-      connection = config.getConnectionFactory().createConnection(hbaseConfig);
-      accessTracker = new PersistentAccessTracker( hbaseTable
+      String trackerHBaseTable = config.getTrackerHBaseTable();
+      String trackerHBaseCF = config.getTrackerHBaseCF();
+      connection = connectionFactory.createConnection(hbaseConfig);
+      PersistentAccessTracker accessTracker = new PersistentAccessTracker( hbaseTable
               , UUID.randomUUID().toString()
               , trackerHBaseCF
               , bat
@@ -131,7 +132,7 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
               , config.getConnectionFactory()
               , hbaseConfig
       );
-      lookup = new EnrichmentLookup(config.getProvider().getTable(hbaseConfig, hbaseTable), config.getHBaseCF(), accessTracker);
+      lookup = new EnrichmentLookup(connectionFactory, hbaseConfig, hbaseTable, config.getHBaseCF(), accessTracker);
     } catch (IOException e) {
       LOG.error("Unable to initialize ThreatIntelAdapter", e);
       return false;

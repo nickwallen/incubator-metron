@@ -20,24 +20,19 @@ package org.apache.metron.enrichment.adapters.simplehbase;
 
 import com.google.common.collect.ImmutableMap;
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.ClusterConnection;
-import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
+import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.enrichment.cache.CacheKey;
+import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.converter.EnrichmentHelper;
-import org.apache.metron.hbase.TableProvider;
-import org.apache.metron.hbase.mock.MockHTable;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
-import org.apache.metron.common.utils.JSONUtils;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
@@ -109,10 +104,10 @@ public class SimpleHBaseAdapterTest {
 
   @Before
   public void setup() throws Exception {
-
-    MockHBaseTableProvider provider = new MockHBaseTableProvider();
-    final Table trackerTable = provider.addToCache(atTableName, cf);
-    final Table hbaseTable = provider.addToCache(hbaseTableName, cf);
+    MockHBaseConnectionFactory connectionFactory = new MockHBaseConnectionFactory()
+            .withTable(atTableName)
+            .withTable(hbaseTableName);
+    Table hbaseTable = connectionFactory.getTable(hbaseTableName);
 
     EnrichmentHelper.INSTANCE.load(hbaseTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
       add(new LookupKV<>(new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3")
@@ -127,11 +122,8 @@ public class SimpleHBaseAdapterTest {
       );
     }});
     BloomAccessTracker bat = new BloomAccessTracker(hbaseTableName, 100, 0.03);
-
-
-    PersistentAccessTracker pat = new PersistentAccessTracker(hbaseTableName, "0", conf, atTableName, provider, cf, bat, 0L);
-
-    lookup = new EnrichmentLookup(provider, hbaseTableName, cf, pat);
+    PersistentAccessTracker pat = new PersistentAccessTracker(hbaseTableName, "0", cf, bat, 0L, connectionFactory, HBaseConfiguration.create());
+    lookup = new EnrichmentLookup(connectionFactory, hbaseTableName, cf, pat);
 
     JSONParser jsonParser = new JSONParser();
     expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
@@ -141,9 +133,11 @@ public class SimpleHBaseAdapterTest {
   public void testEnrich() throws Exception {
     SimpleHBaseAdapter sha = new SimpleHBaseAdapter();
     sha.lookup = lookup;
+
     SensorEnrichmentConfig broSc = JSONUtils.INSTANCE.load(sourceConfigStr, SensorEnrichmentConfig.class);
     JSONObject actualMessage = sha.enrich(new CacheKey("test", "test", broSc));
     Assert.assertEquals(actualMessage, new JSONObject());
+
     actualMessage = sha.enrich(new CacheKey("ip_dst_addr", "10.0.2.3", broSc));
     Assert.assertNotNull(actualMessage);
     Assert.assertEquals(expectedMessage, actualMessage);

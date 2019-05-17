@@ -89,7 +89,8 @@ public class HBaseClientIntegrationTest {
     util.waitTableEnabled(table.getName());
 
     // setup the client
-    MockHBaseConnectionFactory factory = new MockHBaseConnectionFactory(table);
+    MockHBaseConnectionFactory factory = new MockHBaseConnectionFactory()
+            .withTable(tableName, table);
     client = HBaseClient.createSyncClient(factory, config, tableName);
   }
 
@@ -218,7 +219,7 @@ public class HBaseClientIntegrationTest {
     // used to trigger a failure condition in `HbaseClient.mutate`
     Table table = mock(Table.class);
     doThrow(new IOException("exception!")).when(table).batch(any(), any());
-    HBaseConnectionFactory factory = new MockHBaseConnectionFactory(table);
+    HBaseConnectionFactory factory = new MockHBaseConnectionFactory().withTable(tableName, table);
 
     ColumnList cols1 = new ColumnList().addColumn(columnFamily, columnQualifier, "value1");
     client = HBaseClient.createSyncClient(factory, HBaseConfiguration.create(), tableName);
@@ -231,7 +232,8 @@ public class HBaseClientIntegrationTest {
     // used to trigger a failure condition in `HbaseClient.getAll`
     Table table = mock(Table.class);
     when(table.get(anyListOf(Get.class))).thenThrow(new IOException("exception!"));
-    HBaseConnectionFactory factory = new MockHBaseConnectionFactory(table);
+    HBaseConnectionFactory factory = new MockHBaseConnectionFactory()
+            .withTable(tableName, table);
 
     HBaseProjectionCriteria criteria = new HBaseProjectionCriteria();
     criteria.addColumnFamily(columnFamily);

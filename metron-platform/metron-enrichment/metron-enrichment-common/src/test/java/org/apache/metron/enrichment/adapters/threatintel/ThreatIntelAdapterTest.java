@@ -19,9 +19,6 @@ package org.apache.metron.enrichment.adapters.threatintel;
 
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.BufferedMutator;
-import org.apache.hadoop.hbase.client.BufferedMutatorParams;
-import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.log4j.Level;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
@@ -34,8 +31,7 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
-import org.apache.metron.hbase.TableProvider;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.apache.metron.test.utils.UnitTestHelper;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -43,28 +39,11 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
 
 public class ThreatIntelAdapterTest {
-
-  public static class ExceptionProvider implements TableProvider {
-
-    public ExceptionProvider() {
-    }
-
-    @Override
-    public Table getTable(Connection connection, String tableName) throws IOException {
-      throw new IOException();
-    }
-
-    @Override
-    public BufferedMutator getMutator(Connection connection, BufferedMutatorParams params) throws IOException {
-      throw new IOException();
-    }
-  }
 
   private String cf = "cf";
   private String atTableName = "tracker";
@@ -106,17 +85,26 @@ public class ThreatIntelAdapterTest {
 
   @Before
   public void setup() throws Exception {
-    MockHBaseTableProvider provider = new MockHBaseTableProvider();
-    final Table trackerTable= provider.addToCache(atTableName, cf);
-    final Table threatIntelTable = provider.addToCache(threatIntelTableName, cf);
+    MockHBaseConnectionFactory connectionFactory = new MockHBaseConnectionFactory()
+            .withTable(atTableName)
+            .withTable(threatIntelTableName);
+    Table threatIntelTable = connectionFactory.getTable(threatIntelTableName);
 
     EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
       add(new LookupKV<>(new EnrichmentKey("10.0.2.3", "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
     }});
 
     BloomAccessTracker bat = new BloomAccessTracker(threatIntelTableName, 100, 0.03);
-    PersistentAccessTracker pat = new PersistentAccessTracker(threatIntelTableName, "0", HBaseConfiguration.create(), atTableName, provider, cf, bat, 0L);
-    lookup = new EnrichmentLookup(provider, threatIntelTableName, cf, pat);
+    PersistentAccessTracker pat = new PersistentAccessTracker(
+            threatIntelTableName,
+            "0",
+            //atTableName,
+            cf,
+            bat,
+            0L,
+            connectionFactory,
+            HBaseConfiguration.create());
+    lookup = new EnrichmentLookup(connectionFactory, threatIntelTableName, cf, pat);
     JSONParser jsonParser = new JSONParser();
     expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
   }
@@ -146,7 +134,6 @@ public class ThreatIntelAdapterTest {
 
   @Test
   public void testInitializeAdapter() {
-
     String cf = "cf";
     String table = "threatintel";
     String trackCf = "cf";
@@ -163,7 +150,9 @@ public class ThreatIntelAdapterTest {
     config.withMillisecondsBetweenPersists(millionseconds);
     config.withTrackerHBaseCF(trackCf);
     config.withTrackerHBaseTable(trackTable);
-    config.withProviderImpl(ExceptionProvider.class.getName());
+    //config.withProviderImpl(ExceptionProvider.class.getName());
+
+
     ThreatIntelAdapter tia = new ThreatIntelAdapter(config);
     UnitTestHelper.setLog4jLevel(ThreatIntelAdapter.class, Level.FATAL);
     tia.initializeAdapter(null);

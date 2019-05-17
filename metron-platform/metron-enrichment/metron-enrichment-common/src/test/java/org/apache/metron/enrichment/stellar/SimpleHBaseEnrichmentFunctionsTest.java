@@ -19,18 +19,18 @@
 package org.apache.metron.enrichment.stellar;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.metron.hbase.mock.MockHTable;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
-import org.apache.metron.stellar.dsl.Context;
-import org.apache.metron.stellar.dsl.DefaultVariableResolver;
-import org.apache.metron.stellar.dsl.ParseException;
-import org.apache.metron.stellar.dsl.StellarFunctions;
-import org.apache.metron.stellar.common.StellarProcessor;
-
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.mock.StaticMockHBaseConnectionFactory;
+import org.apache.metron.stellar.common.StellarProcessor;
+import org.apache.metron.stellar.dsl.Context;
+import org.apache.metron.stellar.dsl.DefaultVariableResolver;
+import org.apache.metron.stellar.dsl.ParseException;
+import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,12 +46,12 @@ public class SimpleHBaseEnrichmentFunctionsTest {
   private String cf = "cf";
   private static Context context;
 
-
-
   @Before
   public void setup() throws Exception {
 
-    final MockHTable hbaseTable = (MockHTable) MockHBaseTableProvider.addToCache(hbaseTableName, cf);
+    StaticMockHBaseConnectionFactory.withTable(hbaseTableName);
+    Table hbaseTable = StaticMockHBaseConnectionFactory.getTable(hbaseTableName);
+
     EnrichmentHelper.INSTANCE.load(hbaseTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
       for(int i = 0;i < 5;++i) {
         add(new LookupKV<>(new EnrichmentKey(ENRICHMENT_TYPE, "indicator" + i)
@@ -60,12 +60,11 @@ public class SimpleHBaseEnrichmentFunctionsTest {
         );
       }
     }});
+    Map<String, Object> conf = ImmutableMap.of(
+            SimpleHBaseEnrichmentFunctions.CONNECTION_FACTORY_IMPL_CONF,
+            StaticMockHBaseConnectionFactory.class.getName());
     context = new Context.Builder()
-            .with( Context.Capabilities.GLOBAL_CONFIG
-                 , () -> ImmutableMap.of( SimpleHBaseEnrichmentFunctions.TABLE_PROVIDER_TYPE_CONF
-                                        , MockHBaseTableProvider.class.getName()
-                                        )
-                 )
+            .with( Context.Capabilities.GLOBAL_CONFIG, () -> conf)
             .build();
   }
   public Object run(String rule, Map<String, Object> variables) throws Exception {

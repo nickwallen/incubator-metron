@@ -134,15 +134,15 @@ public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, Enri
                           String tableName,
                           String columnFamily,
                           AccessTracker tracker) throws IOException {
-    this(connectionFactory, tableName, columnFamily, tracker, HBaseConfiguration.create());
+    this(connectionFactory, HBaseConfiguration.create(), tableName, columnFamily, tracker);
 
   }
 
   public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
+                          Configuration conf,
                           String tableName,
                           String columnFamily,
-                          AccessTracker tracker,
-                          Configuration conf) throws IOException {
+                          AccessTracker tracker) throws IOException {
     this.connection = connectionFactory.createConnection(conf);
     this.table = connection.getTable(TableName.valueOf(tableName));
     this.setLookupHandler(new Handler(columnFamily));

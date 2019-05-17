@@ -137,16 +137,6 @@ public class PersistentAccessTracker implements AccessTracker {
         this.hbaseClient = HBaseClient.createSyncClient(connectionFactory, configuration, tableName);
     }
 
-    public PersistentAccessTracker( String tableName,
-                                    String containerName,
-                                    String columnFamily,
-                                    AccessTracker underlyingTracker,
-                                    long maxMillisecondsBetweenPersists,
-                                    Configuration hbaseConf,
-                                    String accessTrackerTableName) {
-        this(tableName, containerName, columnFamily, underlyingTracker, maxMillisecondsBetweenPersists, new HBaseConnectionFactory(), hbaseConf);
-    }
-
     public void persist(boolean force) {
         synchronized(sync) {
             if(force || (System.currentTimeMillis() - timestamp) >= maxMillisecondsBetweenPersists) {
