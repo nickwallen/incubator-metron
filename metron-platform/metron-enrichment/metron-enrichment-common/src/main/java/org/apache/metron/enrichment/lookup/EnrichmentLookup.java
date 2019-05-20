@@ -17,125 +17,36 @@
  */
 package org.apache.metron.enrichment.lookup;
 
-import com.google.common.collect.Iterables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.converter.HbaseConverter;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
-import org.apache.metron.enrichment.lookup.handler.KeyWithContext;
+import org.apache.metron.enrichment.lookup.handler.HBaseContext;
+import org.apache.metron.enrichment.lookup.handler.HBaseEnrichmentHandler;
+import org.apache.metron.enrichment.lookup.handler.Handler;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
 
 
-public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, EnrichmentKey, LookupKV<EnrichmentKey,EnrichmentValue>> implements AutoCloseable {
-
-  public static class HBaseContext {
-    private Table table;
-    private String columnFamily;
-
-    public HBaseContext(Table table, String columnFamily) {
-      this.table = table;
-      this.columnFamily = columnFamily;
-    }
-
-    public Table getTable() {
-      return table;
-    }
-
-    public String getColumnFamily() {
-      return columnFamily;
-    }
-  }
-
-  public static class Handler implements org.apache.metron.enrichment.lookup.handler.Handler<HBaseContext,EnrichmentKey,LookupKV<EnrichmentKey,EnrichmentValue>> {
-    String columnFamily;
-    HbaseConverter<EnrichmentKey, EnrichmentValue> converter = new EnrichmentConverter();
-    public Handler(String columnFamily) {
-      this.columnFamily = columnFamily;
-    }
-
-    private String getColumnFamily(HBaseContext context) {
-      return context.getColumnFamily() == null?columnFamily:context.getColumnFamily();
-    }
-
-    @Override
-    public boolean exists(EnrichmentKey key, HBaseContext context, boolean logAccess) throws IOException {
-      return context.getTable().exists(converter.toGet(getColumnFamily(context), key));
-    }
-
-    @Override
-    public LookupKV<EnrichmentKey, EnrichmentValue> get(EnrichmentKey key, HBaseContext context, boolean logAccess) throws IOException {
-      return converter.fromResult(context.getTable().get(converter.toGet(getColumnFamily(context), key)), getColumnFamily(context));
-    }
-
-    private List<Get> keysToGets(Iterable<KeyWithContext<EnrichmentKey, HBaseContext>> keys) {
-      List<Get> ret = new ArrayList<>();
-      for(KeyWithContext<EnrichmentKey, HBaseContext> key : keys) {
-        ret.add(converter.toGet(getColumnFamily(key.getContext()), key.getKey()));
-      }
-      return ret;
-    }
-
-    @Override
-    public Iterable<Boolean> exists(Iterable<KeyWithContext<EnrichmentKey, HBaseContext>> key, boolean logAccess) throws IOException {
-      List<Boolean> ret = new ArrayList<>();
-      if(Iterables.isEmpty(key)) {
-        return Collections.emptyList();
-      }
-      Table table = Iterables.getFirst(key, null).getContext().getTable();
-      for(boolean b : table.existsAll(keysToGets(key))) {
-        ret.add(b);
-      }
-      return ret;
-    }
-
-    @Override
-    public Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> get( Iterable<KeyWithContext<EnrichmentKey, HBaseContext>> keys
-                                                                 , boolean logAccess
-                                                                 ) throws IOException
-    {
-      if(Iterables.isEmpty(keys)) {
-        return Collections.emptyList();
-      }
-      Table table = Iterables.getFirst(keys, null).getContext().getTable();
-      List<LookupKV<EnrichmentKey, EnrichmentValue>> ret = new ArrayList<>();
-      Iterator<KeyWithContext<EnrichmentKey, HBaseContext>> keyWithContextIterator = keys.iterator();
-      for(Result result : table.get(keysToGets(keys))) {
-        HBaseContext context = keyWithContextIterator.next().getContext();
-        ret.add(converter.fromResult(result, getColumnFamily(context)));
-      }
-      return ret;
-    }
-
-
-    @Override
-    public void close() throws Exception {
-
-    }
-  }
+public class EnrichmentLookup extends Lookup<HBaseContext, EnrichmentKey, LookupKV<EnrichmentKey, EnrichmentValue>> implements AutoCloseable {
 
   private Table table;
   private Connection connection;
+
+  public EnrichmentLookup() {
+    // TODO this is a bad idea? see MockEnrichmentLookup
+  }
 
   public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
                           String tableName,
                           String columnFamily,
                           AccessTracker tracker) throws IOException {
     this(connectionFactory, HBaseConfiguration.create(), tableName, columnFamily, tracker);
-
   }
 
   public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
@@ -143,9 +54,17 @@ public class EnrichmentLookup extends Lookup<EnrichmentLookup.HBaseContext, Enri
                           String tableName,
                           String columnFamily,
                           AccessTracker tracker) throws IOException {
+    this(connectionFactory, conf, new HBaseEnrichmentHandler(columnFamily), tableName, tracker);
+  }
+
+  public EnrichmentLookup(HBaseConnectionFactory connectionFactory,
+                          Configuration conf,
+                          Handler<HBaseContext, EnrichmentKey, LookupKV<EnrichmentKey,EnrichmentValue>> handler,
+                          String tableName,
+                          AccessTracker tracker) throws IOException {
     this.connection = connectionFactory.createConnection(conf);
     this.table = connection.getTable(TableName.valueOf(tableName));
-    this.setLookupHandler(new Handler(columnFamily));
+    this.setLookupHandler(handler);
     this.setAccessTracker(tracker);
   }
 

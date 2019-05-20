@@ -25,7 +25,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
-import org.apache.metron.enrichment.lookup.EnrichmentLookup;
+import org.apache.metron.enrichment.lookup.handler.HBaseContext;
 import org.apache.metron.enrichment.lookup.handler.KeyWithContext;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.json.simple.JSONObject;
@@ -43,7 +43,7 @@ public class EnrichmentUtils {
     return Joiner.on(".").join(new String[]{KEY_PREFIX, enrichmentName, field});
   }
 
-  public static class TypeToKey implements Function<String, KeyWithContext<EnrichmentKey, EnrichmentLookup.HBaseContext>> {
+  public static class TypeToKey implements Function<String, KeyWithContext<EnrichmentKey, HBaseContext>> {
     private final String indicator;
     private final EnrichmentConfig config;
     private final Table table;
@@ -54,9 +54,9 @@ public class EnrichmentUtils {
     }
     @Nullable
     @Override
-    public KeyWithContext<EnrichmentKey, EnrichmentLookup.HBaseContext> apply(@Nullable String enrichmentType) {
+    public KeyWithContext<EnrichmentKey, HBaseContext> apply(@Nullable String enrichmentType) {
       EnrichmentKey key = new EnrichmentKey(enrichmentType, indicator);
-      EnrichmentLookup.HBaseContext context = new EnrichmentLookup.HBaseContext(table, getColumnFamily(enrichmentType, config));
+      HBaseContext context = new HBaseContext(table, getColumnFamily(enrichmentType, config));
       return new KeyWithContext<>(key, context);
     }
   }

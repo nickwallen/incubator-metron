@@ -126,6 +126,7 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
       connection = connectionFactory.createConnection(hbaseConfig);
       PersistentAccessTracker accessTracker = new PersistentAccessTracker( hbaseTable
               , UUID.randomUUID().toString()
+              , trackerHBaseTable
               , trackerHBaseCF
               , bat
               , millisecondsBetweenPersist

@@ -23,6 +23,7 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.type.TypeReference;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
 public class EnrichmentValue implements LookupValue {
@@ -34,19 +35,20 @@ public class EnrichmentValue implements LookupValue {
     };
     public static final String VALUE_COLUMN_NAME = "v";
     public static final byte[] VALUE_COLUMN_NAME_B = Bytes.toBytes(VALUE_COLUMN_NAME);
+    private Map<String, Object> metadata;
 
-    private Map<String, Object> metadata = null;
-
-    public EnrichmentValue()
-    {
-
+    public EnrichmentValue() {
+      this.metadata = new HashMap<>();
     }
 
     public EnrichmentValue(Map<String, Object> metadata) {
         this.metadata = metadata;
     }
 
-
+    public EnrichmentValue withValue(String key, Object value) {
+      metadata.put(key, value);
+      return this;
+    }
 
     public Map<String, Object> getMetadata() {
         return metadata;
@@ -60,12 +62,17 @@ public class EnrichmentValue implements LookupValue {
 
     @Override
     public void fromColumns(Iterable<Map.Entry<byte[], byte[]>> values) {
-        for(Map.Entry<byte[], byte[]> cell : values) {
-            if(Bytes.equals(cell.getKey(), VALUE_COLUMN_NAME_B)) {
-                metadata = stringToValue(Bytes.toString(cell.getValue()));
-            }
+      for(Map.Entry<byte[], byte[]> cell : values) {
+        String columnQualifier = Bytes.toString(cell.getKey());
+        String columnValue = Bytes.toString(cell.getValue());
+
+        System.out.println(String.format("column=%s", columnQualifier));
+        if(Bytes.equals(cell.getKey(), VALUE_COLUMN_NAME_B)) {
+          metadata = stringToValue(Bytes.toString(cell.getValue()));
         }
+      }
     }
+
     public Map<String, Object> stringToValue(String s){
         try {
             return _mapper.get().readValue(s, new TypeReference<Map<String, Object>>(){});

@@ -67,7 +67,7 @@ public class MockHBaseConnectionFactory extends HBaseConnectionFactory {
    * @return
    */
   public MockHBaseConnectionFactory withTable(String tableName) {
-    return withTable(tableName, mock(Table.class));
+    return withTable(tableName, new MockHTable(tableName));
   }
 
   public Table getTable(String tableName) {

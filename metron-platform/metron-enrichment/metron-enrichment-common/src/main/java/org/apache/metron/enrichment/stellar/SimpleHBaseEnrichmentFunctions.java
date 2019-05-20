@@ -27,6 +27,7 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
+import org.apache.metron.enrichment.lookup.handler.HBaseContext;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
@@ -171,7 +172,7 @@ public class SimpleHBaseEnrichmentFunctions {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return false;
       }
-      EnrichmentLookup.HBaseContext hbaseContext = new EnrichmentLookup.HBaseContext(lookup.getTable(), cf);
+      HBaseContext hbaseContext = new HBaseContext(lookup.getTable(), cf);
       try {
         return lookup.exists(new EnrichmentKey(enrichmentType, indicator), hbaseContext, true);
       } catch (IOException e) {
@@ -243,7 +244,7 @@ public class SimpleHBaseEnrichmentFunctions {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return new HashMap<String, Object>();
       }
-      EnrichmentLookup.HBaseContext hbaseContext = new EnrichmentLookup.HBaseContext(lookup.getTable(), cf);
+      HBaseContext hbaseContext = new HBaseContext(lookup.getTable(), cf);
       try {
         LookupKV<EnrichmentKey, EnrichmentValue> kv = lookup.get(new EnrichmentKey(enrichmentType, indicator), hbaseContext, true);
         if (kv != null && kv.getValue() != null && kv.getValue().getMetadata() != null) {

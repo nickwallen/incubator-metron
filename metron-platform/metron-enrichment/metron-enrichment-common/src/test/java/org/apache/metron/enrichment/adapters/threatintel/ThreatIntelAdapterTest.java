@@ -98,7 +98,7 @@ public class ThreatIntelAdapterTest {
     PersistentAccessTracker pat = new PersistentAccessTracker(
             threatIntelTableName,
             "0",
-            //atTableName,
+            atTableName,
             cf,
             bat,
             0L,

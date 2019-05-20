@@ -15,39 +15,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.metron.enrichment.lookup.handler;
 
-import java.util.Objects;
+import org.apache.hadoop.hbase.client.Table;
 
-public class KeyWithContext<KEY_T, CONTEXT_T> {
-  private KEY_T key;
-  private CONTEXT_T context;
+public class HBaseContext {
 
-  public KeyWithContext(KEY_T key, CONTEXT_T context) {
-    this.key = key;
-    this.context = context;
+  private Table table;
+  private String columnFamily;
+
+  public HBaseContext(Table table, String columnFamily) {
+    this.table = table;
+    this.columnFamily = columnFamily;
   }
 
-  public KEY_T getKey() {
-    return key;
+  public Table getTable() {
+    return table;
   }
 
-  public CONTEXT_T getContext() {
-    return context;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) return true;
-    if (!(o instanceof KeyWithContext)) return false;
-    KeyWithContext<?, ?> that = (KeyWithContext<?, ?>) o;
-    return Objects.equals(key, that.key) &&
-            Objects.equals(context, that.context);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(key, context);
+  public String getColumnFamily() {
+    return columnFamily;
   }
 }

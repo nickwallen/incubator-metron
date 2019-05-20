@@ -42,7 +42,21 @@ public enum AccessTrackerUtil {
         ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes));
         return (AccessTracker) ois.readObject();
     }
+    public byte[] serializeTracker(AccessTracker tracker) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        ObjectOutputStream oos = new ObjectOutputStream(bos);
+        oos.writeObject(tracker);
+        oos.flush();
+        oos.close();
+        return bos.toByteArray();
+    }
 
+
+    public void persistTracker(Table accessTrackerTable, String columnFamily, PersistentAccessTracker.AccessTrackerKey key, AccessTracker underlyingTracker) throws IOException {
+        Put put = new Put(key.toRowKey());
+        put.addColumn(Bytes.toBytes(columnFamily), COLUMN, serializeTracker(underlyingTracker));
+        accessTrackerTable.put(put);
+    }
 
     public Iterable<AccessTracker> loadAll(Table accessTrackerTable, final String columnFamily, final String name, final long earliest) throws IOException {
         Scan scan = new Scan(PersistentAccessTracker.AccessTrackerKey.getTimestampScanKey(name, earliest));

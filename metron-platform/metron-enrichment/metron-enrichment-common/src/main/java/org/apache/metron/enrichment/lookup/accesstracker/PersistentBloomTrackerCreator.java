@@ -91,6 +91,7 @@ public class PersistentBloomTrackerCreator implements AccessTrackerCreator {
 
     AccessTracker ret = new PersistentAccessTracker(hbaseTable
             , UUID.randomUUID().toString()
+            , hbaseTable
             , patConfig.getHBaseCF()
             , bat
             , millisecondsBetweenPersist
