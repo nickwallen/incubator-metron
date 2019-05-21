@@ -71,7 +71,7 @@ import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.mitre.taxii.client.HttpClient;
 import org.mitre.taxii.messages.xml11.AnyMixedContentType;
 import org.mitre.taxii.messages.xml11.CollectionInformationRequest;
@@ -213,7 +213,7 @@ public class TaxiiHandler extends TimerTask {
               if(LOG.isDebugEnabled() && Math.random() < 0.01) {
                 LOG.debug("Random Stix doc: {}", xml);
               }
-              for (LookupKV<EnrichmentKey, EnrichmentValue> kv : extractor.extract(xml)) {
+              for (EnrichmentResult<EnrichmentKey, EnrichmentValue> kv : extractor.extract(xml)) {
                 if(allowedIndicatorTypes.isEmpty()
                 || allowedIndicatorTypes.contains(kv.getKey().type)
                   )

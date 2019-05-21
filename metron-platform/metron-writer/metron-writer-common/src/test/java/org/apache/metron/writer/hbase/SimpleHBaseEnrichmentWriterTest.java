@@ -33,7 +33,7 @@ import org.apache.metron.common.writer.BulkMessage;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.json.simple.JSONObject;
@@ -75,7 +75,7 @@ public class SimpleHBaseEnrichmentWriterTest {
               add(new BulkMessage<>("messageId", new JSONObject(ImmutableMap.of("ip", "localhost", "user", "cstella", "foo", "bar"))));
             }}
     );
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> values = getValues();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> values = getValues();
     Assert.assertEquals(1, values.size());
     Assert.assertEquals("localhost", values.get(0).getKey().indicator);
     Assert.assertEquals("cstella", values.get(0).getValue().getMetadata().get("user"));
@@ -102,7 +102,7 @@ public class SimpleHBaseEnrichmentWriterTest {
               add(new BulkMessage<>("messageId", new JSONObject(ImmutableMap.of("ip", "localhost", "user", "cstella", "foo", "bar"))));
             }}
     );
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> values = getValues();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> values = getValues();
     Assert.assertEquals(1, values.size());
     Assert.assertEquals("localhost", values.get(0).getKey().indicator);
     Assert.assertEquals("cstella", values.get(0).getValue().getMetadata().get("user"));
@@ -129,7 +129,7 @@ public class SimpleHBaseEnrichmentWriterTest {
               add(new BulkMessage<>("messageId", new JSONObject(ImmutableMap.of("ip", "localhost", "user", "cstella", "foo", "bar"))));
             }}
     );
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> values = getValues();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> values = getValues();
     Assert.assertEquals(1, values.size());
     Assert.assertEquals("localhost", values.get(0).getKey().indicator);
     Assert.assertEquals("cstella", values.get(0).getValue().getMetadata().get("user"));
@@ -254,10 +254,10 @@ public class SimpleHBaseEnrichmentWriterTest {
     }
   }
 
-  public static List<LookupKV<EnrichmentKey, EnrichmentValue>> getValues() throws IOException {
+  public static List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> getValues() throws IOException {
     MockHTable table = (MockHTable) MockHBaseTableProvider.getFromCache(TABLE_NAME);
     Assert.assertNotNull(table);
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> ret = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> ret = new ArrayList<>();
     EnrichmentConverter converter = new EnrichmentConverter();
     for(Result r : table.getScanner(Bytes.toBytes(TABLE_CF))) {
       ret.add(converter.fromResult(r, TABLE_CF));

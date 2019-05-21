@@ -22,7 +22,7 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.dataloads.extractor.ExtractorHandler;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -72,7 +72,7 @@ public class CSVExtractorTest {
 
   public void validate(ExtractorHandler handler) throws IOException {
     {
-      LookupKV results = Iterables.getFirst(handler.getExtractor().extract("google.com,1.0,foo"), null);
+      EnrichmentResult results = Iterables.getFirst(handler.getExtractor().extract("google.com,1.0,foo"), null);
       EnrichmentKey key = (EnrichmentKey) results.getKey();
       EnrichmentValue value = (EnrichmentValue) results.getValue();
       Assert.assertEquals("google.com", key.indicator);
@@ -82,19 +82,19 @@ public class CSVExtractorTest {
       Assert.assertEquals(2, value.getMetadata().size());
     }
     {
-      Iterable<LookupKV> results = handler.getExtractor().extract("#google.com,1.0,foo");
+      Iterable<EnrichmentResult> results = handler.getExtractor().extract("#google.com,1.0,foo");
       Assert.assertEquals(0, Iterables.size(results));
     }
     {
-      Iterable<LookupKV> results = handler.getExtractor().extract("");
+      Iterable<EnrichmentResult> results = handler.getExtractor().extract("");
       Assert.assertEquals(0, Iterables.size(results));
     }
     {
-      Iterable<LookupKV> results = handler.getExtractor().extract(" ");
+      Iterable<EnrichmentResult> results = handler.getExtractor().extract(" ");
       Assert.assertEquals(0, Iterables.size(results));
     }
     {
-      Iterable<LookupKV> results = handler.getExtractor().extract(null);
+      Iterable<EnrichmentResult> results = handler.getExtractor().extract(null);
       Assert.assertEquals(0, Iterables.size(results));
     }
   }

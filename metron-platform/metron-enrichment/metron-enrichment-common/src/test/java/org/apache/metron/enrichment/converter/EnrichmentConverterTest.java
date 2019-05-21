@@ -18,7 +18,7 @@
 package org.apache.metron.enrichment.converter;
 
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -44,7 +44,7 @@ public class EnrichmentConverterTest {
       put("k2", "v2");
     }});
     Put serialized = converter.toPut("cf", k1, v1);
-    LookupKV<EnrichmentKey, EnrichmentValue> kv = converter.fromPut(serialized,"cf");
+    EnrichmentResult kv = converter.fromPut(serialized,"cf");
     Assert.assertEquals(k1, kv.getKey());
     Assert.assertEquals(v1, kv.getValue());
   }

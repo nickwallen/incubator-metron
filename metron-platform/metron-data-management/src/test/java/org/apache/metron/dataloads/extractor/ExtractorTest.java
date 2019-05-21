@@ -20,7 +20,7 @@ package org.apache.metron.dataloads.extractor;
 import com.google.common.collect.Iterables;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,13 +35,13 @@ public class ExtractorTest {
     {
 
         @Override
-        public Iterable<LookupKV> extract(String line) throws IOException {
+        public Iterable<EnrichmentResult> extract(String line) throws IOException {
             EnrichmentKey key = new EnrichmentKey();
             key.indicator = "dummy";
             key.type = "type";
             Map<String, Object> value = new HashMap<>();
             value.put("indicator", "dummy");
-            return Arrays.asList(new LookupKV(key, new EnrichmentValue(value)));
+            return Arrays.asList(new EnrichmentResult(key, new EnrichmentValue(value)));
         }
 
         @Override
@@ -52,7 +52,7 @@ public class ExtractorTest {
     @Test
     public void testDummyExtractor() throws IllegalAccessException, InstantiationException, ClassNotFoundException, IOException, NoSuchMethodException, InvocationTargetException {
         Extractor extractor = Extractors.create(DummyExtractor.class.getName());
-        LookupKV results = Iterables.getFirst(extractor.extract(null), null);
+        EnrichmentResult results = Iterables.getFirst(extractor.extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
         Assert.assertEquals("dummy", key.indicator);
@@ -74,7 +74,7 @@ public class ExtractorTest {
                 "            ,\"extractor\" : \"org.apache.metron.dataloads.extractor.ExtractorTest$DummyExtractor\"\n" +
                 "         }";
         ExtractorHandler handler = ExtractorHandler.load(config);
-        LookupKV results = Iterables.getFirst(handler.getExtractor().extract(null), null);
+        EnrichmentResult results = Iterables.getFirst(handler.getExtractor().extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
         Assert.assertEquals("dummy", key.indicator);

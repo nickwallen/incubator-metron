@@ -25,7 +25,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.dataloads.extractor.ExtractorHandler;
 import org.apache.metron.enrichment.converter.HbaseConverter;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
@@ -47,7 +47,7 @@ public class BulkLoadMapper extends Mapper<Object, Text, ImmutableBytesWritable,
 
     @Override
     public void map(Object key, Text value, Context context) throws IOException, InterruptedException {
-        for(LookupKV results : extractor.extract(value.toString())) {
+        for(EnrichmentResult results : extractor.extract(value.toString())) {
             if (results != null) {
                 Put put = converter.toPut(columnFamily, results.getKey(), results.getValue());
                 write(new ImmutableBytesWritable(results.getKey().toBytes()), put, context);

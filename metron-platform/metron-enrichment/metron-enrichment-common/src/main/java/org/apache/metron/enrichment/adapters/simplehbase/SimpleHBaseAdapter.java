@@ -18,19 +18,17 @@
 
 package org.apache.metron.enrichment.adapters.simplehbase;
 
-
-import com.google.common.collect.Iterables;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.LookupKV;
-import org.apache.metron.enrichment.lookup.accesstracker.NoopAccessTracker;
-import org.apache.metron.enrichment.lookup.handler.HBaseContext;
-import org.apache.metron.enrichment.lookup.handler.KeyWithContext;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,22 +36,29 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 
 public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializable {
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private SimpleHBaseConfig config;
   private EnrichmentLookup lookup;
+  private HBaseConnectionFactory connectionFactory;
 
   public SimpleHBaseAdapter() {
+    this.connectionFactory = new HBaseConnectionFactory();
   }
 
-  public SimpleHBaseAdapter(SimpleHBaseConfig config) {
-    withConfig(config);
+  public SimpleHBaseAdapter withConnectionFactory(HBaseConnectionFactory connectionFactory) {
+    this.connectionFactory = connectionFactory;
+    return this;
   }
 
-  public SimpleHBaseAdapter withEnrichmentLookup(EnrichmentLookup lookup) {
+  public SimpleHBaseAdapter withLookup(EnrichmentLookup lookup) {
     this.lookup = lookup;
     return this;
   }
@@ -68,7 +73,7 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   }
 
   public boolean isInitialized() {
-    return lookup != null && lookup.getTable() != null;
+    return lookup != null && lookup.isInitialized();
   }
 
   @Override
@@ -77,50 +82,45 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
     if(!isInitialized()) {
       initializeAdapter(null);
     }
-    List<String> enrichmentTypes = value.getConfig()
-                                        .getEnrichment().getFieldToTypeMap()
-                                        .get(EnrichmentUtils.toTopLevelField(value.getField()));
-    if(isInitialized() && enrichmentTypes != null && value.getValue() != null) {
+
+    List<String> enrichmentTypes = getEnrichmentTypes(value);
+    if(isInitialized() && isNotEmpty(enrichmentTypes) && value.getValue() != null) {
       try {
-        String valueAsString = value.coerceValue(String.class);
-        EnrichmentConfig config = value.getConfig().getEnrichment();
-        EnrichmentUtils.TypeToKey typeToKey = new EnrichmentUtils.TypeToKey(valueAsString, lookup.getTable(), config);
-        Iterable<KeyWithContext<EnrichmentKey, HBaseContext>> keysWithContext = Iterables.transform(enrichmentTypes, typeToKey);
-        for (LookupKV<EnrichmentKey, EnrichmentValue> kv: lookup.get(keysWithContext, false)) {
-          if (kv != null && kv.getValue() != null && kv.getValue().getMetadata() != null) {
-            EnrichmentKey enrichmentKey = kv.getKey();
-            EnrichmentValue enrichmentValue = kv.getValue();
-            for (Map.Entry<String, Object> values : enrichmentValue.getMetadata().entrySet()) {
-              enriched.put(enrichmentKey.type + "." + values.getKey(), values.getValue());
-            }
-            LOG.trace("Enriched type {} => {}", enrichmentKey.type, enriched);
-          }
+        Iterable<EnrichmentKey> enrichmentKeys = toEnrichmentKeys(value, value.getConfig().getEnrichment());
+        for (EnrichmentResult result: lookup.get(enrichmentKeys)) {
+          appendEnrichment(enriched, result);
         }
       } catch (IOException e) {
-        LOG.error("Unable to retrieve value: {}", e.getMessage(), e);
+        String msg = String.format("Unable to lookup enrichments; error=%s", e.getMessage());
+        LOG.error(msg, e);
         initializeAdapter(null);
-        throw new RuntimeException("Unable to retrieve value: " + e.getMessage(), e);
+        throw new RuntimeException(msg, e);
       }
+    } else if(!isInitialized()) {
+      LOG.debug("Not initialized, cannot enrich.");
+
+    } else if(isEmpty(enrichmentTypes)) {
+      LOG.debug("No enrichments configured for field={}", value.getField());
+
+    } else if(value.getValue() == null) {
+      LOG.debug("Indicator value is unknown, nothing to enrich.");
     }
+
     LOG.trace("SimpleHBaseAdapter succeeded: {}", enriched);
     return enriched;
   }
 
   @Override
   public boolean initializeAdapter(Map<String, Object> configuration) {
-    if(lookup == null) {
-      try {
-        lookup = new EnrichmentLookup(
-                config.getConnectionFactory(),
-                config.getHBaseTable(),
-                config.getHBaseCF(),
-                new NoopAccessTracker());
-
-      } catch (IOException e) {
-        LOG.error("Unable to initialize adapter: {}", e.getMessage(), e);
-        return false;
+    try {
+      if(lookup == null) {
+        lookup = new HBaseEnrichmentLookup(config.getConnectionFactory(), config.getHBaseTable(), config.getHBaseCF());
       }
+    } catch (IOException e) {
+      LOG.error("Unable to initialize adapter: {}", e.getMessage(), e);
+      return false;
     }
+
     return true;
   }
 
@@ -140,5 +140,41 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   @Override
   public String getOutputPrefix(CacheKey value) {
     return value.getField();
+  }
+
+  private void appendEnrichment(JSONObject enriched, EnrichmentResult result) {
+    if(result == null || result.getValue() == null || result.getValue().getMetadata() == null) {
+      return; // nothing to do
+    }
+
+    EnrichmentValue enrichmentValue = result.getValue();
+    for (Map.Entry<String, Object> values : enrichmentValue.getMetadata().entrySet()) {
+      String fieldName = result.getKey().getType() + "." + values.getKey();
+      enriched.put(fieldName, values.getValue());
+    }
+
+    LOG.debug("Found {} enrichment(s) for type={} and indicator={}",
+            enrichmentValue.getMetadata().entrySet().size(), result.getKey().getType(), result.getKey().getIndicator());
+  }
+
+  private Iterable<EnrichmentKey> toEnrichmentKeys(CacheKey cacheKey, EnrichmentConfig config) {
+    List<EnrichmentKey> keys = new ArrayList<>();
+    String indicator = cacheKey.coerceValue(String.class);
+    List<String> enrichmentTypes = config
+            .getFieldToTypeMap()
+            .get(EnrichmentUtils.toTopLevelField(cacheKey.getField()));
+    for(String enrichmentType: enrichmentTypes) {
+      keys.add(new EnrichmentKey(enrichmentType, indicator));
+    }
+
+    LOG.debug("Looking for {} enrichment(s) for field={} where indicator={}", keys.size(), cacheKey.getField(), indicator);
+    return keys;
+  }
+
+  private List<String> getEnrichmentTypes(CacheKey value) {
+    EnrichmentConfig config = value.getConfig().getEnrichment();
+    return config
+            .getFieldToTypeMap()
+            .get(EnrichmentUtils.toTopLevelField(value.getField()));
   }
 }

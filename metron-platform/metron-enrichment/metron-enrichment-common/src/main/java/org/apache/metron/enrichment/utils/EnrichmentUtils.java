@@ -22,7 +22,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.lookup.handler.HBaseContext;
@@ -46,17 +45,17 @@ public class EnrichmentUtils {
   public static class TypeToKey implements Function<String, KeyWithContext<EnrichmentKey, HBaseContext>> {
     private final String indicator;
     private final EnrichmentConfig config;
-    private final Table table;
-    public TypeToKey(String indicator, Table table, EnrichmentConfig config) {
+
+    public TypeToKey(String indicator, EnrichmentConfig config) {
       this.indicator = indicator;
       this.config = config;
-      this.table = table;
     }
+
     @Nullable
     @Override
     public KeyWithContext<EnrichmentKey, HBaseContext> apply(@Nullable String enrichmentType) {
       EnrichmentKey key = new EnrichmentKey(enrichmentType, indicator);
-      HBaseContext context = new HBaseContext(table, getColumnFamily(enrichmentType, config));
+      HBaseContext context = new HBaseContext(getColumnFamily(enrichmentType, config));
       return new KeyWithContext<>(key, context);
     }
   }
@@ -68,12 +67,12 @@ public class EnrichmentUtils {
   };
 
   public static final String TYPE_TO_COLUMN_FAMILY_CONF = "typeToColumnFamily";
+
   public static String getColumnFamily(String enrichmentType, EnrichmentConfig config) {
     Object o = config.getConfig().get(TYPE_TO_COLUMN_FAMILY_CONF);
     if(o == null) {
       return null;
-    }
-    else {
+    } else {
       Map<String, String> cfMap = typeToCFs.get().get(o);
       if(cfMap == null) {
         cfMap = new HashMap<>();

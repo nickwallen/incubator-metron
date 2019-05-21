@@ -26,7 +26,10 @@ import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.MockEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.Lookup;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.handler.HBaseContext;
 import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -35,11 +38,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.HashMap;
-import java.util.Map;
 
 public class SimpleHBaseAdapterTest {
 
-  private EnrichmentLookup lookup;
   private static final String PLAYFUL_CLASSIFICATION_TYPE = "playful_classification";
   private static final String CF1_CLASSIFICATION_TYPE = "cf1";
 
@@ -86,6 +87,7 @@ public class SimpleHBaseAdapterTest {
   @Multiline
   private String sourceConfigWithCFStr;
   private JSONObject expectedMessage;
+  private EnrichmentLookup lookup;
   private SimpleHBaseAdapter adapter;
 
   @Before
@@ -94,7 +96,7 @@ public class SimpleHBaseAdapterTest {
     expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
 
     // provides the enrichment values for these tests (instead of HBase)
-    lookup = new MockEnrichmentLookup()
+    lookup = new InMemoryEnrichmentLookup()
             .withEnrichment(
                     new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3"),
                     new EnrichmentValue().withValue("orientation", "north"))
@@ -103,7 +105,7 @@ public class SimpleHBaseAdapterTest {
                     new EnrichmentValue().withValue("key", "value"));
 
     adapter = new SimpleHBaseAdapter()
-            .withEnrichmentLookup(lookup);
+            .withLookup(lookup);
     adapter.initializeAdapter(new HashMap<>());
   }
 
@@ -148,7 +150,8 @@ public class SimpleHBaseAdapterTest {
     SimpleHBaseConfig config = new SimpleHBaseConfig();
     config.withConnectionFactoryImpl(MockHBaseConnectionFactory.class.getName());
 
-    SimpleHBaseAdapter sha = new SimpleHBaseAdapter(config);
+    SimpleHBaseAdapter sha = new SimpleHBaseAdapter()
+            .withConfig(config);
     sha.initializeAdapter(null);
   }
 

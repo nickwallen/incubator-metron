@@ -38,7 +38,7 @@ import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.integration.components.ConfigUploadComponent;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
@@ -127,9 +127,9 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
     try {
       runner.start();
       kafkaComponent.writeMessages(sensorType, inputMessages);
-      ProcessorResult<List<LookupKV<EnrichmentKey, EnrichmentValue>>> result =
-              runner.process(new Processor<List<LookupKV<EnrichmentKey, EnrichmentValue>>>() {
-                List<LookupKV<EnrichmentKey, EnrichmentValue>> messages = null;
+      ProcessorResult<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>> result =
+              runner.process(new Processor<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>>() {
+                List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> messages = null;
 
                 @Override
                 public ReadinessState process(ComponentRunner runner) {
@@ -149,8 +149,8 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
                 }
 
                 @Override
-                public ProcessorResult<List<LookupKV<EnrichmentKey, EnrichmentValue>>> getResult() {
-                  ProcessorResult.Builder<List<LookupKV<EnrichmentKey,EnrichmentValue>>> builder = new ProcessorResult.Builder();
+                public ProcessorResult<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>> getResult() {
+                  ProcessorResult.Builder<List<EnrichmentResult<EnrichmentKey,EnrichmentValue>>> builder = new ProcessorResult.Builder();
                   return builder.withResult(messages).build();
                 }
               });
@@ -169,7 +169,7 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
           put("col3", "col33");
         }});
       }};
-      for (LookupKV<EnrichmentKey, EnrichmentValue> kv : result.getResult()) {
+      for (EnrichmentResult<EnrichmentKey, EnrichmentValue> kv : result.getResult()) {
         Assert.assertTrue(validIndicators.contains(kv.getKey().indicator));
         Assert.assertEquals(kv.getValue().getMetadata().get("source.type"), "dummy");
         Assert.assertNotNull(kv.getValue().getMetadata().get("timestamp"));

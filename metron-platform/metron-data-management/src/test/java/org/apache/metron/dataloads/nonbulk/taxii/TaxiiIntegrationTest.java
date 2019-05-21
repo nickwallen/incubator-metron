@@ -33,7 +33,7 @@ import org.apache.metron.dataloads.extractor.stix.StixExtractor;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.junit.*;
@@ -139,7 +139,7 @@ public class TaxiiIntegrationTest {
         EnrichmentConverter converter = new EnrichmentConverter();
         Set<String> ret = new HashSet<>();
         for(Put p : puts) {
-            LookupKV<EnrichmentKey, EnrichmentValue> kv = converter.fromPut(p, cf);
+            EnrichmentResult<EnrichmentKey, EnrichmentValue> kv = converter.fromPut(p, cf);
             if (kv.getKey().type.equals(indicatorType)) {
                 ret.add(kv.getKey().indicator);
             }

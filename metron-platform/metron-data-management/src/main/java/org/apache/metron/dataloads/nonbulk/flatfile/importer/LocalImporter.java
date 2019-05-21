@@ -26,7 +26,7 @@ import org.apache.metron.dataloads.nonbulk.flatfile.HBaseExtractorState;
 import org.apache.metron.dataloads.nonbulk.flatfile.LoadOptions;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.HbaseConverter;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.hbase.HTableProvider;
 
 import java.io.*;
@@ -110,8 +110,8 @@ public class LocalImporter extends AbstractLocalImporter<LoadOptions, HBaseExtra
                      ) throws IOException
   {
     List<Put> ret = new ArrayList<>();
-    Iterable<LookupKV> kvs = extractor.extract(line);
-    for(LookupKV kv : kvs) {
+    Iterable<EnrichmentResult> kvs = extractor.extract(line);
+    for(EnrichmentResult kv : kvs) {
       Put put = converter.toPut(cf, kv.getKey(), kv.getValue());
       ret.add(put);
     }

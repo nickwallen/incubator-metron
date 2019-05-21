@@ -24,7 +24,9 @@ import com.google.common.cache.RemovalNotification;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.TrackedEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
 import org.apache.metron.enrichment.lookup.handler.HBaseContext;
@@ -46,11 +48,14 @@ import java.util.concurrent.ExecutionException;
 public class SimpleHBaseEnrichmentFunctions {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String ACCESS_TRACKER_TYPE_CONF = "accessTracker";
-  //public static final String TABLE_PROVIDER_TYPE_CONF = "tableProviderImpl";
   public static final String CONNECTION_FACTORY_IMPL_CONF = "connectionFactoryImpl";
   private static AccessTracker tracker;
   private static HBaseConnectionFactory connectionFactory;
 
+  /**
+   * Serves as a key for the cache of {@link EnrichmentLookup} objects used
+   * to lookup the enrichment values.
+   */
   private static class Table {
     String name;
     String columnFamily;
@@ -88,7 +93,6 @@ public class SimpleHBaseEnrichmentFunctions {
     }
   }
 
-
   private static Map<String, Object> getConfig(Context context) {
     return (Map<String, Object>) context.getCapability(Context.Capabilities.GLOBAL_CONFIG).orElse(new HashMap<>());
   }
@@ -115,8 +119,16 @@ public class SimpleHBaseEnrichmentFunctions {
             .build();
   }
 
+  private static EnrichmentLookup createLookup(String tableName, String columnFamily, AccessTracker accessTracker) throws IOException {
+
+    // TODO we need to instanstiate an InMemoryEnrichmentLookup when testing
+
+    EnrichmentLookup hbaseLookup = new HBaseEnrichmentLookup(connectionFactory, tableName, columnFamily);
+    return new TrackedEnrichmentLookup(hbaseLookup, accessTracker);
+  }
+
   /**
-   * Closes the {@link EnrichmentLookup} after it has been removed from the cache.  This
+   * Closes the {@link HBaseEnrichmentLookup} after it has been removed from the cache.  This
    * ensures that the underlying resources are cleaned up.
    */
   private static class CloseEnrichmentLookup implements RemovalListener<Table, EnrichmentLookup> {
@@ -124,7 +136,7 @@ public class SimpleHBaseEnrichmentFunctions {
     public void onRemoval(RemovalNotification<Table, EnrichmentLookup> notification) {
       try {
         notification.getValue().close();
-      } catch(Exception e) {
+      } catch(Throwable e) {
         LOG.error("Failed to close EnrichmentLookup; cause={}", notification.getCause(), e);
       }
     }
@@ -158,23 +170,19 @@ public class SimpleHBaseEnrichmentFunctions {
       String enrichmentType = (String) args.get(i++);
       String indicator = (String) args.get(i++);
       String table = (String) args.get(i++);
-      String cf = (String) args.get(i++);
+      String columnFamily = (String) args.get(i++);
       if(enrichmentType == null || indicator == null) {
         return false;
       }
-      final Table key = new Table(table, cf);
-      EnrichmentLookup lookup = null;
       try {
-        lookup = enrichmentCollateralCache.get(key,
-                () -> new EnrichmentLookup(connectionFactory, key.name, key.columnFamily, tracker));
+        final Table cacheKey = new Table(table, columnFamily);
+        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey, () -> createLookup(table, columnFamily, tracker));
+        return lookup.exists(new EnrichmentKey(enrichmentType, indicator));
 
       } catch (ExecutionException e) {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return false;
-      }
-      HBaseContext hbaseContext = new HBaseContext(lookup.getTable(), cf);
-      try {
-        return lookup.exists(new EnrichmentKey(enrichmentType, indicator), hbaseContext, true);
+
       } catch (IOException e) {
         LOG.error("Unable to call exists: {}", e.getMessage(), e);
         return false;
@@ -231,26 +239,25 @@ public class SimpleHBaseEnrichmentFunctions {
       String enrichmentType = (String) args.get(i++);
       String indicator = (String) args.get(i++);
       String table = (String) args.get(i++);
-      String cf = (String) args.get(i++);
+      String columnFamily = (String) args.get(i++);
       if(enrichmentType == null || indicator == null) {
         return new HashMap<String, Object>();
       }
-      final Table key = new Table(table, cf);
-      EnrichmentLookup lookup = null;
+
       try {
-        lookup = enrichmentCollateralCache.get(key,
-                () -> new EnrichmentLookup(connectionFactory, key.name, key.columnFamily, tracker));
+        final Table cacheKey = new Table(table, columnFamily);
+        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey, () -> createLookup(table, columnFamily, tracker));
+        EnrichmentResult result = lookup.get(new EnrichmentKey(enrichmentType, indicator));
+        if(result != null && result.getValue() != null && result.getValue().getMetadata() != null) {
+          return result.getValue().getMetadata();
+        } else {
+          return new HashMap<>();
+        }
+
       } catch (ExecutionException e) {
         LOG.error("Unable to retrieve enrichmentLookup: {}", e.getMessage(), e);
         return new HashMap<String, Object>();
-      }
-      HBaseContext hbaseContext = new HBaseContext(lookup.getTable(), cf);
-      try {
-        LookupKV<EnrichmentKey, EnrichmentValue> kv = lookup.get(new EnrichmentKey(enrichmentType, indicator), hbaseContext, true);
-        if (kv != null && kv.getValue() != null && kv.getValue().getMetadata() != null) {
-          return kv.getValue().getMetadata();
-        }
-        return new HashMap<String, Object>();
+
       } catch (IOException e) {
         LOG.error("Unable to call exists: {}", e.getMessage(), e);
         return new HashMap<String, Object>();

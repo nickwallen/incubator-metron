@@ -25,7 +25,7 @@ import org.apache.hadoop.io.Text;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -80,7 +80,7 @@ public class BulkLoadMapperTest {
             EnrichmentConverter converter = new EnrichmentConverter();
             Put put = puts.get(new ImmutableBytesWritable(expectedKey.toBytes()));
             Assert.assertNotNull(puts);
-            LookupKV<EnrichmentKey, EnrichmentValue> results = converter.fromPut(put, "cf");
+            EnrichmentResult<EnrichmentKey, EnrichmentValue> results = converter.fromPut(put, "cf");
             Assert.assertEquals(results.getKey().indicator, "google.com");
             Assert.assertEquals(results.getValue().getMetadata().size(), 2);
             Assert.assertEquals(results.getValue().getMetadata().get("meta"), "foo");

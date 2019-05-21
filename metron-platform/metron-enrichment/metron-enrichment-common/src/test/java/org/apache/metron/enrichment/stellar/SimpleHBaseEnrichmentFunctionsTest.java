@@ -23,8 +23,7 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.hbase.mock.StaticMockHBaseConnectionFactory;
 import org.apache.metron.stellar.common.StellarProcessor;
 import org.apache.metron.stellar.dsl.Context;
@@ -49,12 +48,16 @@ public class SimpleHBaseEnrichmentFunctionsTest {
   @Before
   public void setup() throws Exception {
 
+    // TODO how to change the EnrichmentLookup that is used by these functions?
+
+    // TODO use the simple function resolver so dont scan?
+
     StaticMockHBaseConnectionFactory.withTable(hbaseTableName);
     Table hbaseTable = StaticMockHBaseConnectionFactory.getTable(hbaseTableName);
 
-    EnrichmentHelper.INSTANCE.load(hbaseTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
+    EnrichmentHelper.INSTANCE.load(hbaseTable, cf, new ArrayList<EnrichmentResult>() {{
       for(int i = 0;i < 5;++i) {
-        add(new LookupKV<>(new EnrichmentKey(ENRICHMENT_TYPE, "indicator" + i)
+        add(new EnrichmentResult(new EnrichmentKey(ENRICHMENT_TYPE, "indicator" + i)
                         , new EnrichmentValue(ImmutableMap.of("key" + i, "value" + i))
                 )
         );

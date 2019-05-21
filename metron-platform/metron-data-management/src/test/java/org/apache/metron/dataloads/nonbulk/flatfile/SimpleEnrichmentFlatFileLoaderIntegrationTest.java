@@ -38,7 +38,7 @@ import org.apache.metron.dataloads.hbase.mr.HBaseUtil;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.test.utils.UnitTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -331,7 +331,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -354,7 +354,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -378,7 +378,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -402,7 +402,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for(Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -429,7 +429,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -452,7 +452,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
@@ -476,7 +476,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
+    List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));

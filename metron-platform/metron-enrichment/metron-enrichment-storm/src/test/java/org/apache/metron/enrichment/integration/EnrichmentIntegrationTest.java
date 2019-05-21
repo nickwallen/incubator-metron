@@ -45,7 +45,7 @@ import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.integration.components.ConfigUploadComponent;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentBloomTrackerCreator;
 import org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions;
 import org.apache.metron.enrichment.utils.ThreatIntelUtils;
@@ -204,12 +204,12 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
     //create MockHBaseTables
     final MockHTable trackerTable = (MockHTable) MockHBaseTableProvider.addToCache(trackerHBaseTableName, cf);
     final MockHTable threatIntelTable = (MockHTable) MockHBaseTableProvider.addToCache(threatIntelTableName, cf);
-    EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
-      add(new LookupKV<>(new EnrichmentKey(MALICIOUS_IP_TYPE, "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
+    EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<EnrichmentResult<EnrichmentKey, EnrichmentValue>>() {{
+      add(new EnrichmentResult<>(new EnrichmentKey(MALICIOUS_IP_TYPE, "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
     }});
     final MockHTable enrichmentTable = (MockHTable) MockHBaseTableProvider.addToCache(enrichmentsTableName, cf);
-    EnrichmentHelper.INSTANCE.load(enrichmentTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
-      add(new LookupKV<>(new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3")
+    EnrichmentHelper.INSTANCE.load(enrichmentTable, cf, new ArrayList<EnrichmentResult<EnrichmentKey, EnrichmentValue>>() {{
+      add(new EnrichmentResult<>(new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3")
                       , new EnrichmentValue(PLAYFUL_ENRICHMENT)
               )
       );

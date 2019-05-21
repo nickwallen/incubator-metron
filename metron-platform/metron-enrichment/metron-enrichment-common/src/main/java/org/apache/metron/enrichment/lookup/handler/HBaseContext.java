@@ -17,20 +17,12 @@
  */
 package org.apache.metron.enrichment.lookup.handler;
 
-import org.apache.hadoop.hbase.client.Table;
-
 public class HBaseContext {
 
-  private Table table;
   private String columnFamily;
 
-  public HBaseContext(Table table, String columnFamily) {
-    this.table = table;
+  public HBaseContext(String columnFamily) {
     this.columnFamily = columnFamily;
-  }
-
-  public Table getTable() {
-    return table;
   }
 
   public String getColumnFamily() {

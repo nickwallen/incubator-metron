@@ -17,20 +17,23 @@
  */
 package org.apache.metron.enrichment.adapters.threatintel;
 
-import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
+import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.TrackedEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
@@ -59,12 +62,6 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
 
   @Override
   public void logAccess(CacheKey value) {
-    List<String> enrichmentTypes = value.getConfig().getThreatIntel().getFieldToTypeMap().get(value.getField());
-    if(enrichmentTypes != null) {
-      for(String enrichmentType : enrichmentTypes) {
-        lookup.getAccessTracker().logAccess(new EnrichmentKey(enrichmentType, value.coerceValue(String.class)));
-      }
-    }
   }
 
   @Override
@@ -74,22 +71,14 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
     }
     JSONObject enriched = new JSONObject();
     List<String> enrichmentTypes = value.getConfig()
-                                        .getThreatIntel().getFieldToTypeMap()
-                                        .get(EnrichmentUtils.toTopLevelField(value.getField()));
+            .getThreatIntel()
+            .getFieldToTypeMap()
+            .get(EnrichmentUtils.toTopLevelField(value.getField()));
     if(isInitialized() && enrichmentTypes != null) {
       int i = 0;
       try {
-        for (Boolean isThreat :
-                lookup.exists(Iterables.transform(enrichmentTypes
-                                                 , new EnrichmentUtils.TypeToKey(value.coerceValue(String.class)
-                                                                                , lookup.getTable()
-                                                                                , value.getConfig().getThreatIntel()
-                                                                                )
-                                                 )
-                             , false
-                             )
-            )
-        {
+        Iterable<EnrichmentKey> enrichmentKeys = toKeys(value, value.getConfig().getEnrichment());
+        for (Boolean isThreat : lookup.exists(enrichmentKeys)) {
           String enrichmentType = enrichmentTypes.get(i++);
           if (isThreat) {
             enriched.put(enrichmentType, "alert");
@@ -108,7 +97,7 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   }
 
   public boolean isInitialized() {
-    return lookup != null && lookup.getTable() != null;
+    return lookup != null && lookup.isInitialized();
   }
 
   @Override
@@ -123,6 +112,8 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
     try {
       String trackerHBaseTable = config.getTrackerHBaseTable();
       String trackerHBaseCF = config.getTrackerHBaseCF();
+
+      // TODO the connection can be created and managed within the PAT
       connection = connectionFactory.createConnection(hbaseConfig);
       PersistentAccessTracker accessTracker = new PersistentAccessTracker( hbaseTable
               , UUID.randomUUID().toString()
@@ -133,7 +124,9 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
               , config.getConnectionFactory()
               , hbaseConfig
       );
-      lookup = new EnrichmentLookup(connectionFactory, hbaseConfig, hbaseTable, config.getHBaseCF(), accessTracker);
+      EnrichmentLookup hbaseLookup = new HBaseEnrichmentLookup(connectionFactory, hbaseTable, config.getHBaseCF());
+      lookup = new TrackedEnrichmentLookup(hbaseLookup, accessTracker);
+
     } catch (IOException e) {
       LOG.error("Unable to initialize ThreatIntelAdapter", e);
       return false;
@@ -158,5 +151,19 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   @Override
   public String getOutputPrefix(CacheKey value) {
     return value.getField();
+  }
+
+  private Iterable<EnrichmentKey> toKeys(CacheKey cacheKey, EnrichmentConfig config) {
+    List<EnrichmentKey> keys = new ArrayList<>();
+    String indicator = cacheKey.coerceValue(String.class);
+    List<String> enrichmentTypes = config
+            .getFieldToTypeMap()
+            .get(EnrichmentUtils.toTopLevelField(cacheKey.getField()));
+    for(String enrichmentType: enrichmentTypes) {
+      keys.add(new EnrichmentKey(enrichmentType, indicator));
+    }
+
+    LOG.debug("Looking for {} threat enrichment(s); indicator={}", keys.size(), indicator);
+    return keys;
   }
 }

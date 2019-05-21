@@ -18,41 +18,41 @@
 
 package org.apache.metron.enrichment.lookup;
 
-import java.io.Serializable;
+import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 
-public class LookupKV<KEY_T extends LookupKey, VALUE_T extends LookupValue> implements Serializable {
-    private KEY_T key;
-    private VALUE_T value;
-    public LookupKV(KEY_T key, VALUE_T value) {
+import java.io.Serializable;
+import java.util.Objects;
+
+public class EnrichmentResult implements Serializable {
+    private EnrichmentKey key;
+    private EnrichmentValue value;
+    
+    public EnrichmentResult(EnrichmentKey key, EnrichmentValue value) {
         this.key = key;
         this.value = value;
     }
 
-    public KEY_T getKey() {
+    public EnrichmentKey getKey() {
         return key;
     }
 
-    public VALUE_T getValue() {
+    public EnrichmentValue getValue() {
         return value;
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-
-        LookupKV<?, ?> lookupKV = (LookupKV<?, ?>) o;
-
-        if (key != null ? !key.equals(lookupKV.key) : lookupKV.key != null) return false;
-        return value != null ? value.equals(lookupKV.value) : lookupKV.value == null;
-
+        if (!(o instanceof EnrichmentResult)) return false;
+        EnrichmentResult lookupKV = (EnrichmentResult) o;
+        return Objects.equals(key, lookupKV.key) &&
+                Objects.equals(value, lookupKV.value);
     }
 
     @Override
     public int hashCode() {
-        int result = key != null ? key.hashCode() : 0;
-        result = 31 * result + (value != null ? value.hashCode() : 0);
-        return result;
+        return Objects.hash(key, value);
     }
 
     @Override

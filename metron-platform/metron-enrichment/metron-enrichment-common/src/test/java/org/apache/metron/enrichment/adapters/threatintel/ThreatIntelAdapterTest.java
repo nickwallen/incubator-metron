@@ -27,8 +27,8 @@ import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
 import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
@@ -49,7 +49,7 @@ public class ThreatIntelAdapterTest {
   private String atTableName = "tracker";
   private static final String MALICIOUS_IP_TYPE = "malicious_ip";
   private final String threatIntelTableName = "threat_intel";
-  private EnrichmentLookup lookup;
+  private HBaseEnrichmentLookup lookup;
 
   /**
     {
@@ -90,23 +90,25 @@ public class ThreatIntelAdapterTest {
             .withTable(threatIntelTableName);
     Table threatIntelTable = connectionFactory.getTable(threatIntelTableName);
 
-    EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<LookupKV<EnrichmentKey, EnrichmentValue>>() {{
-      add(new LookupKV<>(new EnrichmentKey("10.0.2.3", "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
+    EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<EnrichmentResult>() {{
+      add(new EnrichmentResult(new EnrichmentKey("10.0.2.3", "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
     }});
 
-    BloomAccessTracker bat = new BloomAccessTracker(threatIntelTableName, 100, 0.03);
-    PersistentAccessTracker pat = new PersistentAccessTracker(
-            threatIntelTableName,
-            "0",
-            atTableName,
-            cf,
-            bat,
-            0L,
-            connectionFactory,
-            HBaseConfiguration.create());
-    lookup = new EnrichmentLookup(connectionFactory, threatIntelTableName, cf, pat);
-    JSONParser jsonParser = new JSONParser();
-    expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
+    // TODO this needs to be like SimpleHBaseADapterTest
+//
+//    BloomAccessTracker bat = new BloomAccessTracker(threatIntelTableName, 100, 0.03);
+//    PersistentAccessTracker pat = new PersistentAccessTracker(
+//            threatIntelTableName,
+//            "0",
+//            atTableName,
+//            cf,
+//            bat,
+//            0L,
+//            connectionFactory,
+//            HBaseConfiguration.create());
+//    lookup = new HBaseEnrichmentLookup(connectionFactory, threatIntelTableName, cf, pat);
+//    JSONParser jsonParser = new JSONParser();
+//    expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
   }
 
   @Test

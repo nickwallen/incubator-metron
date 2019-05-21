@@ -20,12 +20,11 @@ package org.apache.metron.dataloads.extractor.stix;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Iterables;
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.dataloads.extractor.ExtractorHandler;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
-import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -89,7 +88,7 @@ public class StixExtractorTest {
       try {
         ExtractorHandler handler = ExtractorHandler.load(stixConfigOnlyIPV4);
         Extractor extractor = handler.getExtractor();
-        Iterable<LookupKV> results = extractor.extract(stixDoc);
+        Iterable<EnrichmentResult> results = extractor.extract(stixDoc);
 
         Assert.assertEquals(3, Iterables.size(results));
         Assert.assertEquals("10.0.0.0", ((EnrichmentKey) (Iterables.get(results, 0).getKey())).indicator);
@@ -105,7 +104,7 @@ public class StixExtractorTest {
       try {
         ExtractorHandler handler = ExtractorHandler.load(stixConfig);
         Extractor extractor = handler.getExtractor();
-        Iterable<LookupKV> results = extractor.extract(stixDoc);
+        Iterable<EnrichmentResult> results = extractor.extract(stixDoc);
         Assert.assertEquals(3, Iterables.size(results));
         Assert.assertEquals("10.0.0.0", ((EnrichmentKey) (Iterables.get(results, 0).getKey())).indicator);
         Assert.assertEquals("10.0.0.1", ((EnrichmentKey) (Iterables.get(results, 1).getKey())).indicator);
@@ -120,7 +119,7 @@ public class StixExtractorTest {
       try {
         ExtractorHandler handler = ExtractorHandler.load(stixConfigOnlyIPV6);
         Extractor extractor = handler.getExtractor();
-        Iterable<LookupKV> results = extractor.extract(stixDoc);
+        Iterable<EnrichmentResult> results = extractor.extract(stixDoc);
         Assert.assertEquals(0, Iterables.size(results));
       }
       catch(Exception ex) {
