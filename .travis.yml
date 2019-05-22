@@ -24,29 +24,30 @@ env:
 #  - SCRIPT="mvn surefire:test@integration-tests"
   - >
     SCRIPT="mvn surefire:test@integration-tests -pl "
-      metron-platform/metron-parsing/metron-parsing-storm,
       metron-platform/metron-parsing/metron-parsers,
+      metron-platform/metron-parsing/metron-parsing-storm,
       metron-platform/metron-parsing/metron-parsers-common"
-  # - >
-  #   SCRIPT="mvn surefire:test@integration-tests -pl "
-  #     metron-platform/metron-enrichment/metron-enrichment-common/,
-  #     metron-platform/metron-enrichment/metron-enrichment-storm"
-  # - >
-  #   SCRIPT="mvn surefire:test@integration-tests -pl "
-  #     metron-stellar/stellar-zeppelin,
-  #     metron-stellar/stellar-common,
-  #     metron-stellar/stellar-3rd-party-example"
-  # - >
-  #   SCRIPT="mvn surefire:test@integration-tests -pl "
-  #     metron-analytics,
-  #     metron-analytics/metron-statistics,
-  #     metron-analytics/metron-maas-service,
-  #     metron-analytics/metron-maas-common,
-  #     metron-analytics/metron-profiler-common,
-  #     metron-analytics/metron-profiler-client,
-  #     metron-analytics/metron-profiler-repl,
-  #     metron-analytics/metron-profiler-spark,
-  #     metron-analytics/metron-profiler-storm"
+  - >
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-platform/metron-enrichment,
+      metron-platform/metron-enrichment/metron-enrichment-common,
+      metron-platform/metron-enrichment/metron-enrichment-storm"
+  - >
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-stellar/stellar-zeppelin,
+      metron-stellar/stellar-common,
+      metron-stellar/stellar-3rd-party-example"
+  - >
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-analytics,
+      metron-analytics/metron-statistics,
+      metron-analytics/metron-maas-service,
+      metron-analytics/metron-maas-common,
+      metron-analytics/metron-profiler-common,
+      metron-analytics/metron-profiler-client,
+      metron-analytics/metron-profiler-repl,
+      metron-analytics/metron-profiler-spark,
+      metron-analytics/metron-profiler-storm"
   - SCRIPT="mvn clean site --projects site-book"
   - SCRIPT="mvn test --projects metron-interface/metron-alerts"
   - SCRIPT="mvn test --projects metron-interface/metron-config"
