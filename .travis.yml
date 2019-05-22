@@ -20,10 +20,13 @@ addons:
   chrome: stable
 
 env:
-  - SCRIPT="mvn surefire:test@unit-tests -T 2C"
+#  - SCRIPT="mvn surefire:test@unit-tests -T 2C"
 #  - SCRIPT="mvn surefire:test@integration-tests"
-  - SCRIPT="mvn surefire:test@integration-tests -pl metron-platform/metron-parsing/metron-parsing-storm,metron-platform/metron-parsing/metron-parsers,metron-platform/metron-parsing/metron-parsers-common"
-  - SCRIPT="mvn surefire:test@integration-tests -pl metron-platform/metron-enrichment/metron-enrichment-common/,metron-platform/metron-enrichment/metron-enrichment-storm"
+  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-platform/metron-parsing/metron-parsing-storm,metron-platform/metron-parsing/metron-parsers,metron-platform/metron-parsing/metron-parsers-common"
+  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-platform/metron-enrichment/metron-enrichment-common/,metron-platform/metron-enrichment/metron-enrichment-storm"
+  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-stellar/stellar-zeppelin,metron-stellar/stellar-common,metron-stellar/stellar-3rd-party-example"
+  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl $(find ./metron-analytics/ -type d -maxdepth 1 | paste -s -d, -)"
+  - SCRIPT="mvn surefire:test@integration-tests -pl "
   - SCRIPT="mvn clean site --projects site-book"
   - SCRIPT="mvn test --projects metron-interface/metron-config,metron-interface/metron-alerts"
   - SCRIPT="./dev-utilities/build-utils/verify_licenses.sh"
