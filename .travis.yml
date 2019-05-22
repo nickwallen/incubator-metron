@@ -20,46 +20,51 @@ addons:
   chrome: stable
 
 env:
-#  - SCRIPT="mvn surefire:test@unit-tests -T 2C"
+  - >- # all unit tests
+    SCRIPT="mvn surefire:test@unit-tests -T 2C"
 #  - SCRIPT="mvn surefire:test@integration-tests"
   - >- # writer integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
-      metron-platform/metron-writer,
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-platform/metron-writer/metron-writer-common,
-      metron-platform/metron-writer/metron-writer-storm"
+      metron-platform/metron-writer/metron-writer-storm'
+      "
   - >- # rest integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-platform/metron-interface/metron-rest,
-      metron-platform/metron-interface/metron-rest-client"
+      metron-platform/metron-interface/metron-rest-client'
+      "
   - >- # parsing integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
-      metron-platform/metron-parsing/metron-parsers,
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-platform/metron-parsing/metron-parsing-storm,
-      metron-platform/metron-parsing/metron-parsers-common"
+      metron-platform/metron-parsing/metron-parsers-common'
+      "
   - >- # enrichment integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
-      metron-platform/metron-enrichment,
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-platform/metron-enrichment/metron-enrichment-common,
-      metron-platform/metron-enrichment/metron-enrichment-storm"
+      metron-platform/metron-enrichment/metron-enrichment-storm'
+      "
   - >- # stellar integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-stellar/stellar-zeppelin,
       metron-stellar/stellar-common,
-      metron-stellar/stellar-3rd-party-example"
+      metron-stellar/stellar-3rd-party-example'
+      "
   - >- # profiler integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-analytics/metron-profiler-common,
       metron-analytics/metron-profiler-client,
       metron-analytics/metron-profiler-repl,
       metron-analytics/metron-profiler-spark,
-      metron-analytics/metron-profiler-storm"
+      metron-analytics/metron-profiler-storm'
+      "
   - >- # other Analytics integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-analytics/metron-statistics,
       metron-analytics/metron-maas-service,
-      metron-analytics/metron-maas-common"
+      metron-analytics/metron-maas-common'
+      "
   - >- # other Platform integration tests
-    SCRIPT="mvn surefire:test@integration-tests -pl "
+    SCRIPT="mvn surefire:test@integration-tests -pl '
       metron-platform//elasticsearch-shaded
       metron-platform//metron-api
       metron-platform//metron-common
@@ -80,7 +85,8 @@ env:
       metron-platform//metron-storm-kafka
       metron-platform//metron-storm-kafka-override
       metron-platform//metron-test-utilities
-      metron-platform//metron-zookeeper"
+      metron-platform//metron-zookeeper'
+      "
   - >- # alerts ui tests
     SCRIPT="mvn test --projects metron-interface/metron-alerts"
   - >- # management ui tests
