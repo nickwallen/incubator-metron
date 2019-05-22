@@ -24,6 +24,8 @@ import com.google.common.cache.RemovalNotification;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookups;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.TrackedEnrichmentLookup;
@@ -105,7 +107,8 @@ public class SimpleHBaseEnrichmentFunctions {
     }
   }
 
-  private static synchronized void initializeConnectionFactory( Map<String, Object> config) {
+  // TODO do I really need to configure this?
+  private static synchronized void initializeConnectionFactory(Map<String, Object> config) {
     if(connectionFactory == null) {
       String connectionFactoryImpl = (String) config.getOrDefault(CONNECTION_FACTORY_IMPL_CONF, HBaseConnectionFactory.class.getName());
       connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectionFactoryImpl, new HBaseConnectionFactory());
@@ -117,14 +120,6 @@ public class SimpleHBaseEnrichmentFunctions {
             .newBuilder()
             .removalListener(new CloseEnrichmentLookup())
             .build();
-  }
-
-  private static EnrichmentLookup createLookup(String tableName, String columnFamily, AccessTracker accessTracker) throws IOException {
-
-    // TODO we need to instanstiate an InMemoryEnrichmentLookup when testing
-
-    EnrichmentLookup hbaseLookup = new HBaseEnrichmentLookup(connectionFactory, tableName, columnFamily);
-    return new TrackedEnrichmentLookup(hbaseLookup, accessTracker);
   }
 
   /**
@@ -155,12 +150,24 @@ public class SimpleHBaseEnrichmentFunctions {
           ,returns = "True if the enrichment indicator exists and false otherwise"
           )
   public static class EnrichmentExists implements StellarFunction {
+
     boolean initialized = false;
     private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = createCache();
+    private EnrichmentLookupCreator creator;
+
+    public EnrichmentExists() {
+      this.creator = EnrichmentLookups.TRACKED;
+    }
+
+    public EnrichmentExists withEnrichmentLookupCreator(EnrichmentLookupCreator creator) {
+      this.creator = creator;
+      return this;
+    }
 
     @Override
     public Object apply(List<Object> args, Context context) throws ParseException {
       if(!initialized) {
+        LOG.debug("ENRICHMENT_EXISTS not initialized");
         return false;
       }
       if(args.size() != 4) {
@@ -171,12 +178,14 @@ public class SimpleHBaseEnrichmentFunctions {
       String indicator = (String) args.get(i++);
       String table = (String) args.get(i++);
       String columnFamily = (String) args.get(i++);
+
       if(enrichmentType == null || indicator == null) {
         return false;
       }
       try {
         final Table cacheKey = new Table(table, columnFamily);
-        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey, () -> createLookup(table, columnFamily, tracker));
+        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey,
+                () -> creator.create(connectionFactory, table, columnFamily, tracker));
         return lookup.exists(new EnrichmentKey(enrichmentType, indicator));
 
       } catch (ExecutionException e) {
@@ -195,13 +204,13 @@ public class SimpleHBaseEnrichmentFunctions {
         Map<String, Object> config = getConfig(context);
         initializeConnectionFactory(config);
         initializeTracker(config, connectionFactory);
+
       } catch (IOException e) {
         LOG.error("Unable to initialize ENRICHMENT.EXISTS: {}", e.getMessage(), e);
-      }
-      finally{
+
+      } finally{
         initialized = true;
       }
-
     }
 
     @Override
@@ -209,6 +218,11 @@ public class SimpleHBaseEnrichmentFunctions {
       return initialized;
     }
 
+    @Override
+    public void close() {
+      enrichmentCollateralCache.invalidateAll();
+      enrichmentCollateralCache.cleanUp();
+    }
   }
 
   @Stellar(name="GET"
@@ -226,10 +240,21 @@ public class SimpleHBaseEnrichmentFunctions {
   public static class EnrichmentGet implements StellarFunction {
     boolean initialized = false;
     private static Cache<Table, EnrichmentLookup> enrichmentCollateralCache = createCache();
+    private EnrichmentLookupCreator creator;
+
+    public EnrichmentGet() {
+      this.creator = EnrichmentLookups.TRACKED;
+    }
+
+    public EnrichmentGet withEnrichmentLookupCreator(EnrichmentLookupCreator creator) {
+      this.creator = creator;
+      return this;
+    }
 
     @Override
     public Object apply(List<Object> args, Context context) throws ParseException {
       if(!initialized) {
+        LOG.debug("ENRICHMENT_GET not initialized");
         return false;
       }
       if(args.size() != 4) {
@@ -246,7 +271,8 @@ public class SimpleHBaseEnrichmentFunctions {
 
       try {
         final Table cacheKey = new Table(table, columnFamily);
-        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey, () -> createLookup(table, columnFamily, tracker));
+        EnrichmentLookup lookup = enrichmentCollateralCache.get(cacheKey,
+                () -> creator.create(connectionFactory, table, columnFamily, tracker));
         EnrichmentResult result = lookup.get(new EnrichmentKey(enrichmentType, indicator));
         if(result != null && result.getValue() != null && result.getValue().getMetadata() != null) {
           return result.getValue().getMetadata();
@@ -272,10 +298,15 @@ public class SimpleHBaseEnrichmentFunctions {
         initializeTracker(config, connectionFactory);
       } catch (IOException e) {
         LOG.error("Unable to initialize ENRICHMENT.GET: {}", e.getMessage(), e);
-      }
-      finally{
+      } finally{
         initialized = true;
       }
+    }
+
+    @Override
+    public void close() {
+      enrichmentCollateralCache.invalidateAll();
+      enrichmentCollateralCache.cleanUp();
     }
 
     @Override
