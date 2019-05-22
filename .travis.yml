@@ -22,12 +22,34 @@ addons:
 env:
 #  - SCRIPT="mvn surefire:test@unit-tests -T 2C"
 #  - SCRIPT="mvn surefire:test@integration-tests"
-  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-platform/metron-parsing/metron-parsing-storm,metron-platform/metron-parsing/metron-parsers,metron-platform/metron-parsing/metron-parsers-common"
-  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-platform/metron-enrichment/metron-enrichment-common/,metron-platform/metron-enrichment/metron-enrichment-storm"
-  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl metron-stellar/stellar-zeppelin,metron-stellar/stellar-common,metron-stellar/stellar-3rd-party-example"
-  - SCRIPT="mvn surefire:test@unit-tests surefire:test@integration-tests -pl $(find ./metron-analytics/ -type d -maxdepth 1 | paste -s -d, -)"
+  - >
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-platform/metron-parsing/metron-parsing-storm,
+      metron-platform/metron-parsing/metron-parsers,
+      metron-platform/metron-parsing/metron-parsers-common"
+  # - >
+  #   SCRIPT="mvn surefire:test@integration-tests -pl "
+  #     metron-platform/metron-enrichment/metron-enrichment-common/,
+  #     metron-platform/metron-enrichment/metron-enrichment-storm"
+  # - >
+  #   SCRIPT="mvn surefire:test@integration-tests -pl "
+  #     metron-stellar/stellar-zeppelin,
+  #     metron-stellar/stellar-common,
+  #     metron-stellar/stellar-3rd-party-example"
+  # - >
+  #   SCRIPT="mvn surefire:test@integration-tests -pl "
+  #     metron-analytics,
+  #     metron-analytics/metron-statistics,
+  #     metron-analytics/metron-maas-service,
+  #     metron-analytics/metron-maas-common,
+  #     metron-analytics/metron-profiler-common,
+  #     metron-analytics/metron-profiler-client,
+  #     metron-analytics/metron-profiler-repl,
+  #     metron-analytics/metron-profiler-spark,
+  #     metron-analytics/metron-profiler-storm"
   - SCRIPT="mvn clean site --projects site-book"
-  - SCRIPT="mvn test --projects metron-interface/metron-config,metron-interface/metron-alerts"
+  - SCRIPT="mvn test --projects metron-interface/metron-alerts"
+  - SCRIPT="mvn test --projects metron-interface/metron-config"
   - SCRIPT="./dev-utilities/build-utils/verify_licenses.sh"
 
 install: true
@@ -46,21 +68,7 @@ install:
   - time mvn install -T 2C -q -DskipTests=true -Dmaven.javadoc.skip=true -B -V
 
 script:
-#  - time $SCRIPT
-  - >
-    mvn surefire:test@unit-tests surefire:test@integration-tests -pl
-      metron-platform/metron-parsing/metron-parsers,
-      metron-platform/metron-parsing/metron-parsers-common,
-      metron-platform/metron-parsing/metron-parsing-storm
-  - >
-    mvn surefire:test@unit-tests surefire:test@integration-tests -pl
-      metron-platform/metron-enrichment/metron-enrichment-common/,
-      metron-platform/metron-enrichment/metron-enrichment-storm
-  - >
-    mvn surefire:test@unit-tests surefire:test@integration-tests -pl
-        metron-stellar/stellar-common,
-        metron-stellar/stellar-zeppelin,
-        metron-stellar/stellar-3rd-party-example
+  - time $SCRIPT
 
 matrix:
   fast_finish: true
