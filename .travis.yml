@@ -22,36 +22,73 @@ addons:
 env:
 #  - SCRIPT="mvn surefire:test@unit-tests -T 2C"
 #  - SCRIPT="mvn surefire:test@integration-tests"
-  - >
+  - >- # writer integration tests
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-platform/metron-writer,
+      metron-platform/metron-writer/metron-writer-common,
+      metron-platform/metron-writer/metron-writer-storm"
+  - >- # rest integration tests
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-platform/metron-interface/metron-rest,
+      metron-platform/metron-interface/metron-rest-client"
+  - >- # parsing integration tests
     SCRIPT="mvn surefire:test@integration-tests -pl "
       metron-platform/metron-parsing/metron-parsers,
       metron-platform/metron-parsing/metron-parsing-storm,
       metron-platform/metron-parsing/metron-parsers-common"
-  - >
+  - >- # enrichment integration tests
     SCRIPT="mvn surefire:test@integration-tests -pl "
       metron-platform/metron-enrichment,
       metron-platform/metron-enrichment/metron-enrichment-common,
       metron-platform/metron-enrichment/metron-enrichment-storm"
-  - >
+  - >- # stellar integration tests
     SCRIPT="mvn surefire:test@integration-tests -pl "
       metron-stellar/stellar-zeppelin,
       metron-stellar/stellar-common,
       metron-stellar/stellar-3rd-party-example"
-  - >
+  - >- # profiler integration tests
     SCRIPT="mvn surefire:test@integration-tests -pl "
-      metron-analytics,
-      metron-analytics/metron-statistics,
-      metron-analytics/metron-maas-service,
-      metron-analytics/metron-maas-common,
       metron-analytics/metron-profiler-common,
       metron-analytics/metron-profiler-client,
       metron-analytics/metron-profiler-repl,
       metron-analytics/metron-profiler-spark,
       metron-analytics/metron-profiler-storm"
-  - SCRIPT="mvn clean site --projects site-book"
-  - SCRIPT="mvn test --projects metron-interface/metron-alerts"
-  - SCRIPT="mvn test --projects metron-interface/metron-config"
-  - SCRIPT="./dev-utilities/build-utils/verify_licenses.sh"
+  - >- # other Analytics integration tests
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-analytics/metron-statistics,
+      metron-analytics/metron-maas-service,
+      metron-analytics/metron-maas-common"
+  - >- # other Platform integration tests
+    SCRIPT="mvn surefire:test@integration-tests -pl "
+      metron-platform//elasticsearch-shaded
+      metron-platform//metron-api
+      metron-platform//metron-common
+      metron-platform//metron-common-streaming
+      metron-platform//metron-data-management
+      metron-platform//metron-elasticsearch
+      metron-platform//metron-enrichment
+      metron-platform//metron-hbase
+      metron-platform//metron-hbase-client
+      metron-platform//metron-hbase-server
+      metron-platform//metron-indexing
+      metron-platform//metron-integration-test
+      metron-platform//metron-job
+      metron-platform//metron-management
+      metron-platform//metron-pcap
+      metron-platform//metron-pcap-backend
+      metron-platform//metron-solr
+      metron-platform//metron-storm-kafka
+      metron-platform//metron-storm-kafka-override
+      metron-platform//metron-test-utilities
+      metron-platform//metron-zookeeper"
+  - >- # alerts ui tests
+    SCRIPT="mvn test --projects metron-interface/metron-alerts"
+  - >- # management ui tests
+    SCRIPT="mvn test --projects metron-interface/metron-config"
+  - >- # site book
+    SCRIPT="mvn clean site --projects site-book"
+  - >- # license check
+    SCRIPT="./dev-utilities/build-utils/verify_licenses.sh"
 
 install: true
 language: java
