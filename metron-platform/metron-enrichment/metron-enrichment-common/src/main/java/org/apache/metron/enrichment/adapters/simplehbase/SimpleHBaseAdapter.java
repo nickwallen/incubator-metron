@@ -40,22 +40,13 @@ import java.util.List;
 import java.util.Map;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.collections4.CollectionUtils.isNotEmpty;
 
 public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializable {
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private SimpleHBaseConfig config;
   private EnrichmentLookup lookup;
-  private HBaseConnectionFactory connectionFactory;
 
   public SimpleHBaseAdapter() {
-    this.connectionFactory = new HBaseConnectionFactory();
-  }
-
-  // TODO where is this called from?
-  public SimpleHBaseAdapter withConnectionFactory(HBaseConnectionFactory connectionFactory) {
-    this.connectionFactory = connectionFactory;
-    return this;
   }
 
   public SimpleHBaseAdapter withLookup(EnrichmentLookup lookup) {
@@ -78,13 +69,22 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
 
   @Override
   public JSONObject enrich(CacheKey value) {
-    JSONObject enriched = new JSONObject();
     if(!isInitialized()) {
       initializeAdapter(null);
     }
 
+    JSONObject enriched = new JSONObject();
     List<String> enrichmentTypes = getEnrichmentTypes(value);
-    if(isInitialized() && isNotEmpty(enrichmentTypes) && value.getValue() != null) {
+    if(!isInitialized()) {
+      LOG.error("Not initialized, cannot enrich.");
+
+    } else if(isEmpty(enrichmentTypes)) {
+      LOG.debug("No enrichments configured for field={}", value.getField());
+
+    } else if(value.getValue() == null) {
+      LOG.debug("Enrichment indicator value is unknown, cannot enrich.");
+
+    } else {
       try {
         Iterable<EnrichmentKey> enrichmentKeys = toEnrichmentKeys(value, value.getConfig().getEnrichment());
         for (EnrichmentResult result: lookup.get(enrichmentKeys)) {
@@ -96,14 +96,6 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
         initializeAdapter(null);
         throw new RuntimeException(msg, e);
       }
-    } else if(!isInitialized()) {
-      LOG.debug("Not initialized, cannot enrich.");
-
-    } else if(isEmpty(enrichmentTypes)) {
-      LOG.debug("No enrichments configured for field={}", value.getField());
-
-    } else if(value.getValue() == null) {
-      LOG.debug("Indicator value is unknown, nothing to enrich.");
     }
 
     LOG.trace("SimpleHBaseAdapter succeeded: {}", enriched);

@@ -18,7 +18,6 @@
 package org.apache.metron.enrichment.adapters.simplehbase;
 
 
-import com.google.common.collect.ImmutableMap;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
 import org.apache.metron.common.utils.JSONUtils;
@@ -29,16 +28,16 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
 import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
-import org.mockito.Mockito;
 
 import java.io.IOException;
 import java.util.HashMap;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 public class SimpleHBaseAdapterTest {
   private static final String WHITELIST_ENRICHMENT = "whitelist";
