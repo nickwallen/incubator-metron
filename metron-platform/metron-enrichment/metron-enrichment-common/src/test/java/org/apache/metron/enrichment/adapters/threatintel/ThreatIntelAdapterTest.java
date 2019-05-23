@@ -18,149 +18,94 @@
 package org.apache.metron.enrichment.adapters.threatintel;
 
 import org.adrianwalker.multilinestring.Multiline;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.log4j.Level;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.enrichment.cache.CacheKey;
-import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
-import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
-import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
-import org.apache.metron.test.utils.UnitTestHelper;
+import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
 import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 
 
 public class ThreatIntelAdapterTest {
 
-  private String cf = "cf";
-  private String atTableName = "tracker";
-  private static final String MALICIOUS_IP_TYPE = "malicious_ip";
-  private final String threatIntelTableName = "threat_intel";
-  private HBaseEnrichmentLookup lookup;
+  private InMemoryEnrichmentLookup lookup;
+  private ThreatIntelAdapter adapter;
+  private SensorEnrichmentConfig config;
 
   /**
-    {
-    "10.0.2.3":"alert"
-    }
+   * {
+   *   "enrichment": {
+   *   },
+   *   "threatIntel": {
+   *     "fieldMap": {
+   *       "hbaseThreatIntel": ["ip_dst_addr" ]
+   *     },
+   *     "fieldToTypeMap": {
+   *       "ip_dst_addr": [ "blacklist" ]
+   *     }
+   *   }
+   * }
    */
   @Multiline
-  private String expectedMessageString;
-
-  /**
-    {
-      "enrichment": {
-        "fieldMap": {
-          "geo": ["ip_dst_addr", "ip_src_addr"],
-          "host": ["host"]
-        }
-      },
-      "threatIntel" : {
-        "fieldMap": {
-          "hbaseThreatIntel": ["ip_dst_addr", "ip_src_addr"]
-        },
-        "fieldToTypeMap": {
-          "ip_dst_addr" : [ "10.0.2.3" ],
-          "ip_src_addr" : [ "malicious_ip" ]
-        }
-      }
-    }
-   */
-  @Multiline
-  private static String sourceConfigStr;
-
-  private JSONObject expectedMessage;
+  private static String configJson;
 
   @Before
   public void setup() throws Exception {
-    MockHBaseConnectionFactory connectionFactory = new MockHBaseConnectionFactory()
-            .withTable(atTableName)
-            .withTable(threatIntelTableName);
-    Table threatIntelTable = connectionFactory.getTable(threatIntelTableName);
+    // deserialize the enrichment configuration
+    config = JSONUtils.INSTANCE.load(configJson, SensorEnrichmentConfig.class);
 
-    EnrichmentHelper.INSTANCE.load(threatIntelTable, cf, new ArrayList<EnrichmentResult>() {{
-      add(new EnrichmentResult(new EnrichmentKey("10.0.2.3", "10.0.2.3"), new EnrichmentValue(new HashMap<>())));
-    }});
+    // create a 'blacklist' enrichment where the indicator is the IP address
+    lookup = new InMemoryEnrichmentLookup()
+            .withEnrichment(
+                    new EnrichmentKey("blacklist", "10.0.2.3"),
+                    new EnrichmentValue());
 
-    // TODO this needs to be like SimpleHBaseADapterTest
-//
-//    BloomAccessTracker bat = new BloomAccessTracker(threatIntelTableName, 100, 0.03);
-//    PersistentAccessTracker pat = new PersistentAccessTracker(
-//            threatIntelTableName,
-//            "0",
-//            atTableName,
-//            cf,
-//            bat,
-//            0L,
-//            connectionFactory,
-//            HBaseConfiguration.create());
-//    lookup = new HBaseEnrichmentLookup(connectionFactory, threatIntelTableName, cf, pat);
-//    JSONParser jsonParser = new JSONParser();
-//    expectedMessage = (JSONObject) jsonParser.parse(expectedMessageString);
+    // initialize the adapter under test
+    adapter = new ThreatIntelAdapter()
+            .withLookup(lookup);
+    adapter.initializeAdapter(new HashMap<>());
   }
 
   @Test
-  public void testEnrich() throws Exception {
-    ThreatIntelAdapter tia = new ThreatIntelAdapter();
-    tia.lookup = lookup;
-    SensorEnrichmentConfig broSc = JSONUtils.INSTANCE.load(sourceConfigStr, SensorEnrichmentConfig.class);
-    JSONObject actualMessage = tia.enrich(new CacheKey("ip_dst_addr", "10.0.2.3", broSc));
-    Assert.assertNotNull(actualMessage);
-    Assert.assertEquals(expectedMessage, actualMessage);
+  public void testBlacklistHit() {
+    JSONObject actual = adapter.enrich(new CacheKey("ip_dst_addr", "10.0.2.3", config));
+
+    // expect a hit on the whitelist
+    JSONObject expected = new JSONObject();
+    expected.put("blacklist", "alert");
+    Assert.assertEquals(expected, actual);
   }
 
   @Test
-  public void testEnrichNonString() throws Exception {
-    ThreatIntelAdapter tia = new ThreatIntelAdapter();
-    tia.lookup = lookup;
-    SensorEnrichmentConfig broSc = JSONUtils.INSTANCE.load(sourceConfigStr, SensorEnrichmentConfig.class);
-    JSONObject actualMessage = tia.enrich(new CacheKey("ip_dst_addr", "10.0.2.3", broSc));
-    Assert.assertNotNull(actualMessage);
-    Assert.assertEquals(expectedMessage, actualMessage);
+  public void testMiss() {
+    JSONObject actual = adapter.enrich(new CacheKey("ip_dst_addr", "4.4.4.4", config));
 
-    actualMessage = tia.enrich(new CacheKey("ip_dst_addr", 10L, broSc));
-    Assert.assertEquals(actualMessage,new JSONObject());
+    // not a known IP in either the whitelist or the blacklist
+    JSONObject expected = new JSONObject();
+    Assert.assertEquals(expected, actual);
   }
 
   @Test
-  public void testInitializeAdapter() {
-    String cf = "cf";
-    String table = "threatintel";
-    String trackCf = "cf";
-    String trackTable = "Track";
-    double falsePositive = 0.03;
-    int expectedInsertion = 1;
-    long millionseconds = (long) 0.1;
+  public void testMissWithNonStringValue() {
+    JSONObject actual = adapter.enrich(new CacheKey("ip_dst_addr", 10L, config));
 
-    ThreatIntelConfig config = new ThreatIntelConfig();
-    config.withHBaseCF(cf);
-    config.withHBaseTable(table);
-    config.withExpectedInsertions(expectedInsertion);
-    config.withFalsePositiveRate(falsePositive);
-    config.withMillisecondsBetweenPersists(millionseconds);
-    config.withTrackerHBaseCF(trackCf);
-    config.withTrackerHBaseTable(trackTable);
-    //config.withProviderImpl(ExceptionProvider.class.getName());
-
-
-    ThreatIntelAdapter tia = new ThreatIntelAdapter(config);
-    UnitTestHelper.setLog4jLevel(ThreatIntelAdapter.class, Level.FATAL);
-    tia.initializeAdapter(null);
-    UnitTestHelper.setLog4jLevel(ThreatIntelAdapter.class, Level.ERROR);
-    Assert.assertFalse(tia.isInitialized());
+    // not a known IP in either the whitelist or the blacklist
+    JSONObject expected = new JSONObject();
+    Assert.assertEquals(expected, actual);
   }
 
+  @Test
+  public void testNoEnrichmentDefined() {
+    JSONObject actual = adapter.enrich(new CacheKey("username", "ada_lovelace", config));
 
+    // no enrichment defined for the field 'username'
+    JSONObject expected = new JSONObject();
+    Assert.assertEquals(expected, actual);
+  }
 }

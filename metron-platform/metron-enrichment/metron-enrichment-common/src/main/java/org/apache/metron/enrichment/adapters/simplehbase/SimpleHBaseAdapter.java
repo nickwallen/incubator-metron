@@ -27,7 +27,6 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
-import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,17 +84,25 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
       LOG.debug("Enrichment indicator value is unknown, cannot enrich.");
 
     } else {
-      try {
-        Iterable<EnrichmentKey> enrichmentKeys = toEnrichmentKeys(value, value.getConfig().getEnrichment());
-        for (EnrichmentResult result: lookup.get(enrichmentKeys)) {
-          appendEnrichment(enriched, result);
-        }
-      } catch (IOException e) {
-        String msg = String.format("Unable to lookup enrichments; error=%s", e.getMessage());
-        LOG.error(msg, e);
-        initializeAdapter(null);
-        throw new RuntimeException(msg, e);
+      enriched = doEnrich(value);
+    }
+
+    return enriched;
+  }
+
+  private JSONObject doEnrich(CacheKey value) {
+    JSONObject enriched = new JSONObject();
+    try {
+      Iterable<EnrichmentKey> enrichmentKeys = toEnrichmentKeys(value, value.getConfig().getEnrichment());
+      for (EnrichmentResult result: lookup.get(enrichmentKeys)) {
+        appendEnrichment(enriched, result);
       }
+
+    } catch (IOException e) {
+      String msg = String.format("Unable to lookup enrichments; error=%s", e.getMessage());
+      LOG.error(msg, e);
+      initializeAdapter(null);
+      throw new RuntimeException(msg, e);
     }
 
     LOG.trace("SimpleHBaseAdapter succeeded: {}", enriched);
@@ -159,7 +166,8 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
       keys.add(new EnrichmentKey(enrichmentType, indicator));
     }
 
-    LOG.debug("Looking for {} enrichment(s) for field={} where indicator={}", keys.size(), cacheKey.getField(), indicator);
+    LOG.debug("Looking for {} enrichment(s) for field={} where indicator={}",
+            keys.size(), cacheKey.getField(), indicator);
     return keys;
   }
 
