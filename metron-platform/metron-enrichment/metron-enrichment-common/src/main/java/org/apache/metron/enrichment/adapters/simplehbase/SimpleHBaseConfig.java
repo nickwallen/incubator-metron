@@ -21,17 +21,10 @@ import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.Serializable;
 
-
 public class SimpleHBaseConfig implements Serializable {
   private String hBaseTable;
   private String hBaseCF;
   private HBaseConnectionFactory connectionFactory = new HBaseConnectionFactory();
-  public String getHBaseTable() {
-    return hBaseTable;
-  }
-  public String getHBaseCF() {
-    return hBaseCF;
-  }
 
   public HBaseConnectionFactory getConnectionFactory() {
     return connectionFactory;
@@ -42,9 +35,17 @@ public class SimpleHBaseConfig implements Serializable {
     return this;
   }
 
+  public String getHBaseTable() {
+    return hBaseTable;
+  }
+
   public SimpleHBaseConfig withHBaseTable(String hBaseTable) {
     this.hBaseTable = hBaseTable;
     return this;
+  }
+
+  public String getHBaseCF() {
+    return hBaseCF;
   }
 
   public SimpleHBaseConfig withHBaseCF(String cf) {

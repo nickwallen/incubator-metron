@@ -18,7 +18,6 @@
 
 package org.apache.metron.enrichment.adapters.simplehbase;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.metron.common.configuration.enrichment.EnrichmentConfig;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
@@ -53,6 +52,7 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializa
     this.connectionFactory = new HBaseConnectionFactory();
   }
 
+  // TODO where is this called from?
   public SimpleHBaseAdapter withConnectionFactory(HBaseConnectionFactory connectionFactory) {
     this.connectionFactory = connectionFactory;
     return this;

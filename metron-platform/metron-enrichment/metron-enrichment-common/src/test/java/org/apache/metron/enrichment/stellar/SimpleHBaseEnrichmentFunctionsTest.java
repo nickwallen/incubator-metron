@@ -19,19 +19,15 @@
 package org.apache.metron.enrichment.stellar;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentLookups;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
 import org.apache.metron.hbase.mock.StaticMockHBaseConnectionFactory;
 import org.apache.metron.stellar.common.StellarProcessor;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.DefaultVariableResolver;
 import org.apache.metron.stellar.dsl.ParseException;
-import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.apache.metron.stellar.dsl.VariableResolver;
 import org.apache.metron.stellar.dsl.functions.resolver.FunctionResolver;
 import org.apache.metron.stellar.dsl.functions.resolver.SimpleFunctionResolver;
@@ -39,16 +35,14 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentGet;
-import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentExists;
 import static com.google.common.collect.ImmutableMap.of;
 import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.CONNECTION_FACTORY_IMPL_CONF;
+import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentExists;
+import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentGet;
 
 public class SimpleHBaseEnrichmentFunctionsTest {
   private static final String ENRICHMENT_TYPE = "et";
@@ -73,14 +67,16 @@ public class SimpleHBaseEnrichmentFunctionsTest {
             .withEnrichment(new EnrichmentKey(ENRICHMENT_TYPE, "indicator3"), new EnrichmentValue(of("key3", "value3")))
             .withEnrichment(new EnrichmentKey(ENRICHMENT_TYPE, "indicator4"), new EnrichmentValue(of("key4", "value4")));
 
+    EnrichmentLookupCreator lookupCreator = (connFactory, tableName, columnFamily, accessTracker) -> lookup;
+
     // the ENRICHMENT_EXIST function to test
     existsFunction = new EnrichmentExists()
-            .withEnrichmentLookupCreator(((connFactory, tableName, columnFamily, accessTracker) -> lookup));
+            .withEnrichmentLookupCreator(lookupCreator);
     existsFunction.initialize(context);
 
     // the ENRICHMENT_GET function to test
     getFunction = new EnrichmentGet()
-            .withEnrichmentLookupCreator(((connFactory, tableName, columnFamily, accessTracker) -> lookup));
+            .withEnrichmentLookupCreator(lookupCreator);
     getFunction.initialize(context);
   }
 
@@ -99,38 +95,34 @@ public class SimpleHBaseEnrichmentFunctionsTest {
 
   @Test
   public void testExists() {
+    // 'indicator0' exists, so ENRICHMENT_EXISTS('et','indicator0','enrichments','cf') == true
     List<Object> args = Arrays.asList("et", "indicator0", "enrichments", "cf");
     Object result = existsFunction.apply(args, context);
-
-    // 'indicator0' exists
     Assert.assertEquals(true, result);
   }
 
   @Test
   public void testNotExists() {
+    // 'indicator99' does not exist, so ENRICHMENT_EXISTS('et','indicator99','enrichments','cf') == false
     List<Object> args = Arrays.asList("et", "indicator99", "enrichments", "cf");
     Object result = existsFunction.apply(args, context);
-
-    // 'indicator99' does not exist
     Assert.assertEquals(false, result);
   }
 
   @Test
   public void testGet() {
+    // 'indicator0' exists, so ENRICHMENT_GET('et','indicator0','enrichments','cf') == { "key0": "value0" }
     List<Object> args = Arrays.asList("et", "indicator0", "enrichments", "cf");
     Object result = getFunction.apply(args, context);
-
-    // 'indicator0' exists
     Map<String, Object> out = (Map<String, Object>) result;
     Assert.assertEquals("value0", out.get("key0"));
   }
 
   @Test
   public void testGetMiss() {
+    // 'indicator99' does not exist, so ENRICHMENT_GET('et','indicator99','enrichments','cf') == { }
     List<Object> args = Arrays.asList("et", "indicator99", "enrichments", "cf");
     Object result = getFunction.apply(args, context);
-
-    // 'indicator99' does not exist
     Map<String, Object> out = (Map<String, Object>) result;
     Assert.assertTrue(out.isEmpty());
   }
