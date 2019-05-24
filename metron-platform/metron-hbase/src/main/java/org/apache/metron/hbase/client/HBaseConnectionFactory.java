@@ -35,6 +35,7 @@ public class HBaseConnectionFactory {
     return ConnectionFactory.createConnection(configuration);
   }
 
+  // TODO don't pass the instantiated default use () -> new HBaseConnectionFactory()
   public static HBaseConnectionFactory getConnectionFactory(String factoryImpl, HBaseConnectionFactory defaultImpl) {
     if(factoryImpl == null || factoryImpl.length() == 0 || factoryImpl.charAt(0) == '$') {
       return defaultImpl;

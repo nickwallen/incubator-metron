@@ -57,6 +57,7 @@ public class SimpleHBaseEnrichmentWriterTest {
   public void setupMockTable() {
     MockHBaseTableProvider.addToCache(TABLE_NAME, TABLE_CF);
   }
+
   @Test
   public void testBatchOneNormalPath() throws Exception {
     final String sensorType = "dummy";
