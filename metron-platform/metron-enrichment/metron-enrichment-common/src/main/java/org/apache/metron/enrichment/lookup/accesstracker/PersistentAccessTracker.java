@@ -124,7 +124,7 @@ public class PersistentAccessTracker implements AccessTracker {
                                   , AccessTracker underlyingTracker
                                   , long maxMillisecondsBetweenPersists
                                   , HBaseConnectionFactory connectionFactory
-                                  ,  Configuration configuration
+                                  , Configuration configuration
                                   )
     {
         this.containerName = containerName;

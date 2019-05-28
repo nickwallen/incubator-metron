@@ -17,20 +17,18 @@
  */
 package org.apache.metron.enrichment.converter;
 
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+/**
+ * Creates an {@link EnrichmentConverter}.
+ */
+public interface EnrichmentConverterCreator {
 
-import java.io.IOException;
+  // TODO should this return an HBaseConverter instead?
 
-public enum EnrichmentHelper {
-    INSTANCE;
+  // TODO change name of converter to something else?
 
-    public void load(String tableName, String cf, Iterable<EnrichmentResult> results) throws IOException {
-        EnrichmentConverter converter = new EnrichmentConverter(tableName);
-        for(EnrichmentResult result : results) {
-            converter.put(cf, result.getKey(), result.getValue());
-        }
-    }
+  /**
+   * @param tableName The name of the HBase table.
+   * @return The {@link EnrichmentConverter} that was created.
+   */
+  EnrichmentConverter create(String tableName);
 }

@@ -20,11 +20,16 @@ package org.apache.metron.enrichment.converter;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
 import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -35,14 +40,44 @@ import java.util.Map;
 import java.util.NavigableMap;
 
 public class EnrichmentConverter implements HbaseConverter<EnrichmentKey, EnrichmentValue> {
-  public static Function<Cell, Map.Entry<byte[], byte[]>> CELL_TO_ENTRY  = new Function<Cell, Map.Entry<byte[], byte[]>>() {
 
+  private Connection connection;
+  private Table table;
+
+  public static Function<Cell, Map.Entry<byte[], byte[]>> CELL_TO_ENTRY  = new Function<Cell, Map.Entry<byte[], byte[]>>() {
     @Nullable
     @Override
     public Map.Entry<byte[], byte[]> apply(@Nullable Cell cell) {
       return new AbstractMap.SimpleEntry<>(cell.getQualifierArray(), cell.getValueArray());
     }
   };
+
+  public EnrichmentConverter() {
+    // necessary to allow the BulkLoadMapper to instantiate a converter
+  }
+
+  public EnrichmentConverter(String tableName) {
+    this(tableName, new HBaseConnectionFactory());
+  }
+
+  public EnrichmentConverter(String tableName, HBaseConnectionFactory connectionFactory) {
+    try {
+      connection = connectionFactory.createConnection(HBaseConfiguration.create());
+      table = connection.getTable(TableName.valueOf(tableName));
+    } catch(IOException e) {
+      throw new RuntimeException("Unable to connect to HBase", e);
+    }
+  }
+
+  @Override
+  public void close() throws IOException {
+    if(table != null) {
+      table.close();
+    }
+    if(connection != null) {
+      connection.close();
+    }
+  }
 
   @Override
   public Put toPut(String columnFamily, EnrichmentKey key, EnrichmentValue values) throws IOException {
@@ -54,12 +89,18 @@ public class EnrichmentConverter implements HbaseConverter<EnrichmentKey, Enrich
     return put;
   }
 
-  public EnrichmentResult fromPut(Put put, String columnFamily, EnrichmentKey key, EnrichmentValue value) throws IOException {
-    key.fromBytes(put.getRow());
-    byte[] cf = Bytes.toBytes(columnFamily);
-    value.fromColumns(Iterables.transform(put.getFamilyCellMap().get(cf), CELL_TO_ENTRY));
-    return new EnrichmentResult(key, value);
+  @Override
+  public void put(String columnFamily, EnrichmentKey key, EnrichmentValue values) throws IOException {
+    Put put = toPut(columnFamily, key, values);
+    table.put(put);
   }
+
+//  public EnrichmentResult fromPut(Put put, String columnFamily, EnrichmentKey key, EnrichmentValue value) throws IOException {
+//    key.fromBytes(put.getRow());
+//    byte[] cf = Bytes.toBytes(columnFamily);
+//    value.fromColumns(Iterables.transform(put.getFamilyCellMap().get(cf), CELL_TO_ENTRY));
+//    return new EnrichmentResult(key, value);
+//  }
 
   @Override
   public Result toResult(String columnFamily, EnrichmentKey key, EnrichmentValue values) throws IOException {
@@ -96,10 +137,10 @@ public class EnrichmentConverter implements HbaseConverter<EnrichmentKey, Enrich
     return ret;
   }
 
-  @Override
-  public EnrichmentResult fromPut(Put put, String columnFamily) throws IOException {
-    return fromPut(put, columnFamily, new EnrichmentKey(), new EnrichmentValue());
-  }
+//  @Override
+//  public EnrichmentResult fromPut(Put put, String columnFamily) throws IOException {
+//    return fromPut(put, columnFamily, new EnrichmentKey(), new EnrichmentValue());
+//  }
 
   @Override
   public EnrichmentResult fromResult(Result result, String columnFamily) throws IOException {

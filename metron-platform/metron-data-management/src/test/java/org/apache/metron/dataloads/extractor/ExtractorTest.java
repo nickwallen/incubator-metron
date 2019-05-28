@@ -37,8 +37,8 @@ public class ExtractorTest {
         @Override
         public Iterable<EnrichmentResult> extract(String line) throws IOException {
             EnrichmentKey key = new EnrichmentKey();
-            key.indicator = "dummy";
-            key.type = "type";
+            key.setIndicator("dummy");
+            key.setType("type");
             Map<String, Object> value = new HashMap<>();
             value.put("indicator", "dummy");
             return Arrays.asList(new EnrichmentResult(key, new EnrichmentValue(value)));
@@ -55,8 +55,8 @@ public class ExtractorTest {
         EnrichmentResult results = Iterables.getFirst(extractor.extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
-        Assert.assertEquals("dummy", key.indicator);
-        Assert.assertEquals("type", key.type);
+        Assert.assertEquals("dummy", key.getIndicator());
+        Assert.assertEquals("type", key.getType());
         Assert.assertEquals("dummy", value.getMetadata().get("indicator"));
     }
 
@@ -77,8 +77,8 @@ public class ExtractorTest {
         EnrichmentResult results = Iterables.getFirst(handler.getExtractor().extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
-        Assert.assertEquals("dummy", key.indicator);
-        Assert.assertEquals("type", key.type);
+        Assert.assertEquals("dummy", key.getIndicator());
+        Assert.assertEquals("type", key.getType());
         Assert.assertEquals("dummy", value.getMetadata().get("indicator"));
     }
 }

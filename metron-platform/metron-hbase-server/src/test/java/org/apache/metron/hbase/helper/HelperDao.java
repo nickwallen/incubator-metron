@@ -36,13 +36,16 @@ public class HelperDao {
 
   public static void insertRecord(Table table, EnrichmentKey key, String cf, String value)
       throws IOException {
-    Put put = createPut(key, cf, value);
+
+    // TODO should the Table be passed-in like this?
+    Put put = createPut(key, table.getName().getNameAsString(), cf, value);
     table.put(put);
   }
 
-  private static Put createPut(EnrichmentKey rowKey, String cf, String value) throws IOException {
-    return new EnrichmentConverter().toPut(cf, rowKey,
-        new EnrichmentValue(JSONUtils.INSTANCE.load(value, JSONUtils.MAP_SUPPLIER)));
+  private static Put createPut(EnrichmentKey rowKey, String tableName, String cf, String value) throws IOException {
+    EnrichmentValue enrichmentValue = new EnrichmentValue(JSONUtils.INSTANCE.load(value, JSONUtils.MAP_SUPPLIER));
+    return new EnrichmentConverter(tableName)
+            .toPut(cf, rowKey, enrichmentValue);
   }
 
   public static List<String> readRecords(Table table) throws Exception {

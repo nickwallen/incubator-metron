@@ -17,20 +17,16 @@
  */
 package org.apache.metron.enrichment.converter;
 
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+public class MockEnrichmentConverterCreator implements EnrichmentConverterCreator {
 
-import java.io.IOException;
+  private EnrichmentConverter converter;
 
-public enum EnrichmentHelper {
-    INSTANCE;
+  public MockEnrichmentConverterCreator(EnrichmentConverter converter) {
+    this.converter = converter;
+  }
 
-    public void load(String tableName, String cf, Iterable<EnrichmentResult> results) throws IOException {
-        EnrichmentConverter converter = new EnrichmentConverter(tableName);
-        for(EnrichmentResult result : results) {
-            converter.put(cf, result.getKey(), result.getValue());
-        }
-    }
+  @Override
+  public EnrichmentConverter create(String tableName) {
+    return converter;
+  }
 }

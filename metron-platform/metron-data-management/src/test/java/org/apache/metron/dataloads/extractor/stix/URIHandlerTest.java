@@ -89,6 +89,6 @@ public class URIHandlerTest {
     EnrichmentResult kv = Iterables.getFirst(kvs, null);
     EnrichmentKey key = (EnrichmentKey) kv.getKey();
     Assert.assertEquals("http://www.kotimi.com/alpha/gtex/", key.getIndicator());
-    Assert.assertEquals("uriobjecttype", key.type);
+    Assert.assertEquals("uriobjecttype", key.getType());
   }
 }

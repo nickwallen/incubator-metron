@@ -19,6 +19,8 @@ package org.apache.metron.dataloads.extractor.csv;
 
 import org.apache.metron.common.csv.CSVConverter;
 import org.apache.metron.dataloads.extractor.Extractor;
+import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.LookupKey;
 
@@ -66,7 +68,12 @@ public class CSVExtractor extends CSVConverter implements Extractor {
     for(Map.Entry<String, Integer> kv : columnMap.entrySet()) {
       values.put(kv.getKey(), tokens[kv.getValue()]);
     }
-    return Arrays.asList(new EnrichmentResult(key, converter.toValue(values)));
+
+    // TODO there is only one freaking LookupKey/LookupValue; EnrichmentKey/EnrichmentValue. No need to parameterize this
+    // TODO fix this cast
+    return Arrays.asList(new EnrichmentResult(
+            (EnrichmentKey) key,
+            (EnrichmentValue) converter.toValue(values)));
   }
 
   private String getType(String[] tokens) {

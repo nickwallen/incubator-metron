@@ -65,7 +65,6 @@ public class CSVExtractorTest {
 
   @Test
   public void testCSVExtractor() throws Exception {
-
     ExtractorHandler handler = ExtractorHandler.load(testCSVConfig);
     validate(handler);
   }
@@ -75,8 +74,8 @@ public class CSVExtractorTest {
       EnrichmentResult results = Iterables.getFirst(handler.getExtractor().extract("google.com,1.0,foo"), null);
       EnrichmentKey key = (EnrichmentKey) results.getKey();
       EnrichmentValue value = (EnrichmentValue) results.getValue();
-      Assert.assertEquals("google.com", key.indicator);
-      Assert.assertEquals("threat", key.type);
+      Assert.assertEquals("google.com", key.getIndicator());
+      Assert.assertEquals("threat", key.getType());
       Assert.assertEquals("google.com", value.getMetadata().get("host"));
       Assert.assertEquals("foo", value.getMetadata().get("meta"));
       Assert.assertEquals(2, value.getMetadata().size());

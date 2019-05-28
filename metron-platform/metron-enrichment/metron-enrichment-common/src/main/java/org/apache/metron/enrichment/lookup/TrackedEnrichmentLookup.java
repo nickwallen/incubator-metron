@@ -56,4 +56,8 @@ public class TrackedEnrichmentLookup implements EnrichmentLookup {
     accessTracker.cleanup();
     lookup.close();
   }
+
+  public AccessTracker getAccessTracker() {
+    return accessTracker;
+  }
 }

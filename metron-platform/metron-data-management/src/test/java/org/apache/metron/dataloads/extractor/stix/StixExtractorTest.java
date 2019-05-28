@@ -91,9 +91,9 @@ public class StixExtractorTest {
         Iterable<EnrichmentResult> results = extractor.extract(stixDoc);
 
         Assert.assertEquals(3, Iterables.size(results));
-        Assert.assertEquals("10.0.0.0", ((EnrichmentKey) (Iterables.get(results, 0).getKey())).indicator);
-        Assert.assertEquals("10.0.0.1", ((EnrichmentKey) (Iterables.get(results, 1).getKey())).indicator);
-        Assert.assertEquals("10.0.0.2", ((EnrichmentKey) (Iterables.get(results, 2).getKey())).indicator);
+        Assert.assertEquals("10.0.0.0", Iterables.get(results, 0).getKey().getIndicator());
+        Assert.assertEquals("10.0.0.1", Iterables.get(results, 1).getKey().getIndicator());
+        Assert.assertEquals("10.0.0.2", Iterables.get(results, 2).getKey().getIndicator());
       }
       catch(Exception ex) {
         throw new RuntimeException(ex.getMessage(), ex);
@@ -106,9 +106,9 @@ public class StixExtractorTest {
         Extractor extractor = handler.getExtractor();
         Iterable<EnrichmentResult> results = extractor.extract(stixDoc);
         Assert.assertEquals(3, Iterables.size(results));
-        Assert.assertEquals("10.0.0.0", ((EnrichmentKey) (Iterables.get(results, 0).getKey())).indicator);
-        Assert.assertEquals("10.0.0.1", ((EnrichmentKey) (Iterables.get(results, 1).getKey())).indicator);
-        Assert.assertEquals("10.0.0.2", ((EnrichmentKey) (Iterables.get(results, 2).getKey())).indicator);
+        Assert.assertEquals("10.0.0.0", Iterables.get(results, 0).getKey().getIndicator());
+        Assert.assertEquals("10.0.0.1", Iterables.get(results, 1).getKey().getIndicator());
+        Assert.assertEquals("10.0.0.2", Iterables.get(results, 2).getKey().getIndicator());
       }
       catch(Exception ex) {
         throw new RuntimeException(ex.getMessage(), ex);

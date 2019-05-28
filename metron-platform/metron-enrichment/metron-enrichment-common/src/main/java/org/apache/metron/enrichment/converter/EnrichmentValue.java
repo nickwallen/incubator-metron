@@ -58,6 +58,8 @@ public class EnrichmentValue implements LookupValue {
   @Override
   public void fromColumns(Iterable<Map.Entry<byte[], byte[]>> values) {
     for(Map.Entry<byte[], byte[]> cell : values) {
+      System.out.println("cellKey=" + Bytes.toString(cell.getKey()));
+      System.out.println("expeced=" + Bytes.toString(VALUE_COLUMN_NAME_B));
       String columnValue = Bytes.toString(cell.getValue());
       if(Bytes.equals(cell.getKey(), VALUE_COLUMN_NAME_B)) {
         metadata = stringToValue(columnValue);

@@ -40,12 +40,15 @@ public class HBaseEnrichmentLookup implements EnrichmentLookup {
   private Connection connection;
   private Table table;
   private String columnFamily;
-  private HbaseConverter<EnrichmentKey, EnrichmentValue> converter = new EnrichmentConverter();
+  private HbaseConverter<EnrichmentKey, EnrichmentValue> converter;
 
   public HBaseEnrichmentLookup(HBaseConnectionFactory connectionFactory, String tableName, String columnFamily) throws IOException {
     this.connection = connectionFactory.createConnection(HBaseConfiguration.create());
     this.table = connection.getTable(TableName.valueOf(tableName));
     this.columnFamily = columnFamily;
+
+    // TODO don't need this class and EnrichmentConverter to both interact with HBase
+    this.converter = new EnrichmentConverter(tableName);
   }
 
   @Override

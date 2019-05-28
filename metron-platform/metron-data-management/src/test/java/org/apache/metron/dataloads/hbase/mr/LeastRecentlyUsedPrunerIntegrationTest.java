@@ -33,13 +33,17 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.LookupKey;
+import org.apache.metron.enrichment.lookup.TrackedEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.accesstracker.BloomAccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentAccessTracker;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.test.utils.UnitTestHelper;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
@@ -100,65 +104,61 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
 
     @Test
     public void test() throws Exception {
+        HBaseConnectionFactory connFactory = new HBaseConnectionFactory();
+        Configuration config = HBaseConfiguration.create();
+        config.set("hbase.rpc.timeout", "1000");
         long ts = System.currentTimeMillis();
-        BloomAccessTracker bat = new BloomAccessTracker("tracker1", 100, 0.03);
-        PersistentAccessTracker pat = new PersistentAccessTracker(tableName, "0", accessTrackerTable, accessTrackerColumnFamily, bat, 0L);
-        HBaseEnrichmentLookup lookup = new HBaseEnrichmentLookup(testTable, columnFamily, pat);
+        PersistentAccessTracker accessTracker = new PersistentAccessTracker(tableName,
+                "0",
+                accessTrackerTableName,
+                accessTrackerColumnFamily,
+                new BloomAccessTracker("tracker1", 100, 0.03),
+                0L,
+                connFactory,
+                config);
+        HBaseEnrichmentLookup hbaseLookup = new HBaseEnrichmentLookup(connFactory, tableName, columnFamily);
+        TrackedEnrichmentLookup lookup = new TrackedEnrichmentLookup(hbaseLookup, accessTracker);
+
         List<LookupKey> goodKeysHalf = getKeys(0, 5);
         List<LookupKey> goodKeysOtherHalf = getKeys(5, 10);
         Iterable<LookupKey> goodKeys = Iterables.concat(goodKeysHalf, goodKeysOtherHalf);
         List<LookupKey> badKey = getKeys(10, 11);
-        EnrichmentConverter converter = new EnrichmentConverter();
+
+        EnrichmentConverter converter = new EnrichmentConverter(tableName);
         for(LookupKey k : goodKeysHalf) {
-            testTable.put(converter.toPut(columnFamily, (EnrichmentKey) k
-                                            , new EnrichmentValue(
-                                                  new HashMap<String, Object>() {{
-                                                    put("k", "dummy");
-                                                    }}
-                                                  )
-                                          )
-                         );
-            Assert.assertTrue(lookup.exists((EnrichmentKey)k, new HBaseEnrichmentLookup.HBaseContext(testTable, columnFamily), true));
+            testTable.put(converter.toPut(columnFamily,
+                    (EnrichmentKey) k,
+                    new EnrichmentValue().withValue("k", "dummy")));
+            Assert.assertTrue(lookup.exists((EnrichmentKey) k));
         }
-        pat.persist(true);
+        accessTracker.persist(true);
         for(LookupKey k : goodKeysOtherHalf) {
-            testTable.put(converter.toPut(columnFamily, (EnrichmentKey) k
-                                            , new EnrichmentValue(new HashMap<String, Object>() {{
-                                                    put("k", "dummy");
-                                                    }}
-                                                                  )
-                                         )
-                         );
-            Assert.assertTrue(lookup.exists((EnrichmentKey)k, new HBaseEnrichmentLookup.HBaseContext(testTable, columnFamily), true));
+            testTable.put(converter.toPut(columnFamily,
+                    (EnrichmentKey) k,
+                    new EnrichmentValue().withValue("k", "dummy")));
+            Assert.assertTrue(lookup.exists((EnrichmentKey)k));
         }
         testUtil.flush();
         Assert.assertFalse(lookup.getAccessTracker().hasSeen(goodKeysHalf.get(0)));
         for(LookupKey k : goodKeysOtherHalf) {
             Assert.assertTrue(lookup.getAccessTracker().hasSeen(k));
         }
-        pat.persist(true);
+        accessTracker.persist(true);
         {
-            testTable.put(converter.toPut(columnFamily, (EnrichmentKey) badKey.get(0)
-                    , new EnrichmentValue(new HashMap<String, Object>() {{
-                        put("k", "dummy");
-                    }}
-                    )
-                    )
-            );
+            testTable.put(converter.toPut(columnFamily,
+                    (EnrichmentKey) badKey.get(0),
+                    new EnrichmentValue().withValue("k", "dummy")));
         }
         testUtil.flush();
         Assert.assertFalse(lookup.getAccessTracker().hasSeen(badKey.get(0)));
 
-
         Job job = LeastRecentlyUsedPruner.createJob(config, tableName, columnFamily, accessTrackerTableName, accessTrackerColumnFamily, ts);
         Assert.assertTrue(job.waitForCompletion(true));
         for(LookupKey k : goodKeys) {
-            Assert.assertTrue(lookup.exists((EnrichmentKey)k, new HBaseEnrichmentLookup.HBaseContext(testTable, columnFamily), true));
+            Assert.assertTrue(lookup.exists((EnrichmentKey)k));
         }
         for(LookupKey k : badKey) {
-            Assert.assertFalse(lookup.exists((EnrichmentKey)k, new HBaseEnrichmentLookup.HBaseContext(testTable, columnFamily), true));
+            Assert.assertFalse(lookup.exists((EnrichmentKey)k));
         }
-
     }
-
 }
