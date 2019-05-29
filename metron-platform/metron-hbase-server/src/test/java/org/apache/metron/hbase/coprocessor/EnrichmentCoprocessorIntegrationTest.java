@@ -18,17 +18,6 @@
 
 package org.apache.metron.hbase.coprocessor;
 
-import static org.hamcrest.CoreMatchers.equalTo;
-import static org.junit.Assert.assertThat;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -37,8 +26,8 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.log4j.Level;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
@@ -54,6 +43,18 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.junit.Assert.assertThat;
+
 public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
 
   private static final String ENRICHMENT_TABLE = "enrichment";
@@ -65,8 +66,8 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
   private static ZKServerComponent zookeeperComponent;
   private static ComponentRunner componentRunner;
   private static HBaseTestingUtility testUtil;
-  private static HTable enrichmentTable;
-  private static HTable enrichmentListTable;
+  private static Table enrichmentTable;
+  private static Table enrichmentListTable;
   private static Configuration hBaseConfig;
 
   /*
@@ -75,7 +76,6 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
 
   /**
    * {
-   *    "enrichment.list.hbase.provider.impl" : "org.apache.metron.hbase.HTableProvider",
    *    "enrichment.list.hbase.table" : "%TABLE_NAME%",
    *    "enrichment.list.hbase.cf" : "%COLUMN_FAMILY%"
    * }
@@ -88,8 +88,9 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     silenceLogging();
     // don't need the properties for anything else now, but could extract var if desired.
     startZookeeper(new Properties());
-    globalConfig = globalConfig.replace("%TABLE_NAME%", ENRICHMENT_LIST_TABLE)
-        .replace("%COLUMN_FAMILY%", COLUMN_FAMILY);
+    globalConfig = globalConfig
+            .replace("%TABLE_NAME%", ENRICHMENT_LIST_TABLE)
+            .replace("%COLUMN_FAMILY%", COLUMN_FAMILY);
     uploadGlobalConfigToZK(globalConfig);
     configureAndStartHBase();
     addCoprocessor(enrichmentTable.getName());
@@ -140,10 +141,9 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     Map.Entry<HBaseTestingUtility, Configuration> kv = HBaseUtil.INSTANCE.create(true, extraConfig);
     testUtil = kv.getKey();
     hBaseConfig = kv.getValue();
-    enrichmentTable = testUtil.createTable(Bytes.toBytes(ENRICHMENT_TABLE), Bytes.toBytes(
-        COLUMN_FAMILY));
+    enrichmentTable = testUtil.createTable(TableName.valueOf(ENRICHMENT_TABLE), COLUMN_FAMILY);
     enrichmentListTable = testUtil
-        .createTable(Bytes.toBytes(ENRICHMENT_LIST_TABLE), Bytes.toBytes(COLUMN_FAMILY));
+        .createTable(TableName.valueOf(ENRICHMENT_LIST_TABLE), Bytes.toBytes(COLUMN_FAMILY));
 
     for (Result r : enrichmentTable.getScanner(Bytes.toBytes(COLUMN_FAMILY))) {
       Delete d = new Delete(r.getRow());

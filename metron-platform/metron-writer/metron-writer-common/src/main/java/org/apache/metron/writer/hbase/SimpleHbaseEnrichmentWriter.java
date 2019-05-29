@@ -53,7 +53,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Used primarily for streaming enrichments.
+ * Writes streaming enrichment data to HBase.
  */
 public class SimpleHbaseEnrichmentWriter extends AbstractWriter implements BulkMessageWriter<JSONObject>, Serializable {
 

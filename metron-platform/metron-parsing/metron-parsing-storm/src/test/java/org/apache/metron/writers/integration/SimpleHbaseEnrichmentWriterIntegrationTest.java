@@ -127,9 +127,9 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
     try {
       runner.start();
       kafkaComponent.writeMessages(sensorType, inputMessages);
-      ProcessorResult<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>> result =
-              runner.process(new Processor<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>>() {
-                List<EnrichmentResult<EnrichmentKey, EnrichmentValue>> messages = null;
+      ProcessorResult<List<EnrichmentResult>> result =
+              runner.process(new Processor<List<EnrichmentResult>>() {
+                List<EnrichmentResult> messages = null;
 
                 @Override
                 public ReadinessState process(ComponentRunner runner) {
@@ -149,8 +149,8 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
                 }
 
                 @Override
-                public ProcessorResult<List<EnrichmentResult<EnrichmentKey, EnrichmentValue>>> getResult() {
-                  ProcessorResult.Builder<List<EnrichmentResult<EnrichmentKey,EnrichmentValue>>> builder = new ProcessorResult.Builder();
+                public ProcessorResult<List<EnrichmentResult>> getResult() {
+                  ProcessorResult.Builder<List<EnrichmentResult>> builder = new ProcessorResult.Builder();
                   return builder.withResult(messages).build();
                 }
               });
@@ -169,12 +169,12 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
           put("col3", "col33");
         }});
       }};
-      for (EnrichmentResult<EnrichmentKey, EnrichmentValue> kv : result.getResult()) {
-        Assert.assertTrue(validIndicators.contains(kv.getKey().indicator));
+      for (EnrichmentResult kv : result.getResult()) {
+        Assert.assertTrue(validIndicators.contains(kv.getKey().getIndicator()));
         Assert.assertEquals(kv.getValue().getMetadata().get("source.type"), "dummy");
         Assert.assertNotNull(kv.getValue().getMetadata().get("timestamp"));
         Assert.assertNotNull(kv.getValue().getMetadata().get("original_string"));
-        Map<String, String> metadata = validMetadata.get(kv.getKey().indicator);
+        Map<String, String> metadata = validMetadata.get(kv.getKey().getIndicator());
         for (Map.Entry<String, String> x : metadata.entrySet()) {
           Assert.assertEquals(kv.getValue().getMetadata().get(x.getKey()), x.getValue());
         }

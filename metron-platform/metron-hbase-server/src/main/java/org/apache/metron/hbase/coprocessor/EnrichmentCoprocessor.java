@@ -21,27 +21,26 @@ package org.apache.metron.hbase.coprocessor;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.CacheWriter;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorException;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
-import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.coprocessor.RegionObserver;
+import org.apache.hadoop.hbase.wal.WALEdit;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.configuration.EnrichmentConfigurations;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.lang.invoke.MethodHandles;
+import java.util.Map;
 
 /**
  * Handle collecting a list of enrichment coprocessors.
@@ -66,7 +65,7 @@ import org.slf4j.LoggerFactory;
  * @see <a href="https://hbase.apache.org/devapidocs/org/apache/hadoop/hbase/coprocessor/RegionObserver.html">https://hbase.apache.org/devapidocs/org/apache/hadoop/hbase/coprocessor/RegionObserver.html</a>
  * @see EnrichmentConfigurations Available options.
  */
-public class EnrichmentCoprocessor extends BaseRegionObserver {
+public class EnrichmentCoprocessor implements RegionObserver, Coprocessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   // pass in via coprocessor config options - via hbase shell or hbase-site.xml
@@ -117,19 +116,10 @@ public class EnrichmentCoprocessor extends BaseRegionObserver {
         globalConfigService = getGlobalConfigService(zkUrl);
       }
       globalConfig = globalConfigService.get();
+      String tableName = (String) globalConfig.get(EnrichmentConfigurations.TABLE_NAME);
+      String columnFamily = (String) globalConfig.get(EnrichmentConfigurations.COLUMN_FAMILY);
       Configuration config = this.coprocessorEnv.getConfiguration();
-      CacheWriter<String, String> cacheWriter = null;
-      try {
-        String hbaseTableProviderName = (String) globalConfig
-            .get(EnrichmentConfigurations.TABLE_PROVIDER);
-        String tableName = (String) globalConfig.get(EnrichmentConfigurations.TABLE_NAME);
-        String columnFamily = (String) globalConfig.get(EnrichmentConfigurations.COLUMN_FAMILY);
-        cacheWriter = new HBaseCacheWriter(config, TableProvider
-            .create(hbaseTableProviderName, HTableProvider::new), tableName, columnFamily,
-            COLUMN_QUALIFIER);
-      } catch (ClassNotFoundException | InstantiationException | InvocationTargetException | IllegalAccessException | NoSuchMethodException e) {
-        throw new IOException("Unable to instantiate cache writer", e);
-      }
+      CacheWriter<String, String> cacheWriter = new HBaseCacheWriter(config, tableName, columnFamily, COLUMN_QUALIFIER);
       this.cache = Caffeine.newBuilder().writer(cacheWriter).build();
       LOG.info("Finished initializing cache");
     }
@@ -161,8 +151,8 @@ public class EnrichmentCoprocessor extends BaseRegionObserver {
   }
 
   @Override
-  public void postPut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit,
-      Durability durability) throws IOException {
+  public void postPut(ObserverContext<RegionCoprocessorEnvironment> e, Put put, WALEdit edit, Durability durability)
+          throws IOException {
     LOG.trace("enrichment coprocessor postPut call begin");
     try {
       LOG.trace("Extracting enrichment type from rowkey");
@@ -182,7 +172,7 @@ public class EnrichmentCoprocessor extends BaseRegionObserver {
   private String getEnrichmentType(Put put) {
     EnrichmentKey key = new EnrichmentKey();
     key.fromBytes(put.getRow());
-    return key.type;
+    return key.getType();
   }
 
   private void addToCache(String cacheKey, String value) {

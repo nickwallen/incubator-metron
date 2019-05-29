@@ -88,10 +88,11 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
 
     @Test
     public void testCommandLine() throws Exception {
-        Configuration conf = HBaseConfiguration.create();
+        Configuration config = HBaseConfiguration.create();
+        config.set("hbase.rpc.timeout", "1000");
 
         String[] argv = {"-a 04/14/2016 12:00:00", "-f cf", "-t malicious_domains", "-u access_trackers",  "-v georgia", "-z cf"};
-        String[] otherArgs = new GenericOptionsParser(conf, argv).getRemainingArgs();
+        String[] otherArgs = new GenericOptionsParser(config, argv).getRemainingArgs();
 
         CommandLine cli = LeastRecentlyUsedPruner.BulkLoadOptions.parse(new PosixParser(), otherArgs);
         Assert.assertEquals(columnFamily, LeastRecentlyUsedPruner.BulkLoadOptions.COLUMN_FAMILY.get(cli).trim());
@@ -108,6 +109,9 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
         Configuration config = HBaseConfiguration.create();
         config.set("hbase.rpc.timeout", "1000");
         long ts = System.currentTimeMillis();
+
+        // TODO All of the lookups and trackers have separate connections to HBase?
+
         PersistentAccessTracker accessTracker = new PersistentAccessTracker(tableName,
                 "0",
                 accessTrackerTableName,
@@ -129,6 +133,8 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
             testTable.put(converter.toPut(columnFamily,
                     (EnrichmentKey) k,
                     new EnrichmentValue().withValue("k", "dummy")));
+
+            // TODO it seems to hang when trying to put to the table or when calling exists?
             Assert.assertTrue(lookup.exists((EnrichmentKey) k));
         }
         accessTracker.persist(true);

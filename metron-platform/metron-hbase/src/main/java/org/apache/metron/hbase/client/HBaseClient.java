@@ -38,6 +38,8 @@ public class HBaseClient implements HBaseReader, HBaseWriter {
   private HBaseReader reader;
   private HBaseWriter writer;
 
+  // TODO replace createSyncClient with HBaseSyncClientCreator?
+
   /**
    * Creates a synchronous {@link HBaseClient}.
    *
