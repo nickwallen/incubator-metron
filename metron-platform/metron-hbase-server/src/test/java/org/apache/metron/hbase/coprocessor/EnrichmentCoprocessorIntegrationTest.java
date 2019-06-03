@@ -21,10 +21,7 @@ package org.apache.metron.hbase.coprocessor;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Table;
@@ -55,8 +52,10 @@ import java.util.Set;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.junit.Assert.assertThat;
 
+/**
+ * An integration test for the {@link EnrichmentCoprocessor}.
+ */
 public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
-
   private static final String ENRICHMENT_TABLE = "enrichment";
   private static final String ENRICHMENT_LIST_TABLE = "enrichment_list";
   private static final String COLUMN_FAMILY = "c";
@@ -69,10 +68,6 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
   private static Table enrichmentTable;
   private static Table enrichmentListTable;
   private static Configuration hBaseConfig;
-
-  /*
-   * Test Setup
-   */
 
   /**
    * {
@@ -91,9 +86,9 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     globalConfig = globalConfig
             .replace("%TABLE_NAME%", ENRICHMENT_LIST_TABLE)
             .replace("%COLUMN_FAMILY%", COLUMN_FAMILY);
-    uploadGlobalConfigToZK(globalConfig);
+
+    uploadGlobalConfigToZK(globalConfig, zookeeperComponent.getConnectionString());
     configureAndStartHBase();
-    addCoprocessor(enrichmentTable.getName());
   }
 
   /**
@@ -126,9 +121,8 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     componentRunner.start();
   }
 
-  private static void uploadGlobalConfigToZK(String config) throws Exception {
-    ConfigurationsUtils.writeGlobalConfigToZookeeper(config.getBytes(StandardCharsets.UTF_8),
-        zookeeperComponent.getConnectionString());
+  private static void uploadGlobalConfigToZK(String config, String zookeeperUrl) throws Exception {
+    ConfigurationsUtils.writeGlobalConfigToZookeeper(config.getBytes(StandardCharsets.UTF_8), zookeeperUrl);
   }
 
   /**
@@ -136,14 +130,15 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
    * Create enrichment and enrichment list tables.
    */
   private static void configureAndStartHBase() throws Exception {
+    // must define the zookeeper URL for the coprocessor
     Configuration extraConfig = new Configuration();
     extraConfig.set(EnrichmentCoprocessor.ZOOKEEPER_URL, zookeeperComponent.getConnectionString());
     Map.Entry<HBaseTestingUtility, Configuration> kv = HBaseUtil.INSTANCE.create(true, extraConfig);
+
     testUtil = kv.getKey();
     hBaseConfig = kv.getValue();
-    enrichmentTable = testUtil.createTable(TableName.valueOf(ENRICHMENT_TABLE), COLUMN_FAMILY);
-    enrichmentListTable = testUtil
-        .createTable(TableName.valueOf(ENRICHMENT_LIST_TABLE), Bytes.toBytes(COLUMN_FAMILY));
+    enrichmentTable = createTableWithCoprocessor(ENRICHMENT_TABLE, COLUMN_FAMILY);
+    enrichmentListTable = testUtil.createTable(TableName.valueOf(ENRICHMENT_LIST_TABLE), Bytes.toBytes(COLUMN_FAMILY));
 
     for (Result r : enrichmentTable.getScanner(Bytes.toBytes(COLUMN_FAMILY))) {
       Delete d = new Delete(r.getRow());
@@ -155,15 +150,13 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     }
   }
 
-  private static void addCoprocessor(TableName tableName) throws IOException {
-    // https://hbase.apache.org/1.1/book.html#cp_loading
-    Admin hbaseAdmin = testUtil.getConnection().getAdmin();
-    hbaseAdmin.disableTable(tableName);
-    HTableDescriptor htd = new HTableDescriptor(tableName);
-    htd.addFamily(new HColumnDescriptor(COLUMN_FAMILY));
-    htd.addCoprocessor(EnrichmentCoprocessor.class.getCanonicalName());
-    hbaseAdmin.modifyTable(tableName, htd);
-    hbaseAdmin.enableTable(tableName);
+  private static Table createTableWithCoprocessor(String nameOfTable, String columnFamily) throws IOException {
+    TableName tableName = TableName.valueOf(nameOfTable);
+    byte[][] columnFamilies = new byte[][]{ Bytes.toBytes(columnFamily) };
+    int numVersions = 1;
+    int blockSize = 65536;
+    String coprocessorClassName = EnrichmentCoprocessor.class.getCanonicalName();
+    return testUtil.createTable(tableName, columnFamilies, numVersions, blockSize, coprocessorClassName);
   }
 
   @AfterClass
@@ -198,11 +191,19 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
       String indicator = enrichKV.getKey();
       String type = enrichKV.getValue();
       expectedEnrichmentTypes.add(type);
-      HelperDao.insertRecord(enrichmentTable, new EnrichmentKey(type, indicator), COLUMN_FAMILY,
-          "{ \"apache\" : \"metron\" }");
+
+      // TODO we are unable to insert this record for some reason
+      HelperDao.insertRecord(
+              enrichmentTable,
+              hBaseConfig,
+              new EnrichmentKey(type, indicator),
+              COLUMN_FAMILY,
+              "{ \"apache\" : \"metron\" }");
     }
+    enrichmentTable.close();
+
     List<String> enrichmentsList = HelperDao.readRecords(enrichmentListTable);
-    assertThat(new HashSet<String>(enrichmentsList), equalTo(expectedEnrichmentTypes));
+    assertThat(new HashSet<>(enrichmentsList), equalTo(expectedEnrichmentTypes));
   }
 
 }

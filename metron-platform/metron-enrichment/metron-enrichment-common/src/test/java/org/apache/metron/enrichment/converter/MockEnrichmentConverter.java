@@ -17,6 +17,7 @@
  */
 package org.apache.metron.enrichment.converter;
 
+import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -28,7 +29,7 @@ import java.io.IOException;
 public class MockEnrichmentConverter extends EnrichmentConverter {
 
   public MockEnrichmentConverter() {
-    super("tableName", new MockHBaseConnectionFactory());
+    super("tableName", new MockHBaseConnectionFactory(), HBaseConfiguration.create());
   }
 
   // TODO need to implement each of these in a way that is useful for testing.

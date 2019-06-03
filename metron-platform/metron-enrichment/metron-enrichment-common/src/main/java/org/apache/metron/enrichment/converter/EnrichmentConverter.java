@@ -19,6 +19,7 @@ package org.apache.metron.enrichment.converter;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Iterables;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
@@ -57,12 +58,12 @@ public class EnrichmentConverter implements HbaseConverter<EnrichmentKey, Enrich
   }
 
   public EnrichmentConverter(String tableName) {
-    this(tableName, new HBaseConnectionFactory());
+    this(tableName, new HBaseConnectionFactory(), HBaseConfiguration.create());
   }
 
-  public EnrichmentConverter(String tableName, HBaseConnectionFactory connectionFactory) {
+  public EnrichmentConverter(String tableName, HBaseConnectionFactory connectionFactory, Configuration conf) {
     try {
-      connection = connectionFactory.createConnection(HBaseConfiguration.create());
+      connection = connectionFactory.createConnection(conf);
       table = connection.getTable(TableName.valueOf(tableName));
     } catch(IOException e) {
       throw new RuntimeException("Unable to connect to HBase", e);

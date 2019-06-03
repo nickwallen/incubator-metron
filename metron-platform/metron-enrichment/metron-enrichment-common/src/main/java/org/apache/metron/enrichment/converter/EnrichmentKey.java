@@ -69,7 +69,7 @@ public class EnrichmentKey implements LookupKey {
       type = w.readUTF();
       indicator = w.readUTF();
     } catch (IOException e) {
-      throw new RuntimeException("Unable to convert type and indicator from bytes", e);
+      throw new RuntimeException("Invalid enrichment key; Unable to parse type and indicator from row key", e);
     }
   }
 
