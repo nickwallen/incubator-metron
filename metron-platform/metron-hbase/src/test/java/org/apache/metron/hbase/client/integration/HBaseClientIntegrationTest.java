@@ -44,12 +44,14 @@ import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
@@ -68,11 +70,11 @@ public class HBaseClientIntegrationTest {
   private static final String columnFamily = "W";
   private static final String columnQualifier = "column";
   private static HBaseTestingUtility util;
-  private static HBaseClient client;
   private static Table table;
   private static Admin admin;
   private static final byte[] rowKey1 = Bytes.toBytes("row-key-1");
   private static final byte[] rowKey2 = Bytes.toBytes("row-key-2");
+  private HBaseClient client;
 
   @BeforeClass
   public static void startHBase() throws Exception {
@@ -87,11 +89,6 @@ public class HBaseClientIntegrationTest {
     // create the table
     table = util.createTable(TableName.valueOf(tableName), columnFamily);
     util.waitTableEnabled(table.getName());
-
-    // setup the client
-    MockHBaseConnectionFactory factory = new MockHBaseConnectionFactory()
-            .withTable(tableName, table);
-    client = HBaseClient.createSyncClient(factory, config, tableName);
   }
 
   @AfterClass
@@ -101,15 +98,23 @@ public class HBaseClientIntegrationTest {
     util.cleanupTestDir();
   }
 
-  @After
-  public void clearTable() throws Exception {
+  @Before
+  public void setup() {
+    client = HBaseClient.createSyncClient(new HBaseConnectionFactory(), util.getConfiguration(), tableName);
+  }
 
-    // clear all record
+  @After
+  public void tearDown() throws Exception {
+    // delete all records in the table
     List<Delete> deletions = new ArrayList<>();
     for(Result r : table.getScanner(new Scan())) {
       deletions.add(new Delete(r.getRow()));
     }
     table.delete(deletions);
+
+    if(client != null) {
+      client.close();
+    }
   }
 
   @Test
