@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.function.Supplier;
 
 /**
  * Establishes a {@link Connection} to HBase.
@@ -35,10 +36,14 @@ public class HBaseConnectionFactory {
     return ConnectionFactory.createConnection(configuration);
   }
 
-  // TODO don't pass the instantiated default use () -> new HBaseConnectionFactory()
-  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl, HBaseConnectionFactory defaultImpl) {
+  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl) {
+    return getConnectionFactory(factoryImpl, () -> new HBaseConnectionFactory());
+  }
+
+  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl,
+                                                            Supplier<HBaseConnectionFactory> defaultImpl) {
     if(factoryImpl == null || factoryImpl.length() == 0 || factoryImpl.charAt(0) == '$') {
-      return defaultImpl;
+      return defaultImpl.get();
     } else {
       try {
         Class<? extends HBaseConnectionFactory> clazz =

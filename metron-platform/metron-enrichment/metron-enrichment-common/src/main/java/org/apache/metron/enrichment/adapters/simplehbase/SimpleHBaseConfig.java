@@ -31,7 +31,7 @@ public class SimpleHBaseConfig implements Serializable {
   }
 
   public SimpleHBaseConfig withConnectionFactoryImpl(String connectorImpl) {
-    connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectorImpl, new HBaseConnectionFactory());
+    connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectorImpl);
     return this;
   }
 

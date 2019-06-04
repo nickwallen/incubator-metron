@@ -111,7 +111,7 @@ public class SimpleHBaseEnrichmentFunctions {
   private static synchronized void initializeConnectionFactory(Map<String, Object> config) {
     if(connectionFactory == null) {
       String connectionFactoryImpl = (String) config.getOrDefault(CONNECTION_FACTORY_IMPL_CONF, HBaseConnectionFactory.class.getName());
-      connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectionFactoryImpl, new HBaseConnectionFactory());
+      connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectionFactoryImpl);
     }
   }
 
