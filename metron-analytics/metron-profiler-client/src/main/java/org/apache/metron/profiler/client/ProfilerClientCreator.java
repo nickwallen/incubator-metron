@@ -19,19 +19,18 @@
  */
 package org.apache.metron.profiler.client;
 
-import org.apache.metron.profiler.ProfileMeasurement;
-
-import java.util.List;
-import java.util.function.Function;
+import java.util.Map;
 
 /**
- * Responsible for writing {@link ProfileMeasurement} values to persistent storage.
+ * Responsible for creating a {@link ProfilerClient}.
  */
-public interface ProfileWriter {
+public interface ProfilerClientCreator {
 
   /**
-   * Write a {@link ProfileMeasurement} to persistent storage.
-   * @param m The ProfileMeasurement to write.
+   * Create a {@link ProfilerClient}.
+   *
+   * @param globals The global configuration.
+   * @return The {@link ProfilerClient}.
    */
-  void write(ProfileMeasurement m);
+  ProfilerClient create(Map<String, Object> globals);
 }

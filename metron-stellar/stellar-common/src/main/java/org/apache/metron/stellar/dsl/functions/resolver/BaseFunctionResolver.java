@@ -52,7 +52,7 @@ public abstract class BaseFunctionResolver implements FunctionResolver, Serializ
   /**
    * Maps a function name to the metadata necessary to execute the Stellar function.
    */
-  private Supplier<Map<String, StellarFunctionInfo>> functions;
+  protected Supplier<Map<String, StellarFunctionInfo>> functions;
 
   /**
    * The Stellar execution context that can be used to inform the function resolution process.

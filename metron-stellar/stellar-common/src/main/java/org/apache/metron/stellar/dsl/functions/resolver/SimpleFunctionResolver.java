@@ -18,12 +18,16 @@
 
 package org.apache.metron.stellar.dsl.functions.resolver;
 
-import java.lang.invoke.MethodHandles;
-import java.util.HashSet;
-import java.util.Set;
+import com.google.common.base.Suppliers;
 import org.apache.metron.stellar.dsl.StellarFunction;
+import org.apache.metron.stellar.dsl.StellarFunctionInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.lang.invoke.MethodHandles;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A simple Stellar function resolver that resolves functions from specific
@@ -49,11 +53,31 @@ public class SimpleFunctionResolver extends BaseFunctionResolver {
   }
 
   /**
-   * Will attempt to resolve any Stellar functions defined within the specified class.
+   * Attempts to resolve any functions defined within a specific class.
+   *
    * @param clazz The class which may contain a Stellar function.
    */
   public SimpleFunctionResolver withClass(Class<? extends StellarFunction> clazz) {
     this.classesToResolve.add(clazz);
+    return this;
+  }
+
+  /**
+   * Attempts to resolve a function defined within the provided {@link StellarFunction}
+   * instance.
+   *
+   * @param function The Stellar function to resolve.
+   */
+  public SimpleFunctionResolver withInstance(StellarFunction function) {
+    // perform function resolution on the instance that was passed in
+    StellarFunctionInfo functionInfo = resolveFunction(function.getClass());
+    functionInfo.setFunction(function);
+
+    // add the function to the set of resolvable functions
+    Map<String, StellarFunctionInfo> currentFunctions = this.functions.get();
+    currentFunctions.put(functionInfo.getName(), functionInfo);
+
+    this.functions = Suppliers.memoize(() -> currentFunctions);
     return this;
   }
 }

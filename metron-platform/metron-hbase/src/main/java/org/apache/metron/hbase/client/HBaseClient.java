@@ -64,30 +64,6 @@ public class HBaseClient implements HBaseReader, HBaseWriter {
     }
   }
 
-  /**
-   * Creates an asynchronous {@link HBaseClient}.
-   *
-   * @param factory The connection factory.
-   * @param configuration The HBase configuration.
-   * @param tableName The name of the HBase table.
-   * @return An {@link HBaseClient} that behaves asynchronously.
-   */
-  public static HBaseClient createAsyncClient(HBaseConnectionFactory factory,
-                                              Configuration configuration,
-                                              String tableName) {
-    try {
-      Connection connection = factory.createConnection(configuration);
-      HBaseReader reader = new TableHBaseReader(connection, tableName);
-      HBaseWriter writer = new BufferedMutatorHBaseWriter(connection, tableName);
-      return new HBaseClient(connection, reader, writer);
-
-    } catch (Exception e) {
-      String msg = String.format("Unable to open connection to HBase for table '%s'", tableName);
-      LOG.error(msg, e);
-      throw new RuntimeException(msg, e);
-    }
-  }
-
   public HBaseClient(Connection connection, HBaseReader reader, HBaseWriter writer) {
     // the connection will be closed when the client is closed
     this.connection = connection;

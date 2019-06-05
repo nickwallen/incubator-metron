@@ -42,6 +42,7 @@ public class HBaseSyncClientCreator implements HBaseClientCreator {
   public HBaseClient create(HBaseConnectionFactory factory,
                             Configuration configuration,
                             String tableName) {
+
     try {
       Connection connection = factory.createConnection(configuration);
       HBaseReader reader = new TableHBaseReader(connection, tableName);
