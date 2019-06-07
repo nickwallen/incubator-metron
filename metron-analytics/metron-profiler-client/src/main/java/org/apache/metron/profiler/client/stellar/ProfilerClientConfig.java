@@ -39,7 +39,7 @@ public enum ProfilerClientConfig {
   /**
    * A global property that defines the name of the {@link HBaseConnectionFactory} implementation class.
    */
-  PROFILER_HBASE_TABLE_PROVIDER("hbase.provider.impl", HBaseConnectionFactory.class.getName(), String.class),
+  PROFILER_HBASE_CONNECTION_FACTORY("hbase.provider.impl", HBaseConnectionFactory.class.getName(), String.class),
 
   /**
    * A global property that defines the duration of each profile period.  This value

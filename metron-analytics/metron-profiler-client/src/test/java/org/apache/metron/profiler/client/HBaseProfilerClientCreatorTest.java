@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
@@ -61,7 +61,7 @@ public class HBaseProfilerClientCreatorTest {
       put(PROFILER_HBASE_TABLE.getKey(), tableName);
       put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
       put(PROFILER_SALT_DIVISOR.getKey(), saltDivisor.toString());
-      put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseConnectionFactory.class.getName());
+      put(PROFILER_HBASE_CONNECTION_FACTORY.getKey(), MockHBaseConnectionFactory.class.getName());
       put(PROFILER_PERIOD.getKey(), periodDuration.toString());
       put(PROFILER_PERIOD_UNITS.getKey(), periodDurationUnits.toString());
     }};
@@ -83,7 +83,7 @@ public class HBaseProfilerClientCreatorTest {
   public void testCreateUsingDefaultValues() {
     Map<String, Object> globals = new HashMap<String, Object>() {{
       // without using a mock connection factory, the test will hang trying to connect to HBase
-      put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseConnectionFactory.class.getName());
+      put(PROFILER_HBASE_CONNECTION_FACTORY.getKey(), MockHBaseConnectionFactory.class.getName());
     }};
 
     // find what the default values should be

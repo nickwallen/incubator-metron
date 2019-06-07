@@ -25,7 +25,9 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseMapper;
 import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.apache.metron.hbase.client.HBaseSyncClientCreator;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -84,6 +86,11 @@ public class HBaseBolt extends BaseRichBolt {
   private HBaseConnectionFactory connectionFactory;
 
   /**
+   * Creates the {@link HBaseClient} used by this bolt.
+   */
+  private HBaseClientCreator hbaseClientCreator;
+
+  /**
    * Used to write to HBase.
    */
   protected transient HBaseClient hbaseClient;
@@ -94,6 +101,7 @@ public class HBaseBolt extends BaseRichBolt {
     this.tableName = tableName;
     this.mapper = mapper;
     this.connectionFactory = new HBaseConnectionFactory();
+    this.hbaseClientCreator = new HBaseSyncClientCreator();
   }
 
   public HBaseBolt writeToWAL(boolean writeToWAL) {
@@ -116,8 +124,8 @@ public class HBaseBolt extends BaseRichBolt {
     return this;
   }
 
-  public HBaseBolt withHBaseClient(HBaseClient hBaseClient) {
-    this.hbaseClient = hBaseClient;
+  public HBaseBolt withHBaseClientCreator(HBaseClientCreator clientCreator) {
+    this.hbaseClientCreator = clientCreator;
     return this;
   }
 
@@ -133,9 +141,7 @@ public class HBaseBolt extends BaseRichBolt {
   public void prepare(Map map, TopologyContext topologyContext, OutputCollector collector) {
     this.collector = collector;
     this.batchHelper = new BatchHelper(batchSize, collector);
-    if(this.hbaseClient == null) {
-      this.hbaseClient = HBaseClient.createSyncClient(connectionFactory, HBaseConfiguration.create(), tableName);
-    }
+    this.hbaseClient = hbaseClientCreator.create(connectionFactory, HBaseConfiguration.create(), tableName);
   }
 
   @Override

@@ -21,6 +21,9 @@ package org.apache.metron.hbase.client;
 
 import org.apache.hadoop.conf.Configuration;
 
+import java.lang.reflect.InvocationTargetException;
+import java.util.function.Supplier;
+
 /**
  * Responsible for creating an {@link HBaseClient}.
  */
@@ -33,4 +36,26 @@ public interface HBaseClientCreator {
    * @return An {@link HBaseClient}.
    */
   HBaseClient create(HBaseConnectionFactory factory, Configuration configuration, String tableName);
+
+  /**
+   * Instantiates a new {@link HBaseClientCreator} by class name.
+   *
+   * @param creatorImpl The class name of the {@link HBaseClientCreator} to instantiate.
+   * @param defaultImpl The default instance to instantiate if the creatorImpl is invalid.
+   * @return A new {@link HBaseClientCreator}.
+   */
+  static HBaseClientCreator newInstance(String creatorImpl, Supplier<HBaseClientCreator> defaultImpl) {
+    if(creatorImpl == null || creatorImpl.length() == 0 || creatorImpl.charAt(0) == '$') {
+      return defaultImpl.get();
+    } else {
+      try {
+        Class<? extends HBaseClientCreator> clazz = (Class<? extends HBaseClientCreator>) Class.forName(creatorImpl);
+        return clazz.getConstructor().newInstance();
+
+      } catch(InstantiationException | IllegalAccessException | InvocationTargetException |
+              NoSuchMethodException | ClassNotFoundException e) {
+        throw new IllegalStateException("Unable to instantiate connector.", e);
+      }
+    }
+  }
 }

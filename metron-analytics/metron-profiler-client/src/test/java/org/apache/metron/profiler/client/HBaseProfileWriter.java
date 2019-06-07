@@ -20,24 +20,12 @@
 
 package org.apache.metron.profiler.client;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.profiler.ProfileMeasurement;
-import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
-import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
-import org.apache.metron.profiler.hbase.ValueOnlyColumnBuilder;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * Writes ProfileMeasurement values that can be read during automated testing.
@@ -47,12 +35,6 @@ public class HBaseProfileWriter implements ProfileWriter {
   private RowKeyBuilder rowKeyBuilder;
   private ColumnBuilder columnBuilder;
   private HBaseClient hbaseClient;
-
-  public HBaseProfileWriter(String tableName, RowKeyBuilder rowKeyBuilder, ColumnBuilder columnBuilder) {
-    this(rowKeyBuilder,
-            columnBuilder,
-            HBaseClient.createSyncClient(new HBaseConnectionFactory(), HBaseConfiguration.create(), tableName));
-  }
 
   /**
    * @param rowKeyBuilder Builds the row key for a {@link ProfileMeasurement}.

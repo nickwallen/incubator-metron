@@ -78,7 +78,7 @@ public class HBaseBoltTest extends BaseBoltTest {
   private HBaseBolt createBolt(int batchSize, WidgetMapper mapper) throws IOException {
     HBaseBolt bolt = new HBaseBolt(tableName, mapper)
             .withBatchSize(batchSize)
-            .withHBaseClient(client);
+            .withHBaseClientCreator((f, c, t) -> client);
     bolt.prepare(Collections.emptyMap(), topologyContext, outputCollector);
     return bolt;
   }

@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
 import static org.apache.metron.profiler.client.stellar.Util.getPeriodDurationInMillis;
 
@@ -47,7 +47,11 @@ public class HBaseProfilerClientCreator implements ProfilerClientCreator {
   private HBaseClientCreator hbaseClientCreator;
 
   public HBaseProfilerClientCreator() {
-    this.hbaseClientCreator = new HBaseSyncClientCreator();
+    this(new HBaseSyncClientCreator());
+  }
+
+  public HBaseProfilerClientCreator(HBaseClientCreator hbaseClientCreator) {
+    this.hbaseClientCreator = hbaseClientCreator;
   }
 
   @Override
@@ -88,7 +92,7 @@ public class HBaseProfilerClientCreator implements ProfilerClientCreator {
    * @param global The global configuration.
    */
   private static HBaseConnectionFactory getConnectionFactory(Map<String, Object> global) {
-    String clazzName = PROFILER_HBASE_TABLE_PROVIDER.get(global, String.class);
+    String clazzName = PROFILER_HBASE_CONNECTION_FACTORY.get(global, String.class);
     return HBaseConnectionFactory.getConnectionFactory(clazzName);
   }
 }

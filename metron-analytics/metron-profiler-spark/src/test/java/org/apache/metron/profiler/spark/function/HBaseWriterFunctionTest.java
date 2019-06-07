@@ -21,7 +21,7 @@ package org.apache.metron.profiler.spark.function;
 
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
+import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.spark.ProfileMeasurementAdapter;
 import org.json.simple.JSONObject;
@@ -37,10 +37,12 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
+import static org.mockito.Mockito.mock;
 
 public class HBaseWriterFunctionTest {
 
-  Properties profilerProperties;
+  private Properties profilerProperties;
+  private HBaseClient hbaseClient;
 
   @Before
   public void setup() {
@@ -49,7 +51,8 @@ public class HBaseWriterFunctionTest {
     // create a mock table for HBase
     String tableName = HBASE_TABLE_NAME.get(profilerProperties, String.class);
     String columnFamily = HBASE_COLUMN_FAMILY.get(profilerProperties, String.class);
-    MockHBaseTableProvider.addToCache(tableName, columnFamily);
+
+    hbaseClient = mock(HBaseClient.class);
   }
 
   @Test
@@ -65,7 +68,7 @@ public class HBaseWriterFunctionTest {
 
     // setup the function to test
     HBaseWriterFunction function = new HBaseWriterFunction(profilerProperties);
-    function.withTableProviderImpl(MockHBaseTableProvider.class.getName());
+    function.withClientCreator((f, c, t) -> hbaseClient);
 
     // write the measurements
     Iterator<Integer> results = function.call(measurements.iterator());
@@ -89,7 +92,7 @@ public class HBaseWriterFunctionTest {
 
     // setup the function to test
     HBaseWriterFunction function = new HBaseWriterFunction(profilerProperties);
-    function.withTableProviderImpl(MockHBaseTableProvider.class.getName());
+    function.withClientCreator((f, c, t) -> hbaseClient);
 
     // write the measurements
     Iterator<Integer> results = function.call(measurements.iterator());
@@ -108,7 +111,7 @@ public class HBaseWriterFunctionTest {
 
     // setup the function to test
     HBaseWriterFunction function = new HBaseWriterFunction(profilerProperties);
-    function.withTableProviderImpl(MockHBaseTableProvider.class.getName());
+    function.withClientCreator((f, c, t) -> hbaseClient);
 
     // write the measurements
     Iterator<Integer> results = function.call(measurements.iterator());

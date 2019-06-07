@@ -24,7 +24,7 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.io.FileUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
+import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
 import org.apache.metron.integration.ComponentRunner;
@@ -32,6 +32,9 @@ import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.FluxTopologyComponent;
 import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
+import org.apache.metron.profiler.client.HBaseProfilerClient;
+import org.apache.metron.profiler.client.HBaseProfilerClientCreator;
+import org.apache.metron.profiler.client.ProfilerClient;
 import org.apache.metron.profiler.client.stellar.FixedLookback;
 import org.apache.metron.profiler.client.stellar.GetProfile;
 import org.apache.metron.profiler.client.stellar.WindowLookback;
@@ -48,6 +51,7 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,8 +67,8 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
+import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE_PROVIDER;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_SALT_DIVISOR;
@@ -428,7 +432,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");
-      setProperty("hbase.provider.impl", "" + MockHBaseTableProvider.class.getName());
+      setProperty("profiler.hbase.client.creator", FakeHBaseClient.class.getName());
+//      setProperty("hbase.provider.impl", "" + MockHBaseTableProvider.class.getName());
 
       // profile settings
       setProperty("profiler.period.duration", Long.toString(periodDurationMillis));
@@ -443,7 +448,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     }};
 
     // create the mock table
-    profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
+//    profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
 
     zkComponent = getZKServerComponent(topologyProperties);
 
@@ -478,7 +483,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
   @AfterClass
   public static void tearDownAfterClass() throws Exception {
-    MockHBaseTableProvider.clear();
+//    MockHBaseTableProvider.clear();
     if (runner != null) {
       runner.stop();
     }
@@ -487,13 +492,16 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   @Before
   public void setup() {
     // create the mock table
-    profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
+//    profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
+
+    // TODO this might need to be a static FakeHBaseClient
+    HBaseClient hbaseClient = Mockito.mock(HBaseClient.class);
 
     // global properties
     Map<String, Object> global = new HashMap<String, Object>() {{
       put(PROFILER_HBASE_TABLE.getKey(), tableName);
       put(PROFILER_COLUMN_FAMILY.getKey(), columnFamily);
-      put(PROFILER_HBASE_TABLE_PROVIDER.getKey(), MockHBaseTableProvider.class.getName());
+//      put(PROFILER_HBASE_CONNECTION_FACTORY.getKey(), MockHBaseTableProvider.class.getName());
 
       // client needs to use the same period duration
       put(PROFILER_PERIOD.getKey(), Long.toString(periodDurationMillis));
@@ -503,12 +511,17 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       put(PROFILER_SALT_DIVISOR.getKey(), saltDivisor);
     }};
 
+    // the GET_PROFILE function
+    ProfilerClient profilerClient = new HBaseProfilerClientCreator((f, c, t) -> hbaseClient).create(global);
+    GetProfile getProfileFunction = new GetProfile();
+    getProfileFunction.withProfilerClientCreator(globals -> profilerClient);
+
     // create the stellar execution environment
     executor = new DefaultStellarStatefulExecutor(
             new SimpleFunctionResolver()
-                    .withClass(GetProfile.class)
                     .withClass(FixedLookback.class)
-                    .withClass(WindowLookback.class),
+                    .withClass(WindowLookback.class)
+                    .withInstance(getProfileFunction),
             new Context.Builder()
                     .with(Context.Capabilities.GLOBAL_CONFIG, () -> global)
                     .build());
@@ -516,8 +529,8 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
   @After
   public void tearDown() throws Exception {
-    MockHBaseTableProvider.clear();
-    profilerTable.clear();
+//    MockHBaseTableProvider.clear();
+//    profilerTable.clear();
     if (runner != null) {
       runner.reset();
     }

@@ -179,7 +179,9 @@ bolts:
             - "${profiler.hbase.table}"
             - ref: "hbaseMapper"
         configMethods:
-            - name: "withTableProvider"
+            - name: "withHBaseClientCreator"
+              args: ["${profiler.hbase.client.creator}"]
+            - name: "withConnectionFactory"
               args: ["${hbase.provider.impl}"]
             - name: "withBatchSize"
               args: [${profiler.hbase.batch}]
