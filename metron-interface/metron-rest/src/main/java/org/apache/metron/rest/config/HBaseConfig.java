@@ -17,15 +17,11 @@
  */
 package org.apache.metron.rest.config;
 
-import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
-
-import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.common.configuration.EnrichmentConfigurations;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
-import org.apache.metron.hbase.client.SyncHBaseClient;
+import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.service.GlobalConfigService;
 import org.apache.metron.rest.user.UserSettingsClient;
@@ -34,49 +30,56 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
+import java.util.Map;
+import java.util.function.Supplier;
+
+import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;
+
 @Configuration
 @Profile("!" + TEST_PROFILE)
 public class HBaseConfig {
 
-    @Autowired
-    private GlobalConfigService globalConfigService;
+  @Autowired
+  private GlobalConfigService globalConfigService;
 
-    @Autowired
-    public HBaseConfig(GlobalConfigService globalConfigService) {
-        this.globalConfigService = globalConfigService;
+  @Autowired
+  private HBaseConnectionFactory hBaseConnectionFactory;
+
+  @Autowired
+  private HBaseConfiguration hBaseConfiguration;
+
+  @Autowired
+  private HBaseClientCreator hBaseClientCreator;
+
+  private Supplier<Map<String, Object>> globals = () -> {
+    try {
+      return globalConfigService.get();
+    } catch (RestException e) {
+      throw new IllegalStateException("Unable to retrieve the global config.", e);
     }
+  };
 
-    @Bean()
-    public UserSettingsClient userSettingsClient() {
-      UserSettingsClient userSettingsClient = new UserSettingsClient();
-      userSettingsClient.init(() -> {
-        try {
-          return globalConfigService.get();
-        } catch (RestException e) {
-          throw new IllegalStateException("Unable to retrieve the global config.", e);
-        }
-      }, new HTableProvider());
-      return userSettingsClient;
-    }
+  @Autowired
+  public HBaseConfig(GlobalConfigService globalConfigService,
+                     HBaseConnectionFactory hBaseConnectionFactory,
+                     HBaseConfiguration hBaseConfiguration,
+                     HBaseClientCreator hBaseClientCreator) {
+    this.globalConfigService = globalConfigService;
+    this.hBaseConnectionFactory = hBaseConnectionFactory;
+    this.hBaseConfiguration = hBaseConfiguration;
+    this.hBaseClientCreator = hBaseClientCreator;
+  }
 
-    @Bean()
-    public SyncHBaseClient hBaseClient() {
-      Map<String, Object> restConfig = null;
-      try {
-        restConfig = globalConfigService.get();
-      } catch (RestException e) {
-        throw new IllegalStateException("Unable to retrieve the global config.", e);
-      }
-      TableProvider provider = null;
-      try {
-        provider = TableProvider
-            .create((String) restConfig.get(EnrichmentConfigurations.TABLE_PROVIDER),
-                HTableProvider::new);
-      } catch (ClassNotFoundException | InstantiationException | InvocationTargetException | IllegalAccessException | NoSuchMethodException e) {
-        throw new IllegalStateException("Unable to create table provider", e);
-      }
-      return new SyncHBaseClient(provider, HBaseConfiguration.create(),
-          (String) restConfig.get(EnrichmentConfigurations.TABLE_NAME));
-    }
+  @Bean(destroyMethod = "close")
+  public UserSettingsClient userSettingsClient() {
+    UserSettingsClient userSettingsClient = new UserSettingsClient(globals, hBaseConnectionFactory, hBaseConfiguration);
+    userSettingsClient.init();
+    return userSettingsClient;
+  }
 
+  @Bean()
+  public HBaseClient hBaseClient() {
+    String tableName = (String) globals.get().get(EnrichmentConfigurations.TABLE_NAME);
+    return hBaseClientCreator.create(hBaseConnectionFactory, hBaseConfiguration, tableName);
+  }
 }

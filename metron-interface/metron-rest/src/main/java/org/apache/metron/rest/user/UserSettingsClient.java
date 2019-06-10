@@ -17,6 +17,22 @@
  */
 package org.apache.metron.rest.user;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.Delete;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Put;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.charset.StandardCharsets;
@@ -25,68 +41,80 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
 import java.util.function.Supplier;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.hbase.TableProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-public class UserSettingsClient {
-
+public class UserSettingsClient implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  public static final String USER_SETTINGS_HBASE_TABLE = "user.settings.hbase.table";
+  public static final String USER_SETTINGS_HBASE_CF = "user.settings.hbase.cf";
 
-  public static String USER_SETTINGS_HBASE_TABLE = "user.settings.hbase.table";
-  public static String USER_SETTINGS_HBASE_CF = "user.settings.hbase.cf";
-
-  private HTableInterface userSettingsTable;
+  private Table userSettingsTable;
   private byte[] cf;
   private Supplier<Map<String, Object>> globalConfigSupplier;
-  private TableProvider tableProvider;
+  private HBaseConnectionFactory connectionFactory;
+  private Configuration configuration;
+  private Connection connection;
 
-  public UserSettingsClient() {
-  }
-
-  public UserSettingsClient(Supplier<Map<String, Object>> globalConfigSupplier, TableProvider tableProvider) {
+  public UserSettingsClient(Supplier<Map<String, Object>> globalConfigSupplier,
+                            HBaseConnectionFactory connectionFactory,
+                            Configuration configuration) {
     this.globalConfigSupplier = globalConfigSupplier;
-    this.tableProvider = tableProvider;
+    this.connectionFactory = connectionFactory;
+    this.configuration = configuration;
   }
 
-  public UserSettingsClient(HTableInterface userSettingsTable, byte[] cf) {
-    this.userSettingsTable = userSettingsTable;
-    this.cf = cf;
-  }
-
-  public synchronized void init(Supplier<Map<String, Object>> globalConfigSupplier, TableProvider tableProvider) {
+  public synchronized void init() {
     if (this.userSettingsTable == null) {
-      Map<String, Object> globalConfig = globalConfigSupplier.get();
-      if(globalConfig == null) {
-        throw new IllegalStateException("Cannot find the global config.");
-      }
-      String table = (String)globalConfig.get(USER_SETTINGS_HBASE_TABLE);
-      String cf = (String) globalConfigSupplier.get().get(USER_SETTINGS_HBASE_CF);
-      if(table == null || cf == null) {
-        throw new IllegalStateException("You must configure " + USER_SETTINGS_HBASE_TABLE + " and " + USER_SETTINGS_HBASE_CF + " in the global config.");
-      }
+      Map<String, Object> globalConfig = getGlobals();
+      String table = getTableName(globalConfig);
+      this.cf = getColumnFamily(globalConfig).getBytes();
       try {
-        userSettingsTable = tableProvider.getTable(HBaseConfiguration.create(), table);
-        this.cf = cf.getBytes();
+        connection = connectionFactory.createConnection(configuration);
+        userSettingsTable = connection.getTable(TableName.valueOf(table));
+
       } catch (IOException e) {
         throw new IllegalStateException("Unable to initialize HBaseDao: " + e.getMessage(), e);
       }
-
     }
   }
 
-  public HTableInterface getTableInterface() {
+  @Override
+  public synchronized void close() throws IOException {
+    if(userSettingsTable != null) {
+      userSettingsTable.close();
+    }
+    if(connection != null) {
+      connection.close();
+    }
+  }
+
+  private Map<String, Object> getGlobals() {
+    Map<String, Object> globalConfig = globalConfigSupplier.get();
+    if(globalConfig == null) {
+      throw new IllegalStateException("Cannot find the global config.");
+    }
+    return globalConfig;
+  }
+
+  private static String getTableName(Map<String, Object> globalConfig) {
+    String table = (String) globalConfig.get(USER_SETTINGS_HBASE_TABLE);
+    if(table == null) {
+      throw new IllegalStateException("You must configure " + USER_SETTINGS_HBASE_TABLE + "in the global config.");
+    }
+    return table;
+  }
+
+  private static String getColumnFamily(Map<String, Object> globalConfig) {
+    String cf = (String) globalConfig.get(USER_SETTINGS_HBASE_CF);
+    if(cf == null) {
+      throw new IllegalStateException("You must configure " + USER_SETTINGS_HBASE_CF + " in the global config.");
+    }
+
+    return cf;
+  }
+
+  protected Table getTable() {
     if(userSettingsTable == null) {
-      init(globalConfigSupplier, tableProvider);
+      init();
     }
     return userSettingsTable;
   }
@@ -103,7 +131,7 @@ public class UserSettingsClient {
 
   public Map<String, Map<String, String>> findAll() throws IOException {
     Scan scan = new Scan();
-    ResultScanner results = getTableInterface().getScanner(scan);
+    ResultScanner results = getTable().getScanner(scan);
     Map<String, Map<String, String>> allUserSettings = new HashMap<>();
     for (Result result : results) {
       allUserSettings.put(new String(result.getRow()), getAllUserSettings(result));
@@ -113,7 +141,7 @@ public class UserSettingsClient {
 
   public Map<String, Optional<String>> findAll(String type) throws IOException {
     Scan scan = new Scan();
-    ResultScanner results = getTableInterface().getScanner(scan);
+    ResultScanner results = getTable().getScanner(scan);
     Map<String, Optional<String>> allUserSettings = new HashMap<>();
     for (Result result : results) {
       allUserSettings.put(new String(result.getRow()), getUserSettings(result, type));
@@ -125,25 +153,25 @@ public class UserSettingsClient {
     byte[] rowKey = Bytes.toBytes(user);
     Put put = new Put(rowKey);
     put.addColumn(cf, Bytes.toBytes(type), Bytes.toBytes(userSettings));
-    getTableInterface().put(put);
+    getTable().put(put);
   }
 
   public void delete(String user) throws IOException {
     Delete delete = new Delete(Bytes.toBytes(user));
-    getTableInterface().delete(delete);
+    getTable().delete(delete);
   }
 
   public void delete(String user, String type) throws IOException {
     Delete delete = new Delete(Bytes.toBytes(user));
     delete.addColumn(cf, Bytes.toBytes(type));
-    getTableInterface().delete(delete);
+    getTable().delete(delete);
   }
 
   private Result getResult(String user) throws IOException {
     byte[] rowKey = Bytes.toBytes(user);
     Get get = new Get(rowKey);
     get.addFamily(cf);
-    return getTableInterface().get(get);
+    return getTable().get(get);
   }
 
   private Optional<String> getUserSettings(Result result, String type) throws IOException {
