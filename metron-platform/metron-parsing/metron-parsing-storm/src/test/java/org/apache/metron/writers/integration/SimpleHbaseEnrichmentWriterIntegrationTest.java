@@ -39,7 +39,6 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.integration.components.ConfigUploadComponent;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
 import org.apache.metron.integration.ComponentRunner;
@@ -91,7 +90,7 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
     }};
 
     // setup external components; kafka, zookeeper
-    MockHBaseTableProvider.addToCache(sensorType, "cf");
+//    MockHBaseTableProvider.addToCache(sensorType, "cf");
     final Properties topologyProperties = new Properties();
     final ZKServerComponent zkServerComponent = getZKServerComponent(topologyProperties);
     final KafkaComponent kafkaComponent = getKafkaComponent(topologyProperties, new ArrayList<KafkaComponent.Topic>() {{
@@ -133,18 +132,18 @@ public class SimpleHbaseEnrichmentWriterIntegrationTest extends BaseIntegrationT
 
                 @Override
                 public ReadinessState process(ComponentRunner runner) {
-                  MockHTable table = (MockHTable) MockHBaseTableProvider.getFromCache(sensorType);
-                  if (table != null && table.size() == inputMessages.size()) {
-                    EnrichmentConverter converter = new EnrichmentConverter();
-                    messages = new ArrayList<>();
-                    try {
-                      for (Result r : table.getScanner(Bytes.toBytes("cf"))) {
-                        messages.add(converter.fromResult(r, "cf"));
-                      }
-                    } catch (IOException e) {
-                    }
-                    return ReadinessState.READY;
-                  }
+//                  MockHTable table = (MockHTable) MockHBaseTableProvider.getFromCache(sensorType);
+//                  if (table != null && table.size() == inputMessages.size()) {
+//                    EnrichmentConverter converter = new EnrichmentConverter();
+//                    messages = new ArrayList<>();
+//                    try {
+//                      for (Result r : table.getScanner(Bytes.toBytes("cf"))) {
+//                        messages.add(converter.fromResult(r, "cf"));
+//                      }
+//                    } catch (IOException e) {
+//                    }
+//                    return ReadinessState.READY;
+//                  }
                   return ReadinessState.NOT_READY;
                 }
 

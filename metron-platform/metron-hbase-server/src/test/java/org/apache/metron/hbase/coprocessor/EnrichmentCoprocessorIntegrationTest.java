@@ -133,10 +133,13 @@ public class EnrichmentCoprocessorIntegrationTest extends BaseIntegrationTest {
     // must define the zookeeper URL for the coprocessor
     Configuration extraConfig = new Configuration();
     extraConfig.set(EnrichmentCoprocessor.ZOOKEEPER_URL, zookeeperComponent.getConnectionString());
-    Map.Entry<HBaseTestingUtility, Configuration> kv = HBaseUtil.INSTANCE.create(true, extraConfig);
 
+    // start hbase
+    Map.Entry<HBaseTestingUtility, Configuration> kv = HBaseUtil.INSTANCE.create(true, extraConfig);
     testUtil = kv.getKey();
     hBaseConfig = kv.getValue();
+
+    // create the tables and coprocessor
     enrichmentTable = createTableWithCoprocessor(ENRICHMENT_TABLE, COLUMN_FAMILY);
     enrichmentListTable = testUtil.createTable(TableName.valueOf(ENRICHMENT_LIST_TABLE), Bytes.toBytes(COLUMN_FAMILY));
 

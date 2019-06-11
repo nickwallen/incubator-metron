@@ -32,7 +32,6 @@ import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.FluxTopologyComponent;
 import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
-import org.apache.metron.profiler.client.HBaseProfilerClient;
 import org.apache.metron.profiler.client.HBaseProfilerClientCreator;
 import org.apache.metron.profiler.client.ProfilerClient;
 import org.apache.metron.profiler.client.stellar.FixedLookback;
@@ -67,7 +66,6 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_COLUMN_FAMILY;
-import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_HBASE_TABLE;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD;
 import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PROFILER_PERIOD_UNITS;
@@ -432,7 +430,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.hbase.column.family", columnFamily);
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");
-      setProperty("profiler.hbase.client.creator", FakeHBaseClient.class.getName());
+//      setProperty("profiler.hbase.client.creator", FakeHBaseClient.class.getName());
 //      setProperty("hbase.provider.impl", "" + MockHBaseTableProvider.class.getName());
 
       // profile settings
