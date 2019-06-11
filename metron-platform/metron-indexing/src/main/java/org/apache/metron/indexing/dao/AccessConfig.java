@@ -17,8 +17,10 @@
  */
 package org.apache.metron.indexing.dao;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
+
 import java.util.function.Function;
-import org.apache.metron.hbase.TableProvider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,7 +32,8 @@ public class AccessConfig {
   private Supplier<Map<String, Object>> globalConfigSupplier;
   private Function<String, String> indexSupplier;
   private Map<String, String> optionalSettings = new HashMap<>();
-  private TableProvider tableProvider = null;
+  private HBaseConnectionFactory hbaseConnectionFactory;
+  private Configuration hbaseConfiguration;
   private Boolean isKerberosEnabled = false;
 
   /**
@@ -86,14 +89,27 @@ public class AccessConfig {
   }
 
   /**
-   * @return The table provider to use for NoSql DAOs
+   * @return The {@link HBaseConnectionFactory} that establishes connections to HBase.
    */
-  public TableProvider getTableProvider() {
-    return tableProvider;
+  public HBaseConnectionFactory getHbaseConnectionFactory() {
+    return hbaseConnectionFactory;
   }
 
-  public void setTableProvider(TableProvider tableProvider) {
-    this.tableProvider = tableProvider;
+  public AccessConfig setHbaseConnectionFactory(HBaseConnectionFactory hbaseConnectionFactory) {
+    this.hbaseConnectionFactory = hbaseConnectionFactory;
+    return this;
+  }
+
+  /**
+   * @return The configuration used to connect to HBase.
+   */
+  public Configuration getHbaseConfiguration() {
+    return hbaseConfiguration;
+  }
+
+  public AccessConfig setHbaseConfiguration(Configuration hbaseConfiguration) {
+    this.hbaseConfiguration = hbaseConfiguration;
+    return this;
   }
 
   /**

@@ -22,8 +22,6 @@ import static org.apache.metron.rest.MetronRestConstants.INDEX_WRITER_NAME;
 
 import java.util.Optional;
 import org.apache.metron.common.zookeeper.ConfigurationsCache;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.IndexDao;
 import org.apache.metron.indexing.dao.IndexDaoFactory;
@@ -54,10 +52,9 @@ public class IndexConfig {
     this.environment = environment;
   }
 
-  @Bean
+  @Bean(destroyMethod = "close")
   public IndexDao indexDao() {
     try {
-      String hbaseProviderImpl = environment.getProperty(MetronRestConstants.INDEX_HBASE_TABLE_PROVIDER_IMPL, String.class, null);
       String indexDaoImpl = environment.getProperty(MetronRestConstants.INDEX_DAO_IMPL, String.class, null);
       int searchMaxResults = environment.getProperty(MetronRestConstants.SEARCH_MAX_RESULTS, Integer.class, 1000);
       int searchMaxGroups = environment.getProperty(MetronRestConstants.SEARCH_MAX_GROUPS, Integer.class, 1000);
@@ -75,7 +72,6 @@ public class IndexConfig {
         }
       });
       config.setIndexSupplier(IndexingCacheUtil.getIndexLookupFunction(cache, environment.getProperty(INDEX_WRITER_NAME)));
-      config.setTableProvider(TableProvider.create(hbaseProviderImpl, () -> new HTableProvider()));
       config.setKerberosEnabled(environment.getProperty(MetronRestConstants.KERBEROS_ENABLED_SPRING_PROPERTY, Boolean.class, false));
       if (indexDaoImpl == null) {
         throw new IllegalStateException("You must provide an index DAO implementation via the " + INDEX_DAO_IMPL + " config");

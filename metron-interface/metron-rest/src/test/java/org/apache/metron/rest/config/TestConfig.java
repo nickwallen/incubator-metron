@@ -46,8 +46,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.zookeeper.ConfigurationsCache;
 import org.apache.metron.common.zookeeper.ZKConfigurationsCache;
-import org.apache.metron.hbase.client.SyncHBaseClient;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.KafkaComponent;
@@ -74,9 +72,9 @@ import org.springframework.web.client.RestTemplate;
 @Profile(TEST_PROFILE)
 public class TestConfig {
 
-  static {
-    MockHBaseTableProvider.addToCache("updates", "t");
-  }
+//  static {
+//    MockHBaseTableProvider.addToCache("updates", "t");
+//  }
 
   @Bean
   public Properties zkProperties() {
@@ -192,29 +190,29 @@ public class TestConfig {
     return AdminUtils$.MODULE$;
   }
 
-  @Bean()
-  public UserSettingsClient userSettingsClient() throws RestException, IOException {
-    return new UserSettingsClient(new MockHBaseTableProvider().addToCache("user_settings", "cf"), Bytes.toBytes("cf"));
-  }
-
-  @Bean()
-  public SyncHBaseClient hBaseClient() throws RestException, IOException {
-    final String cf = "t";
-    final String cq = "v";
-    HTableInterface table = MockHBaseTableProvider.addToCache("enrichment_list", cf);
-    List<String> enrichmentTypes = new ArrayList<String>() {{
-      add("foo");
-      add("bar");
-      add("baz");
-    }};
-    for (String type : enrichmentTypes) {
-      Put put = new Put(Bytes.toBytes(type));
-      put.addColumn(Bytes.toBytes(cf), Bytes.toBytes(cq), "{}".getBytes(StandardCharsets.UTF_8));
-      table.put(put);
-    }
-    return new SyncHBaseClient(new MockHBaseTableProvider(), HBaseConfiguration.create(),
-        "enrichment_list");
-  }
+//  @Bean()
+//  public UserSettingsClient userSettingsClient() throws RestException, IOException {
+//    return new UserSettingsClient(new MockHBaseTableProvider().addToCache("user_settings", "cf"), Bytes.toBytes("cf"));
+//  }
+//
+//  @Bean()
+//  public SyncHBaseClient hBaseClient() throws RestException, IOException {
+//    final String cf = "t";
+//    final String cq = "v";
+//    HTableInterface table = MockHBaseTableProvider.addToCache("enrichment_list", cf);
+//    List<String> enrichmentTypes = new ArrayList<String>() {{
+//      add("foo");
+//      add("bar");
+//      add("baz");
+//    }};
+//    for (String type : enrichmentTypes) {
+//      Put put = new Put(Bytes.toBytes(type));
+//      put.addColumn(Bytes.toBytes(cf), Bytes.toBytes(cq), "{}".getBytes(StandardCharsets.UTF_8));
+//      table.put(put);
+//    }
+//    return new SyncHBaseClient(new MockHBaseTableProvider(), HBaseConfiguration.create(),
+//        "enrichment_list");
+//  }
 
   @Bean
   public JobManager jobManager() {
