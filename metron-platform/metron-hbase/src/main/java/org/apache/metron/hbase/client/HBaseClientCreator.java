@@ -25,7 +25,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.function.Supplier;
 
 /**
- * Responsible for creating an {@link HBaseClient}.
+ * Responsible for creating an {@link HBaseTableClient}.
  */
 public interface HBaseClientCreator {
 
@@ -33,7 +33,7 @@ public interface HBaseClientCreator {
    * @param factory The connection factory for creating connections to HBase.
    * @param configuration The HBase configuration.
    * @param tableName The name of the HBase table.
-   * @return An {@link HBaseClient}.
+   * @return An {@link HBaseTableClient}.
    */
   HBaseClient create(HBaseConnectionFactory factory, Configuration configuration, String tableName);
 

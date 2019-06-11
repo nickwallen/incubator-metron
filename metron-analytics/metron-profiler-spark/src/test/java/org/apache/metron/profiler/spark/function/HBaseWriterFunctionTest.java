@@ -21,6 +21,7 @@ package org.apache.metron.profiler.spark.function;
 
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.spark.ProfileMeasurementAdapter;
@@ -52,7 +53,7 @@ public class HBaseWriterFunctionTest {
     String tableName = HBASE_TABLE_NAME.get(profilerProperties, String.class);
     String columnFamily = HBASE_COLUMN_FAMILY.get(profilerProperties, String.class);
 
-    hbaseClient = mock(HBaseClient.class);
+    hbaseClient = mock(HBaseTableClient.class);
   }
 
   @Test

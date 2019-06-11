@@ -23,7 +23,7 @@ package org.apache.metron.profiler.client;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.common.utils.SerDeUtils;
-import org.apache.metron.hbase.bolt.mapper.HBaseProjectionCriteria;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
@@ -94,7 +94,7 @@ public class HBaseProfilerClientTest {
     when(columnBuilder.getColumnQualifier(eq("value"))).thenReturn(columnQualifier);
 
     // this mock is used to feed data to the profiler client while testing
-    hbaseClient = mock(HBaseClient.class);
+    hbaseClient = mock(HBaseTableClient.class);
 
     // a result that matches the expected profile measurement that can be return by the mock hbase client
     expectedResult = mock(Result.class);

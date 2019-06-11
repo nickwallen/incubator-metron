@@ -21,6 +21,7 @@ package org.apache.metron.profiler.client;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.profiler.ProfileMeasurement;
@@ -98,7 +99,7 @@ public class ProfileGenerator {
             .withPeriod(when, periodDurationMillis, TimeUnit.MILLISECONDS);
 
     HBaseConnectionFactory connFactory = new HBaseConnectionFactory();
-    HBaseClient hbaseClient = HBaseClient.createSyncClient(connFactory, HBaseConfiguration.create(), "profiler");
+    HBaseClient hbaseClient = HBaseTableClient.createSyncClient(connFactory, HBaseConfiguration.create(), "profiler");
     HBaseProfileWriter profileWriter = new HBaseProfileWriter(rowKeyBuilder, columnBuilder, hbaseClient);
     ProfileGenerator generator = new ProfileGenerator(profileWriter);
     generator.generate(measure, 2 * 24 * 4, Collections.emptyList(), val -> new Random().nextInt(10));

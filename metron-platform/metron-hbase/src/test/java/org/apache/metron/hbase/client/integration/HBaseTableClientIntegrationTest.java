@@ -21,13 +21,9 @@
 package org.apache.metron.hbase.client.integration;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.Cell;
-import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.Tag;
-import org.apache.hadoop.hbase.TagType;
 import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
@@ -40,6 +36,7 @@ import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseProjectionCriteria;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -51,7 +48,6 @@ import org.junit.Test;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
@@ -62,9 +58,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests the SynchronousHBaseClient
+ * An integration test for the {@link HBaseTableClient}.
  */
-public class HBaseClientIntegrationTest {
+public class HBaseTableClientIntegrationTest {
 
   private static final String tableName = "widgets";
   private static final String columnFamily = "W";
@@ -99,8 +95,8 @@ public class HBaseClientIntegrationTest {
   }
 
   @Before
-  public void setup() {
-    client = HBaseClient.createSyncClient(new HBaseConnectionFactory(), util.getConfiguration(), tableName);
+  public void setup() throws IOException {
+    client = new HBaseTableClient(new HBaseConnectionFactory(), util.getConfiguration(), tableName);
   }
 
   @After
@@ -216,7 +212,7 @@ public class HBaseClientIntegrationTest {
     HBaseConnectionFactory factory = mock(HBaseConnectionFactory.class);
     when(factory.createConnection(any())).thenThrow(new IllegalArgumentException("test exception"));
 
-    client = HBaseClient.createSyncClient(factory, HBaseConfiguration.create(), tableName);
+    client = new HBaseTableClient(factory, HBaseConfiguration.create(), tableName);
   }
 
   @Test(expected = RuntimeException.class)
@@ -227,7 +223,7 @@ public class HBaseClientIntegrationTest {
     HBaseConnectionFactory factory = new MockHBaseConnectionFactory().withTable(tableName, table);
 
     ColumnList cols1 = new ColumnList().addColumn(columnFamily, columnQualifier, "value1");
-    client = HBaseClient.createSyncClient(factory, HBaseConfiguration.create(), tableName);
+    client = new HBaseTableClient(factory, HBaseConfiguration.create(), tableName);
     client.addMutation(rowKey1, cols1, Durability.SYNC_WAL);
     client.mutate();
   }
@@ -243,7 +239,7 @@ public class HBaseClientIntegrationTest {
     HBaseProjectionCriteria criteria = new HBaseProjectionCriteria();
     criteria.addColumnFamily(columnFamily);
 
-    client = HBaseClient.createSyncClient(factory, HBaseConfiguration.create(), tableName);
+    client = new HBaseTableClient(factory, HBaseConfiguration.create(), tableName);
     client.addGet(rowKey1, criteria);
     client.addGet(rowKey2, criteria);
     client.getAll();

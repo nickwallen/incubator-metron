@@ -20,14 +20,13 @@
 package org.apache.metron.hbase.client;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.Connection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
 
 /**
- * Creates a synchronous {@link HBaseClient}.
+ * Creates a synchronous {@link HBaseTableClient}.
  */
 public class HBaseSyncClientCreator implements HBaseClientCreator {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -36,7 +35,7 @@ public class HBaseSyncClientCreator implements HBaseClientCreator {
    * @param factory The factory that creates connections to HBase.
    * @param configuration The HBase configuration.
    * @param tableName The name of the HBase table.
-   * @return An {@link HBaseClient} that behaves synchronously.
+   * @return An {@link HBaseTableClient} that behaves synchronously.
    */
   @Override
   public HBaseClient create(HBaseConnectionFactory factory,
@@ -44,10 +43,7 @@ public class HBaseSyncClientCreator implements HBaseClientCreator {
                             String tableName) {
 
     try {
-      Connection connection = factory.createConnection(configuration);
-      HBaseReader reader = new TableHBaseReader(connection, tableName);
-      HBaseWriter writer = new TableHBaseWriter(connection, tableName);
-      return new HBaseClient(connection, reader, writer);
+      return new HBaseTableClient(factory, configuration, tableName);
 
     } catch (Exception e) {
       String msg = String.format("Unable to open connection to HBase for table '%s'", tableName);

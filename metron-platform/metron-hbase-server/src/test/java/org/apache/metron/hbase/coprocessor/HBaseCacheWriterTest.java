@@ -20,9 +20,9 @@ package org.apache.metron.hbase.coprocessor;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
-import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.junit.Before;
 import org.junit.Test;
@@ -55,7 +55,7 @@ public class HBaseCacheWriterTest {
 
   @Test
   public void test() {
-    HBaseClient client = mock(HBaseClient.class);
+    HBaseClient client = mock(HBaseTableClient.class);
 
     // the creator needs to return the mock HBaseClient
     HBaseClientCreator creator = mock(HBaseClientCreator.class);

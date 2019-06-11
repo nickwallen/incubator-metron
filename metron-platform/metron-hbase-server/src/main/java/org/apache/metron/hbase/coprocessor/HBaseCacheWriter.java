@@ -23,6 +23,7 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
@@ -64,7 +65,7 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
   /**
    * Constructor useful for testing.
    *
-   * @param clientCreator Creates the {@link HBaseClient}.
+   * @param clientCreator Creates the {@link HBaseTableClient}.
    * @param connectionFactory Creates the {@link org.apache.hadoop.hbase.client.Connection} to HBase.
    * @param conf The HBase configuration.
    * @param tableName The name of the HBase table.

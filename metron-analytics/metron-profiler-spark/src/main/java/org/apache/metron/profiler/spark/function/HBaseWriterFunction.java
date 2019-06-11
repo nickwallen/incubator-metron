@@ -24,6 +24,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
@@ -67,7 +68,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
   private HBaseConnectionFactory connectionFactory;
 
   /**
-   * Creates the {@link HBaseClient} when it is needed.
+   * Creates the {@link HBaseTableClient} when it is needed.
    */
   private HBaseClientCreator hbaseClientCreator;
 

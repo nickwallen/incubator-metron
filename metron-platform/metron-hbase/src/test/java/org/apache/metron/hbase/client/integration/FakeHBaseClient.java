@@ -28,66 +28,55 @@ import org.apache.metron.hbase.client.HBaseClient;
 import java.io.IOException;
 import java.util.List;
 
-public class FakeHBaseClient extends HBaseClient {
-
-  private static Result[] results;
-
-  public FakeHBaseClient() {
-    // TODO need HBaseClient to be an interface.
-    super(null, null, null);
-  }
+public class FakeHBaseClient implements HBaseClient {
 
   @Override
   public void addGet(byte[] rowKey, HBaseProjectionCriteria criteria) {
-    // TODO
+
   }
 
   @Override
   public Result[] getAll() {
-    return results;
-  }
-
-  public void setResults(Result[] theResults) {
-    results = theResults;
+    return new Result[0];
   }
 
   @Override
   public void clearGets() {
-    super.clearGets();
+
   }
 
   @Override
   public List<String> scanRowKeys() throws IOException {
-    return super.scanRowKeys();
+    return null;
   }
 
   @Override
   public void addMutation(byte[] rowKey, ColumnList cols) {
-    super.addMutation(rowKey, cols);
+
   }
 
   @Override
   public void addMutation(byte[] rowKey, ColumnList cols, Durability durability) {
-    super.addMutation(rowKey, cols, durability);
+
   }
 
   @Override
   public void addMutation(byte[] rowKey, ColumnList cols, Durability durability, Long timeToLiveMillis) {
-    super.addMutation(rowKey, cols, durability, timeToLiveMillis);
+
   }
 
   @Override
   public int mutate() {
-    return super.mutate();
+    return 0;
   }
 
   @Override
   public void clearMutations() {
-    super.clearMutations();
+
   }
 
   @Override
   public void close() throws IOException {
-    super.close();
+
   }
 }

@@ -24,6 +24,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseMapper;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
@@ -86,7 +87,7 @@ public class HBaseBolt extends BaseRichBolt {
   private HBaseConnectionFactory connectionFactory;
 
   /**
-   * Creates the {@link HBaseClient} used by this bolt.
+   * Creates the {@link HBaseTableClient} used by this bolt.
    */
   private HBaseClientCreator hbaseClientCreator;
 

@@ -24,6 +24,7 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.io.FileUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
@@ -493,7 +494,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 //    profilerTable = (MockHTable) MockHBaseTableProvider.addToCache(tableName, columnFamily);
 
     // TODO this might need to be a static FakeHBaseClient
-    HBaseClient hbaseClient = Mockito.mock(HBaseClient.class);
+    HBaseClient hbaseClient = Mockito.mock(HBaseTableClient.class);
 
     // global properties
     Map<String, Object> global = new HashMap<String, Object>() {{

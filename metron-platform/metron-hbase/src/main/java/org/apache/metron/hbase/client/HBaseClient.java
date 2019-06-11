@@ -19,109 +19,86 @@
  */
 package org.apache.metron.hbase.client;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseProjectionCriteria;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.List;
 
-public class HBaseClient implements HBaseReader, HBaseWriter {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  private Connection connection;
-  private HBaseReader reader;
-  private HBaseWriter writer;
-
-  // TODO replace createSyncClient with HBaseSyncClientCreator?
+/**
+ * A client that interacts with HBase.
+ */
+public interface HBaseClient extends Closeable {
 
   /**
-   * Creates a synchronous {@link HBaseClient}.
-   *
-   * @param factory The connection factory.
-   * @param configuration The HBase configuration.
-   * @param tableName The name of the HBase table.
-   * @return An {@link HBaseClient} that behaves synchronously.
+   * Enqueues a 'get' request that will be submitted when {@link #getAll()} is called.
+   * @param rowKey The row key to be retrieved.
    */
-  public static HBaseClient createSyncClient(HBaseConnectionFactory factory,
-                                             Configuration configuration,
-                                             String tableName) {
-    try {
-      Connection connection = factory.createConnection(configuration);
-      HBaseReader reader = new TableHBaseReader(connection, tableName);
-      HBaseWriter writer = new TableHBaseWriter(connection, tableName);
-      return new HBaseClient(connection, reader, writer);
+  void addGet(byte[] rowKey, HBaseProjectionCriteria criteria);
 
-    } catch (Exception e) {
-      String msg = String.format("Unable to open connection to HBase for table '%s'", tableName);
-      LOG.error(msg, e);
-      throw new RuntimeException(msg, e);
-    }
-  }
+  /**
+   * Submits all pending get operations and returns the result of each.
+   * @return The result of each pending get request.
+   */
+  Result[] getAll();
 
-  public HBaseClient(Connection connection, HBaseReader reader, HBaseWriter writer) {
-    // the connection will be closed when the client is closed
-    this.connection = connection;
-    this.reader = reader;
-    this.writer = writer;
-  }
+  /**
+   * Clears all pending get operations.
+   */
+  void clearGets();
 
-  @Override
-  public void addGet(byte[] rowKey, HBaseProjectionCriteria criteria) {
-    reader.addGet(rowKey, criteria);
-  }
+  /**
+   * Scans an entire table returning all row keys as a List of Strings.
+   *
+   * <p><b>**WARNING**:</b> Do not use this method unless you're absolutely crystal clear about the performance
+   * impact. Doing full table scans in HBase can adversely impact performance.
+   *
+   * @return List of all row keys as Strings for this table.
+   */
+  List<String> scanRowKeys() throws IOException;
 
-  @Override
-  public Result[] getAll() {
-    return reader.getAll();
-  }
+  /**
+   * Enqueues a {@link org.apache.hadoop.hbase.client.Mutation} such as a put or
+   * increment.  The operation is enqueued for later execution.
+   *
+   * @param rowKey     The row key of the Mutation.
+   * @param cols       The columns affected by the Mutation.
+   */
+  void addMutation(byte[] rowKey, ColumnList cols);
 
-  @Override
-  public void clearGets() {
-    reader.clearGets();
-  }
+  /**
+   * Enqueues a {@link org.apache.hadoop.hbase.client.Mutation} such as a put or
+   * increment.  The operation is enqueued for later execution.
+   *
+   * @param rowKey     The row key of the Mutation.
+   * @param cols       The columns affected by the Mutation.
+   * @param durability The durability of the mutation.
+   */
+  void addMutation(byte[] rowKey, ColumnList cols, Durability durability);
 
-  @Override
-  public List<String> scanRowKeys() throws IOException {
-    return reader.scanRowKeys();
-  }
+  /**
+   * Enqueues a {@link org.apache.hadoop.hbase.client.Mutation} such as a put or
+   * increment.  The operation is enqueued for later execution.
+   *
+   * @param rowKey           The row key of the Mutation.
+   * @param cols             The columns affected by the Mutation.
+   * @param durability       The durability of the mutation.
+   * @param timeToLiveMillis The time to live in milliseconds.
+   */
+  void addMutation(byte[] rowKey, ColumnList cols, Durability durability, Long timeToLiveMillis);
 
-  @Override
-  public void addMutation(byte[] rowKey, ColumnList cols) {
-    writer.addMutation(rowKey, cols);
-  }
+  /**
+   * Ensures that all pending mutations have completed.
+   *
+   * @return The number of operations completed.
+   */
+  int mutate();
 
-  @Override
-  public void addMutation(byte[] rowKey, ColumnList cols, Durability durability) {
-    writer.addMutation(rowKey, cols, durability);
-  }
-
-  @Override
-  public void addMutation(byte[] rowKey, ColumnList cols, Durability durability, Long timeToLiveMillis) {
-    writer.addMutation(rowKey, cols, durability, timeToLiveMillis);
-  }
-
-  @Override
-  public int mutate() {
-    return writer.mutate();
-  }
-
-  @Override
-  public void clearMutations() {
-    writer.clearMutations();
-  }
-
-  @Override
-  public void close() throws IOException {
-    reader.close();
-    writer.close();
-    if(connection != null) {
-      connection.close();
-    }
-  }
+  /**
+   * Clears all pending mutations.
+   */
+  void clearMutations();
 }

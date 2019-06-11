@@ -22,6 +22,7 @@ package org.apache.metron.hbase.bolt;
 
 import org.apache.metron.hbase.Widget;
 import org.apache.metron.hbase.WidgetMapper;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.test.bolt.BaseBoltTest;
 import org.apache.storm.Constants;
@@ -69,7 +70,7 @@ public class HBaseBoltTest extends BaseBoltTest {
   public void setup() throws Exception {
     tuple1 = mock(Tuple.class);
     tuple2 = mock(Tuple.class);
-    client = mock(HBaseClient.class);
+    client = mock(HBaseTableClient.class);
   }
 
   /**
