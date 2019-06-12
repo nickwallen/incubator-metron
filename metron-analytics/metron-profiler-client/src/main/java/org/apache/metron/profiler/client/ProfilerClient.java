@@ -71,10 +71,4 @@ public interface ProfilerClient extends Closeable {
                                      List<Object> groups,
                                      Iterable<ProfilePeriod> periods,
                                      Optional<T> defaultValue);
-
-  /**
-   * Write a {@link ProfileMeasurement} to persistent storage.
-   * @param m The ProfileMeasurement to write.
-   */
-  void write(ProfileMeasurement m);
 }

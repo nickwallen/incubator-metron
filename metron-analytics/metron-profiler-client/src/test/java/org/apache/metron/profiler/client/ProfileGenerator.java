@@ -98,8 +98,7 @@ public class ProfileGenerator {
             .withEntity("192.168.66.121")
             .withPeriod(when, periodDurationMillis, TimeUnit.MILLISECONDS);
 
-    HBaseConnectionFactory connFactory = new HBaseConnectionFactory();
-    HBaseClient hbaseClient = HBaseTableClient.createSyncClient(connFactory, HBaseConfiguration.create(), "profiler");
+    HBaseClient hbaseClient = new HBaseTableClient(new HBaseConnectionFactory(), HBaseConfiguration.create(), "profiler");
     HBaseProfileWriter profileWriter = new HBaseProfileWriter(rowKeyBuilder, columnBuilder, hbaseClient);
     ProfileGenerator generator = new ProfileGenerator(profileWriter);
     generator.generate(measure, 2 * 24 * 4, Collections.emptyList(), val -> new Random().nextInt(10));

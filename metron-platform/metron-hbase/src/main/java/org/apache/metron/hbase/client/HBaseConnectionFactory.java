@@ -24,13 +24,14 @@ import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.Supplier;
 
 /**
  * Establishes a {@link Connection} to HBase.
  */
-public class HBaseConnectionFactory {
+public class HBaseConnectionFactory implements Serializable {
 
   public Connection createConnection(Configuration configuration) throws IOException {
     return ConnectionFactory.createConnection(configuration);

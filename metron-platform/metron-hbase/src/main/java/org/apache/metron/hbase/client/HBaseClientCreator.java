@@ -21,13 +21,14 @@ package org.apache.metron.hbase.client;
 
 import org.apache.hadoop.conf.Configuration;
 
+import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.Supplier;
 
 /**
  * Responsible for creating an {@link HBaseTableClient}.
  */
-public interface HBaseClientCreator {
+public interface HBaseClientCreator extends Serializable {
 
   /**
    * @param factory The connection factory for creating connections to HBase.

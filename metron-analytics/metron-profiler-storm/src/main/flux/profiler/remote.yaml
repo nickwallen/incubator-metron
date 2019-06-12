@@ -137,6 +137,9 @@ components:
             - ${profiler.window.lag}
             - "${profiler.window.lag.units}"
 
+    -   id: "hbaseClientCreator"
+        className: "${profiler.hbase.client.creator}"
+
 spouts:
 
     -   id: "kafkaSpout"
@@ -180,7 +183,7 @@ bolts:
             - ref: "hbaseMapper"
         configMethods:
             - name: "withHBaseClientCreator"
-              args: ["${profiler.hbase.client.creator}"]
+              args: [ref: "hbaseClientCreator"]
             - name: "withConnectionFactory"
               args: ["${hbase.provider.impl}"]
             - name: "withBatchSize"
