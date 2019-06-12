@@ -24,7 +24,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseSyncClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
@@ -47,7 +47,7 @@ public class HBaseProfilerClientCreator implements ProfilerClientCreator {
   private HBaseClientCreator hbaseClientCreator;
 
   public HBaseProfilerClientCreator() {
-    this(new HBaseSyncClientCreator());
+    this(new HBaseTableClientCreator());
   }
 
   public HBaseProfilerClientCreator(HBaseClientCreator hbaseClientCreator) {

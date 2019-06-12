@@ -26,9 +26,9 @@ import org.slf4j.LoggerFactory;
 import java.lang.invoke.MethodHandles;
 
 /**
- * Creates a synchronous {@link HBaseTableClient}.
+ * Creates an {@link HBaseTableClient}.
  */
-public class HBaseSyncClientCreator implements HBaseClientCreator {
+public class HBaseTableClientCreator implements HBaseClientCreator {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**

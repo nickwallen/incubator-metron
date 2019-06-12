@@ -27,7 +27,7 @@ import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseSyncClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +59,7 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
                           String tableName,
                           String columnFamily,
                           String columnQualifier) {
-    this(new HBaseSyncClientCreator(), new HBaseConnectionFactory(), conf, tableName, columnFamily, columnQualifier);
+    this(new HBaseTableClientCreator(), new HBaseConnectionFactory(), conf, tableName, columnFamily, columnQualifier);
   }
 
   /**

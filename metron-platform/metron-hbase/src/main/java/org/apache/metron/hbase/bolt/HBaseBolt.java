@@ -28,7 +28,7 @@ import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseSyncClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -102,7 +102,7 @@ public class HBaseBolt extends BaseRichBolt {
     this.tableName = tableName;
     this.mapper = mapper;
     this.connectionFactory = new HBaseConnectionFactory();
-    this.hbaseClientCreator = new HBaseSyncClientCreator();
+    this.hbaseClientCreator = new HBaseTableClientCreator();
   }
 
   public HBaseBolt writeToWAL(boolean writeToWAL) {

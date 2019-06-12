@@ -28,7 +28,7 @@ import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseSyncClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
@@ -113,7 +113,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
 
     // client creator
     String creatorImpl = HBASE_CLIENT_CREATOR.get(properties, String.class);
-    hbaseClientCreator = HBaseClientCreator.newInstance(creatorImpl, () -> new HBaseSyncClientCreator());
+    hbaseClientCreator = HBaseClientCreator.newInstance(creatorImpl, () -> new HBaseTableClientCreator());
   }
 
   /**

@@ -20,16 +20,14 @@
 package org.apache.metron.profiler.spark;
 
 import org.apache.hadoop.hbase.client.Durability;
-import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseSyncClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 
 import java.util.Map;
 import java.util.Properties;
 
 import static org.apache.metron.profiler.spark.reader.TelemetryReaders.JSON;
-import static org.apache.metron.profiler.spark.reader.TelemetryReaders.TEXT;
 
 /**
  * Defines the configuration values recognized by the Batch Profiler.
@@ -44,7 +42,7 @@ public enum BatchProfilerConfig {
 
   HBASE_CONNECTION_FACTORY("profiler.hbase.connection.provider", HBaseConnectionFactory.class.getName(), String.class),
 
-  HBASE_CLIENT_CREATOR("profiler.hbase.client.creator", HBaseSyncClientCreator.class, String.class),
+  HBASE_CLIENT_CREATOR("profiler.hbase.client.creator", HBaseTableClientCreator.class, String.class),
 
   HBASE_TABLE_NAME("profiler.hbase.table", "profiler", String.class),
 
