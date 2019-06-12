@@ -17,7 +17,6 @@ package org.apache.metron.indexing.dao;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.commons.collections.MapUtils;
 import org.apache.metron.common.Constants;
-import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.search.AlertComment;
 import org.apache.metron.indexing.dao.update.CommentAddRemoveRequest;
 import org.apache.metron.indexing.dao.update.Document;
@@ -285,7 +284,6 @@ public abstract class UpdateIntegrationTest {
   }
 
   protected abstract String getIndexName();
-  protected abstract MockHTable getMockHTable();
   protected abstract void addTestData(String indexName, String sensorType, List<Map<String,Object>> docs) throws Exception;
   protected abstract List<Map<String,Object>> getIndexedTestData(String indexName, String sensorType) throws Exception;
 }

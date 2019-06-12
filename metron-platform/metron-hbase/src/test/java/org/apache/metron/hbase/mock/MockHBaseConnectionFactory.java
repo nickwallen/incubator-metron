@@ -67,8 +67,7 @@ public class MockHBaseConnectionFactory extends HBaseConnectionFactory {
    * @return
    */
   public MockHBaseConnectionFactory withTable(String tableName) {
-    // TODO should not use the old MockHTable; need to at least clean out that class
-    return withTable(tableName, new MockHTable(tableName));
+    return withTable(tableName, mock(Table.class));
   }
 
   public Table getTable(String tableName) {

@@ -40,7 +40,7 @@ import java.util.Map;
 
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
-public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>,Serializable {
+public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>, Serializable {
   protected static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private SimpleHBaseConfig config;
   private EnrichmentLookup lookup;

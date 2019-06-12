@@ -24,23 +24,18 @@ import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.dataloads.extractor.TransformFilterExtractorDecorator;
 import org.apache.metron.dataloads.extractor.stix.StixExtractor;
-import org.apache.metron.enrichment.converter.EnrichmentConverter;
-import org.apache.metron.enrichment.converter.EnrichmentKey;
-import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.converter.MockEnrichmentConverter;
 import org.apache.metron.enrichment.converter.MockEnrichmentConverterCreator;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
-import org.apache.metron.hbase.mock.MockHTable;
-import org.junit.*;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Set;
 
 public class TaxiiIntegrationTest {
 
@@ -55,14 +50,14 @@ public class TaxiiIntegrationTest {
     }
 
     /**
-         {
-            "endpoint" : "http://localhost:8282/taxii-discovery-service"
-           ,"type" : "DISCOVER"
-           ,"collection" : "guest.Abuse_ch"
-           ,"table" : "threat_intel"
-           ,"columnFamily" : "cf"
-           ,"allowedIndicatorTypes" : [ "domainname:FQDN", "address:IPV_4_ADDR" ]
-         }
+     * {
+     *   "endpoint": "http://localhost:8282/taxii-discovery-service",
+     *   "type": "DISCOVER",
+     *   "collection": "guest.Abuse_ch",
+     *   "table": "threat_intel",
+     *   "columnFamily": "cf",
+     *   "allowedIndicatorTypes": [ "domainname:FQDN", "address:IPV_4_ADDR" ]
+     * }
     */
     @Multiline
     static String taxiiConnectionConfig;
@@ -93,7 +88,7 @@ public class TaxiiIntegrationTest {
     @Test
     public void testTaxii() throws Exception {
 
-        MockEnrichmentConverter converter = new MockEnrichmentConverter();
+        ;
 
         // TODO need to replicate this test data in the converter somehow
 
@@ -115,7 +110,7 @@ public class TaxiiIntegrationTest {
 //        Assert.assertEquals(numStringsMatch(MockTaxiiService.pollMsg, "AddressObj:Address_Value condition=\"Equal\""), maliciousAddresses.size());
 //        MockHBaseTableProvider.clear();
 
-
+        MockEnrichmentConverter converter = new MockEnrichmentConverter()
         MockEnrichmentConverterCreator creator = new MockEnrichmentConverterCreator(converter);
 
         final Configuration config = HBaseConfiguration.create();

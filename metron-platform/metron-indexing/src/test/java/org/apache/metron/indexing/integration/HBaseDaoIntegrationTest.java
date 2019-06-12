@@ -27,7 +27,6 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.HBaseDao;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -268,11 +267,6 @@ public class HBaseDaoIntegrationTest extends UpdateIntegrationTest  {
 
   @Override
   protected String getIndexName() {
-    return null;
-  }
-
-  @Override
-  protected MockHTable getMockHTable() {
     return null;
   }
 

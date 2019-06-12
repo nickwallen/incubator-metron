@@ -50,7 +50,7 @@ import org.apache.metron.enrichment.lookup.accesstracker.PersistentBloomTrackerC
 import org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions;
 import org.apache.metron.enrichment.utils.ThreatIntelUtils;
 //import org.apache.metron.hbase.mock.MockHBaseTableProvider;
-import org.apache.metron.hbase.mock.MockHTable;
+//import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.integration.BaseIntegrationTest;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.ProcessorResult;

@@ -24,8 +24,6 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.elasticsearch.dao.ElasticsearchDao;
 import org.apache.metron.elasticsearch.integration.components.ElasticSearchComponent;
-import org.apache.metron.hbase.mock.MockHBaseTableProvider;
-import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.HBaseDao;
 import org.apache.metron.indexing.dao.IndexDao;
@@ -54,7 +52,6 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
 
   private static final String TABLE_NAME = "modifications";
   private static final String CF = "p";
-  private static MockHTable table;
   private static IndexDao hbaseDao;
   private static IndexDao elasticsearchDao;
   private static AccessConfig accessConfig;
@@ -68,9 +65,6 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
   @BeforeClass
   public static void setupBeforeClass() throws UnableToStartException, IOException {
     Configuration config = HBaseConfiguration.create();
-    MockHBaseTableProvider tableProvider = new MockHBaseTableProvider();
-    MockHBaseTableProvider.addToCache(TABLE_NAME, CF);
-    table = (MockHTable) tableProvider.getTable(config, TABLE_NAME);
 
     globalConfig = new HashMap<>();
     globalConfig.put("es.clustername", "metron");
@@ -81,7 +75,6 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
     globalConfig.put(HBaseDao.HBASE_CF, CF);
 
     accessConfig = new AccessConfig();
-    accessConfig.setTableProvider(tableProvider);
     accessConfig.setGlobalConfigSupplier(() -> globalConfig);
 
     es = new ElasticSearchComponent.Builder()
@@ -104,7 +97,6 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
   @After
   public void reset() {
     es.reset();
-    table.clear();
   }
 
   @AfterClass
@@ -131,10 +123,5 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
   @Override
   protected List<Map<String, Object>> getIndexedTestData(String indexName, String sensorType) throws Exception {
     return es.getAllIndexedDocs(index, SENSOR_NAME + "_doc");
-  }
-
-  @Override
-  protected MockHTable getMockHTable() {
-    return table;
   }
 }
