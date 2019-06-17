@@ -144,7 +144,7 @@ public class SimpleHbaseEnrichmentWriter extends AbstractWriter implements BulkM
     cf = Configurations.HBASE_CF.getAndConvert(sensorConfig, String.class);
     String hbaseProviderImpl = HBASE_PROVIDER.getAndConvert(sensorConfig, String.class);
     if(hbaseProviderImpl != null) {
-      connectionFactory = HBaseConnectionFactory.getConnectionFactory(hbaseProviderImpl);
+      connectionFactory = HBaseConnectionFactory.byName(hbaseProviderImpl);
     }
 
     LOG.debug("configured writer; sensor={}, connectionFactory={}", sensorName, getClassName(connectionFactory));

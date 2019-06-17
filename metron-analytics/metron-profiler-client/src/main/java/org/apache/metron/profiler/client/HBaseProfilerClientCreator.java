@@ -93,6 +93,6 @@ public class HBaseProfilerClientCreator implements ProfilerClientCreator {
    */
   private static HBaseConnectionFactory getConnectionFactory(Map<String, Object> global) {
     String clazzName = PROFILER_HBASE_CONNECTION_FACTORY.get(global, String.class);
-    return HBaseConnectionFactory.getConnectionFactory(clazzName);
+    return HBaseConnectionFactory.byName(clazzName);
   }
 }

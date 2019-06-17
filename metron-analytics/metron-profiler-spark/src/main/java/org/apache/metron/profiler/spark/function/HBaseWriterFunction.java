@@ -164,7 +164,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     }
 
     // instantiate the table provider
-    return HBaseConnectionFactory.getConnectionFactory(factoryImpl);
+    return HBaseConnectionFactory.byName(factoryImpl);
   }
 
   protected HBaseWriterFunction withConnectionFactory(HBaseConnectionFactory connectionFactory) {

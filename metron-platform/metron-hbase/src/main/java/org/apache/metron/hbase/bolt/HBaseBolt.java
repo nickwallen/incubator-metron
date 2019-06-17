@@ -126,7 +126,7 @@ public class HBaseBolt extends BaseRichBolt {
   }
 
   public HBaseBolt withConnectionFactory(String connectionFactoryImpl) {
-    this.connectionFactory = HBaseConnectionFactory.getConnectionFactory(connectionFactoryImpl);
+    this.connectionFactory = HBaseConnectionFactory.byName(connectionFactoryImpl);
     return this;
   }
 

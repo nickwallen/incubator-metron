@@ -26,7 +26,6 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
-import java.util.function.Supplier;
 
 /**
  * Establishes a {@link Connection} to HBase.
@@ -37,30 +36,19 @@ public class HBaseConnectionFactory implements Serializable {
     return ConnectionFactory.createConnection(configuration);
   }
 
-  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl) {
-    return getConnectionFactory(factoryImpl, () -> new HBaseConnectionFactory());
-  }
+  /**
+   * Creates an {@link HBaseConnectionFactory} based on a fully-qualified class name.
+   *
+   * @param className The fully-qualified class name to instantiate.
+   * @return A {@link HBaseConnectionFactory}.
+   */
+  public static HBaseConnectionFactory byName(String className) {
+    try {
+      Class<? extends HBaseConnectionFactory> clazz = (Class<? extends HBaseConnectionFactory>) Class.forName(className);
+      return clazz.getConstructor().newInstance();
 
-  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl,
-                                                            Supplier<HBaseConnectionFactory> defaultImpl) {
-    if(factoryImpl == null || factoryImpl.length() == 0 || factoryImpl.charAt(0) == '$') {
-      return defaultImpl.get();
-    } else {
-      try {
-        Class<? extends HBaseConnectionFactory> clazz =
-                (Class<? extends HBaseConnectionFactory>) Class.forName(factoryImpl);
-        return clazz.getConstructor().newInstance();
-      } catch (InstantiationException e) {
-        throw new IllegalStateException("Unable to instantiate connector.", e);
-      } catch (IllegalAccessException e) {
-        throw new IllegalStateException("Unable to instantiate connector: illegal access", e);
-      } catch (InvocationTargetException e) {
-        throw new IllegalStateException("Unable to instantiate connector", e);
-      } catch (NoSuchMethodException e) {
-        throw new IllegalStateException("Unable to instantiate connector: no such method", e);
-      } catch (ClassNotFoundException e) {
-        throw new IllegalStateException("Unable to instantiate connector: class not found", e);
-      }
+    } catch (InstantiationException | NoSuchMethodException | IllegalAccessException | ClassNotFoundException | InvocationTargetException e) {
+      throw new IllegalStateException("Unable to instantiate HBaseConnectionFactory.", e);
     }
   }
 }

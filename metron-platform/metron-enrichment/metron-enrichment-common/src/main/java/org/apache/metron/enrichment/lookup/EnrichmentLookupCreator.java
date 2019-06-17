@@ -22,14 +22,32 @@ import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
 
 /**
  * Responsible for creating an {@link EnrichmentLookup}.
  */
-public interface EnrichmentLookupCreator {
+public interface EnrichmentLookupCreator extends Serializable {
 
   EnrichmentLookup create(HBaseConnectionFactory connectionFactory,
                           String tableName,
                           String columnFamily,
                           AccessTracker accessTracker) throws IOException;
+
+  /**
+   * Creates an {@link EnrichmentLookupCreator} based on a fully-qualified class name.
+   *
+   * @param className The fully-qualified class name to instantiate.
+   * @return A {@link EnrichmentLookupCreator}.
+   */
+  static EnrichmentLookupCreator byName(String className) {
+      try {
+        Class<? extends EnrichmentLookupCreator> clazz = (Class<? extends EnrichmentLookupCreator>) Class.forName(className);
+        return clazz.getConstructor().newInstance();
+
+      } catch (InstantiationException | NoSuchMethodException | IllegalAccessException | ClassNotFoundException | InvocationTargetException e) {
+        throw new IllegalStateException("Unable to instantiate EnrichmentLookupCreator.", e);
+      }
+  }
 }
