@@ -19,6 +19,7 @@ package org.apache.metron.enrichment.bolt;
 
 import static org.apache.metron.common.Constants.STELLAR_CONTEXT_CONF;
 
+import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.storm.common.bolt.ConfiguredEnrichmentBolt;
 import org.apache.metron.common.configuration.ConfigurationType;
@@ -56,6 +57,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 
 /**
  * This bolt is a unified enrichment/threat intel bolt.  In contrast to the split/enrich/join
@@ -94,6 +96,7 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
    * enrichment or threat intel.  It is configured in the topology itself.
    */
   protected EnrichmentStrategies strategy;
+
   /**
    * Determine the way to retrieve the message.  This must be specified in the topology.
    */
@@ -101,6 +104,7 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
   protected MessageGetters getterStrategy;
   protected OutputCollector collector;
   private Context stellarContext;
+
   /**
    * An enrichment type to adapter map.  This is configured externally.
    */
@@ -111,10 +115,12 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
    * element is in the cache, then the result is returned instead of computed.
    */
   protected Long maxCacheSize;
+
   /**
    * The total amount of time in minutes since write to keep an element in the cache.
    */
   protected Long maxTimeRetain;
+
   /**
    * If the bolt is reloaded, invalidate the cache?
    */
@@ -259,7 +265,7 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
     try {
       String sourceType = MessageUtils.getSensorType(message);
       SensorEnrichmentConfig config = getConfigurations().getSensorEnrichmentConfig(sourceType);
-      if(config == null) {
+      if (config == null) {
         LOG.debug("Unable to find SensorEnrichmentConfig for sourceType: {}", sourceType);
         config = new SensorEnrichmentConfig();
       }
@@ -274,11 +280,11 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
       enriched = strategy.postProcess(enriched, config, enrichmentContext);
 
       //we can emit the message now
-      collector.emit("message",
-              input,
-              new Values(guid, enriched));
+      LOG.trace("Emitting message; message={}", enriched);
+      collector.emit("message", input, new Values(guid, enriched));
+
       //and handle each of the errors in turn.  If any adapter errored out, we will have one message per.
-      for(Map.Entry<Object, Throwable> t : result.getEnrichmentErrors()) {
+      for (Map.Entry<Object, Throwable> t : result.getEnrichmentErrors()) {
         LOG.error("[Metron] Unable to enrich message: {}", message, t);
         MetronError error = new MetronError()
                 .withErrorType(strategy.getErrorType())
@@ -287,18 +293,28 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
                 .addRawMessage(t.getKey());
         StormErrorUtils.handleError(collector, error);
       }
-    } catch (Exception e) {
-      //If something terrible and unexpected happens then we want to send an error along, but this
-      //really shouldn't be happening.
-      LOG.error("[Metron] Unable to enrich message: {}", message, e);
+    } catch(TimeoutException e) {
+      //If something terrible and unexpected happens then we want to send an error along, but this should not happen
+      LOG.error("Unable to enrich message within given timeout: {}", message, e);
       MetronError error = new MetronError()
               .withErrorType(strategy.getErrorType())
               .withMessage(e.getMessage())
               .withThrowable(e)
               .addRawMessage(message);
       StormErrorUtils.handleError(collector, error);
-    }
-    finally {
+
+    } catch (Throwable e) {
+      //If something terrible and unexpected happens then we want to send an error along, but this should not happen
+      LOG.error("Unable to enrich message: {}", message, e);
+      MetronError error = new MetronError()
+              .withErrorType(strategy.getErrorType())
+              .withMessage(e.getMessage())
+              .withThrowable(e)
+              .addRawMessage(message);
+      StormErrorUtils.handleError(collector, error);
+
+    } finally {
+      LOG.trace("Acking message; message={}", message);
       collector.ack(input);
     }
   }
@@ -319,7 +335,9 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
    * @return
    */
   public JSONObject generateMessage(Tuple tuple) {
-    return (JSONObject) messageGetter.get(tuple);
+    JSONObject message = (JSONObject) messageGetter.get(tuple);
+    LOG.trace("Received message; message={}", message);
+    return message;
   }
 
   @Override

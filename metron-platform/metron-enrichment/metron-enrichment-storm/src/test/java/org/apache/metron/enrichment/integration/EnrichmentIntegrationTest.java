@@ -25,6 +25,7 @@ import com.google.common.base.Splitter;
 import com.google.common.collect.Iterables;
 import java.io.File;
 import java.io.IOException;
+import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,11 +42,11 @@ import org.apache.metron.common.Constants;
 import org.apache.metron.common.utils.JSONUtils;
 import org.apache.metron.enrichment.adapters.maxmind.asn.GeoLiteAsnDatabase;
 import org.apache.metron.enrichment.adapters.maxmind.geo.GeoLiteCityDatabase;
-import org.apache.metron.enrichment.converter.EnrichmentHelper;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
+import org.apache.metron.enrichment.lookup.FakeEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.FakeEnrichmentLookupCreator;
 import org.apache.metron.integration.components.ConfigUploadComponent;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.accesstracker.PersistentBloomTrackerCreator;
 import org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions;
 import org.apache.metron.enrichment.utils.ThreatIntelUtils;
@@ -65,12 +66,16 @@ import org.json.simple.parser.ParseException;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static org.apache.metron.common.Constants.INDEXING_TOPIC;
 
 /**
  * Integration test for the 'Split-Join' enrichment topology.
  */
 public class EnrichmentIntegrationTest extends BaseIntegrationTest {
-
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   public static final String ERROR_TOPIC = "enrichment_error";
   public static final String SRC_IP = "ip_src_addr";
   public static final String DST_IP = "ip_dst_addr";
@@ -171,6 +176,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
       setProperty("threat_intel_stellar_parallelism", "1");
       setProperty("threat_intel_join_parallelism", "1");
       setProperty("kafka_writer_parallelism", "1");
+      setProperty("enrichment_lookup_creator", FakeEnrichmentLookupCreator.class.getName());
     }};
   }
 
@@ -200,6 +206,17 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
             .withTopologyProperties(topologyProperties)
             .withGlobalConfig(globalConfigStr)
             .withEnrichmentConfigsPath(enrichmentConfigPath);
+
+    // TODO need to load up these enrichments in the in-memory EnrichmentLookups thing.
+
+    // add enrichments to the set of global, static enrichments
+    FakeEnrichmentLookup lookup = new FakeEnrichmentLookup()
+            .withEnrichment(
+                    new EnrichmentKey(MALICIOUS_IP_TYPE, "10.0.2.3"),
+                    new EnrichmentValue(new HashMap<>()))
+            .withEnrichment(
+                    new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3"),
+                    new EnrichmentValue(PLAYFUL_ENRICHMENT));
 
     //create MockHBaseTables
 //    final MockHTable trackerTable = (MockHTable) MockHBaseTableProvider.addToCache(trackerHBaseTableName, cf);
@@ -238,30 +255,29 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
       runner.start();
       fluxComponent.submitTopology();
 
+      // write the input telemetry to kafka
       kafkaComponent.writeMessages(Constants.ENRICHMENT_TOPIC, inputMessages);
-      ProcessorResult<Map<String, List<Map<String, Object>>>> result = runner.process(getProcessor());
+
+      // read the messages output by the enrichment topology
+      ProcessorResult<Map<String, List<Map<String, Object>>>> result = runner.process(getKafkaProcessor());
       Map<String,List<Map<String, Object>>> outputMessages = result.getResult();
+
+      // validate the successfully enriched messages
       List<Map<String, Object>> docs = outputMessages.get(Constants.INDEXING_TOPIC);
       Assert.assertEquals(inputMessages.size(), docs.size());
       validateAll(docs);
+
+      // validate the error messages
       List<Map<String, Object>> errors = outputMessages.get(ERROR_TOPIC);
       Assert.assertEquals(inputMessages.size(), errors.size());
       validateErrors(errors);
+
     } finally {
       runner.stop();
     }
   }
 
-  public void dumpParsedMessages(List<Map<String,Object>> outputMessages, StringBuffer buffer) {
-    for (Map<String,Object> map  : outputMessages) {
-      for( String json : map.keySet()) {
-        buffer.append(json).append("\n");
-      }
-    }
-  }
-
   public static void validateAll(List<Map<String, Object>> docs) {
-
     for (Map<String, Object> doc : docs) {
       baseValidation(doc);
       hostEnrichmentValidation(doc);
@@ -567,8 +583,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
     return tmp;
   }
   @SuppressWarnings("unchecked")
-  private KafkaProcessor<Map<String,List<Map<String, Object>>>> getProcessor(){
-
+  private KafkaProcessor<Map<String,List<Map<String, Object>>>> getKafkaProcessor(){
     return new KafkaProcessor<>()
             .withKafkaComponentName("kafka")
             .withReadTopic(Constants.INDEXING_TOPIC)
@@ -577,7 +592,13 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
               @Nullable
               @Override
               public Boolean apply(@Nullable KafkaMessageSet messageSet) {
-                return (messageSet.getMessages().size() == inputMessages.size()) && (messageSet.getErrors().size() == inputMessages.size());
+                int expected = inputMessages.size();
+                int actualSuccesses = messageSet.getMessages().size();
+                int actualErrors = messageSet.getErrors().size();
+                LOG.debug("Got {} of {} successful message(s) and {} of {} error message(s)",
+                        actualSuccesses, expected, actualErrors, expected);
+
+                return (actualSuccesses == expected) && (actualErrors == expected);
               }
             })
             .withProvideResult(new Function<KafkaMessageSet,Map<String,List<Map<String, Object>>>>(){
@@ -585,7 +606,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
               @Override
               public Map<String,List<Map<String, Object>>> apply(@Nullable KafkaMessageSet messageSet) {
                 return new HashMap<String, List<Map<String, Object>>>() {{
-                  put(Constants.INDEXING_TOPIC, loadMessages(messageSet.getMessages()));
+                  put(INDEXING_TOPIC, loadMessages(messageSet.getMessages()));
                   put(ERROR_TOPIC, loadMessages(messageSet.getErrors()));
                 }};
               }

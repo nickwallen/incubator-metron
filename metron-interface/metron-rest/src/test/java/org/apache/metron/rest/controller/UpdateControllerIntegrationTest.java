@@ -22,7 +22,6 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.metron.hbase.mock.MockHTable;
 import org.apache.metron.indexing.dao.HBaseDao;
 import org.apache.metron.indexing.dao.SearchIntegrationTest;
 import org.apache.metron.indexing.dao.update.CommentAddRemoveRequest;

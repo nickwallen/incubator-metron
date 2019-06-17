@@ -229,11 +229,10 @@ public class GenericEnrichmentBolt extends ConfiguredEnrichmentBolt {
               perfLog.log("enrich", "key={}, time to run enrichment type={}", key, enrichmentType);
 
               if (enrichedField == null)
-                throw new Exception("[Metron] Could not enrich string: "
-                        + value);
+                throw new Exception("[Metron] Could not enrich string: " + value);
             }
             catch(Exception e) {
-              LOG.error(e.getMessage(), e);
+              LOG.error("Unable to enrich message: type={}, key={}, group={}, message={}", enrichmentType, key, subGroup, rawMessage, e);
               MetronError metronError = new MetronError()
                       .withErrorType(Constants.ErrorType.ENRICHMENT_ERROR)
                       .withThrowable(e)
@@ -260,7 +259,7 @@ public class GenericEnrichmentBolt extends ConfiguredEnrichmentBolt {
   // Made protected to allow for error testing in integration test. Directly flaws inputs while everything is functioning hits other
   // errors, so this is made available in order to ensure ERROR_STREAM is output properly.
   protected void handleError(String key, JSONObject rawMessage, String subGroup, JSONObject enrichedMessage, Exception e) {
-    LOG.error("[Metron] Unable to enrich message: {}", rawMessage, e);
+    LOG.error("Unable to enrich message: type={}, key={}, group={}, message={}", enrichmentType, key, subGroup, rawMessage, e);
     if (key != null) {
       collector.emit(enrichmentType, new Values(key, enrichedMessage, subGroup));
     }
