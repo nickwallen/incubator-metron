@@ -49,15 +49,18 @@ components:
 
     -   id: "geoEnrichmentAdapter"
         className: "org.apache.metron.enrichment.adapters.geo.GeoAdapter"
+
     -   id: "geoEnrichment"
         className: "org.apache.metron.enrichment.configuration.Enrichment"
         constructorArgs:
             -   "geo"
             -   ref: "geoEnrichmentAdapter"
+
     -   id: "hostEnrichmentAdapter"
         className: "org.apache.metron.enrichment.adapters.host.HostFromJSONListAdapter"
         constructorArgs:
             - '${enrichment.host.known_hosts}'
+
     -   id: "hostEnrichment"
         className: "org.apache.metron.enrichment.configuration.Enrichment"
         constructorArgs:
@@ -67,26 +70,29 @@ components:
     -   id: "simpleHBaseEnrichmentConfig"
         className: "org.apache.metron.enrichment.adapters.simplehbase.SimpleHBaseConfig"
         configMethods:
-            -   name: "withProviderImpl"
-                args:
-                    - "${hbase.provider.impl}"
             -   name: "withHBaseTable"
                 args:
                     - "${enrichment.simple.hbase.table}"
             -   name: "withHBaseCF"
                 args:
                     - "${enrichment.simple.hbase.cf}"
+            -   name: "withEnrichmentLookupCreator"
+                args:
+                      - "${enrichment.lookup.creator}"
+
     -   id: "simpleHBaseEnrichmentAdapter"
         className: "org.apache.metron.enrichment.adapters.simplehbase.SimpleHBaseAdapter"
         configMethods:
            -    name: "withConfig"
                 args:
                     - ref: "simpleHBaseEnrichmentConfig"
+
     -   id: "simpleHBaseEnrichment"
         className: "org.apache.metron.enrichment.configuration.Enrichment"
         constructorArgs:
           -   "hbaseEnrichment"
           -   ref: "simpleHBaseEnrichmentAdapter"
+
     -   id: "enrichments"
         className: "java.util.ArrayList"
         configMethods:
@@ -124,17 +130,16 @@ components:
             -   name: "ofType"
                 args:
                     - "THREAT_INTEL"
+
     -   id: "stellarThreatIntelEnrichment"
         className: "org.apache.metron.enrichment.configuration.Enrichment"
         constructorArgs:
             -   "stellar"
             -   ref: "stellarThreatIntelAdapter"
+
     -   id: "simpleHBaseThreatIntelConfig"
         className: "org.apache.metron.enrichment.adapters.threatintel.ThreatIntelConfig"
         configMethods:
-            -   name: "withProviderImpl"
-                args:
-                    - "${hbase.provider.impl}"
             -   name: "withTrackerHBaseTable"
                 args:
                     - "${threat.intel.tracker.table}"
@@ -147,12 +152,17 @@ components:
             -   name: "withHBaseCF"
                 args:
                     - "${threat.intel.simple.hbase.cf}"
+            -   name: "withEnrichmentLookupCreator"
+                args:
+                - "${enrichment.lookup.creator}"
+
     -   id: "simpleHBaseThreatIntelAdapter"
         className: "org.apache.metron.enrichment.adapters.threatintel.ThreatIntelAdapter"
         configMethods:
            -    name: "withConfig"
                 args:
                     - ref: "simpleHBaseThreatIntelConfig"
+
     -   id: "simpleHBaseThreatIntelEnrichment"
         className: "org.apache.metron.enrichment.configuration.Enrichment"
         constructorArgs:

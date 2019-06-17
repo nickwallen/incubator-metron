@@ -24,6 +24,7 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
@@ -113,7 +114,8 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>, Serializ
   public boolean initializeAdapter(Map<String, Object> configuration) {
     try {
       if(lookup == null) {
-        lookup = new HBaseEnrichmentLookup(config.getConnectionFactory(), config.getHBaseTable(), config.getHBaseCF());
+        EnrichmentLookupCreator creator = config.getEnrichmentLookupCreator();
+        lookup = creator.create(config.getConnectionFactory(), config.getHBaseTable(), config.getHBaseCF(), null);
       }
     } catch (IOException e) {
       LOG.error("Unable to initialize adapter: {}", e.getMessage(), e);

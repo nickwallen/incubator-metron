@@ -110,7 +110,7 @@ public class TaxiiIntegrationTest {
 //        Assert.assertEquals(numStringsMatch(MockTaxiiService.pollMsg, "AddressObj:Address_Value condition=\"Equal\""), maliciousAddresses.size());
 //        MockHBaseTableProvider.clear();
 
-        MockEnrichmentConverter converter = new MockEnrichmentConverter()
+        MockEnrichmentConverter converter = new MockEnrichmentConverter();
         MockEnrichmentConverterCreator creator = new MockEnrichmentConverterCreator(converter);
 
         final Configuration config = HBaseConfiguration.create();
