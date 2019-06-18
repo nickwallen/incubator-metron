@@ -228,7 +228,8 @@ public class ParallelEnricher {
             (left, right) -> join(left, right));
 
     // TODO could add a timeout here
-    JSONObject enrichedMessage = enrichmentFutures.get(5, TimeUnit.SECONDS);
+    //JSONObject enrichedMessage = enrichmentFutures.get(5, TimeUnit.SECONDS);
+    JSONObject enrichedMessage = enrichmentFutures.get();
     LOG.error("======================= DONE W CALL ALL=================");
 
 
