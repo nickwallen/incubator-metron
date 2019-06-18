@@ -247,7 +247,6 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
     }
   }
 
-
   /**
    * Fully enrich a message based on the strategy which was used to configure the bolt.
    * Each enrichment is done in parallel and the results are joined together.  Each enrichment
@@ -262,6 +261,9 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
   @Override
   public void execute(Tuple input) {
     JSONObject message = generateMessage(input);
+    String guid = getGUID(input, message);
+    LOG.trace("Received message; guid={}, message={}", guid, message);
+
     try {
       String sourceType = MessageUtils.getSensorType(message);
       SensorEnrichmentConfig config = getConfigurations().getSensorEnrichmentConfig(sourceType);
@@ -272,7 +274,6 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
       //This is an existing kludge for the stellar adapter to pass information along.
       //We should figure out if this can be rearchitected a bit.  This smells.
       config.getConfiguration().putIfAbsent(STELLAR_CONTEXT_CONF, stellarContext);
-      String guid = getGUID(input, message);
 
       // enrich the message
       ParallelEnricher.EnrichmentResult result = enricher.apply(message, strategy, config, perfLog);
@@ -280,41 +281,34 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
       enriched = strategy.postProcess(enriched, config, enrichmentContext);
 
       //we can emit the message now
-      LOG.trace("Emitting message; message={}", enriched);
+      LOG.trace("Emitting message; guid={}, message={}", guid, enriched);
       collector.emit("message", input, new Values(guid, enriched));
 
       //and handle each of the errors in turn.  If any adapter errored out, we will have one message per.
-      for (Map.Entry<Object, Throwable> t : result.getEnrichmentErrors()) {
-        LOG.error("[Metron] Unable to enrich message: {}", message, t);
+      for (Map.Entry<Object, Throwable> entry : result.getEnrichmentErrors()) {
+        Throwable throwable = entry.getValue();
+        String reason = entry.getValue().getMessage();
+        LOG.error("Unable to enrich message: reason={}, guid={}, message={}", reason, guid, entry.getKey(), throwable);
         MetronError error = new MetronError()
                 .withErrorType(strategy.getErrorType())
-                .withMessage(t.getValue().getMessage())
-                .withThrowable(t.getValue())
-                .addRawMessage(t.getKey());
+                .withMessage(reason)
+                .withThrowable(throwable)
+                .addRawMessage(entry.getKey());
         StormErrorUtils.handleError(collector, error);
       }
-    } catch(TimeoutException e) {
-      //If something terrible and unexpected happens then we want to send an error along, but this should not happen
-      LOG.error("Unable to enrich message within given timeout: {}", message, e);
-      MetronError error = new MetronError()
-              .withErrorType(strategy.getErrorType())
-              .withMessage(e.getMessage())
-              .withThrowable(e)
-              .addRawMessage(message);
-      StormErrorUtils.handleError(collector, error);
-
     } catch (Throwable e) {
       //If something terrible and unexpected happens then we want to send an error along, but this should not happen
-      LOG.error("Unable to enrich message: {}", message, e);
+      String reason = e.getMessage();
+      LOG.error("Unable to enrich message: reason={}, guid={}, message={}", reason, guid, message, e);
       MetronError error = new MetronError()
               .withErrorType(strategy.getErrorType())
-              .withMessage(e.getMessage())
+              .withMessage(reason)
               .withThrowable(e)
               .addRawMessage(message);
       StormErrorUtils.handleError(collector, error);
 
     } finally {
-      LOG.trace("Acking message; message={}", message);
+      LOG.trace("Acking message; guid={}", guid);
       collector.ack(input);
     }
   }
@@ -335,9 +329,7 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
    * @return
    */
   public JSONObject generateMessage(Tuple tuple) {
-    JSONObject message = (JSONObject) messageGetter.get(tuple);
-    LOG.trace("Received message; message={}", message);
-    return message;
+    return (JSONObject) messageGetter.get(tuple);
   }
 
   @Override
@@ -402,23 +394,32 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
    * @return
    */
   public String getGUID(Tuple tuple, JSONObject message) {
-    String key = null, guid = null;
-    try {
-      key = tuple.getStringByField("key");
-      guid = (String)message.get(Constants.GUID);
-    }
-    catch(Throwable t) {
-      //swallowing this just in case.
-    }
-    if(key != null) {
-      return key;
-    }
-    else if(guid != null) {
+    // retrieve the GUID from within the tuple
+    String guid = getFieldFromTuple(tuple, "key");
+    if(guid != null) {
       return guid;
     }
-    else {
-      return UUID.randomUUID().toString();
+
+    // retrieve the GUID from within the message
+    guid = (String) message.get(Constants.GUID);
+    if(guid != null) {
+      return guid;
     }
+
+    // if all else fails, generate a GUID
+    guid = UUID.randomUUID().toString();
+    LOG.trace("No GUID found in tuple or message; generated guid={}", guid);
+    return guid;
+  }
+
+  private String getFieldFromTuple(Tuple tuple, String fieldName) {
+    String field = null;
+    try {
+      field = tuple.getStringByField(fieldName);
+    } catch(IllegalArgumentException e) {
+      // the tuple does not contain the given field
+    }
+    return field;
   }
 
   /**
