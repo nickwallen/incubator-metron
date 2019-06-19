@@ -20,8 +20,11 @@
 package org.apache.metron.hbase.client;
 
 import org.apache.hadoop.conf.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationTargetException;
 import java.util.function.Supplier;
 
@@ -29,6 +32,7 @@ import java.util.function.Supplier;
  * Responsible for creating an {@link HBaseTableClient}.
  */
 public interface HBaseClientCreator extends Serializable {
+  Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
    * @param factory The connection factory for creating connections to HBase.
@@ -41,16 +45,20 @@ public interface HBaseClientCreator extends Serializable {
   /**
    * Instantiates a new {@link HBaseClientCreator} by class name.
    *
-   * @param creatorImpl The class name of the {@link HBaseClientCreator} to instantiate.
-   * @param defaultImpl The default instance to instantiate if the creatorImpl is invalid.
+   * @param className The class name of the {@link HBaseClientCreator} to instantiate.
+   * @param defaultImpl The default instance to instantiate if the className is invalid.
    * @return A new {@link HBaseClientCreator}.
    */
-  static HBaseClientCreator newInstance(String creatorImpl, Supplier<HBaseClientCreator> defaultImpl) {
-    if(creatorImpl == null || creatorImpl.length() == 0 || creatorImpl.charAt(0) == '$') {
+  static HBaseClientCreator byName(String className, Supplier<HBaseClientCreator> defaultImpl) {
+    LOG.debug("Creating HBase client creator; className={}", className);
+
+    if(className == null || className.length() == 0 || className.charAt(0) == '$') {
+      LOG.debug("Using default hbase client creator");
       return defaultImpl.get();
+
     } else {
       try {
-        Class<? extends HBaseClientCreator> clazz = (Class<? extends HBaseClientCreator>) Class.forName(creatorImpl);
+        Class<? extends HBaseClientCreator> clazz = (Class<? extends HBaseClientCreator>) Class.forName(className);
         return clazz.getConstructor().newInstance();
 
       } catch(InstantiationException | IllegalAccessException | InvocationTargetException |

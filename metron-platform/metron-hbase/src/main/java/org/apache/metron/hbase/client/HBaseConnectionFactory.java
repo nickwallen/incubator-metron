@@ -47,7 +47,7 @@ public class HBaseConnectionFactory implements Serializable {
    * @return A {@link HBaseConnectionFactory}.
    */
   public static HBaseConnectionFactory byName(String className) {
-    LOG.debug("Initializing HBase connection factory; className={}", className);
+    LOG.debug("Creating HBase connection factory; className={}", className);
     try {
       Class<? extends HBaseConnectionFactory> clazz = (Class<? extends HBaseConnectionFactory>) Class.forName(className);
       return clazz.getConstructor().newInstance();

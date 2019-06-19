@@ -21,13 +21,12 @@ package org.apache.metron.profiler.spark.function;
 
 import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
-import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
@@ -48,9 +47,9 @@ import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_CLIENT_CREATOR;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
+import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_SALT_DIVISOR;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_CONNECTION_FACTORY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_WRITE_DURABILITY;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION;
 import static org.apache.metron.profiler.spark.BatchProfilerConfig.PERIOD_DURATION_UNITS;
@@ -66,11 +65,6 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
    * Establishes connections to HBase.
    */
   private HBaseConnectionFactory connectionFactory;
-
-  /**
-   * The HBase configuration used to establish connections to HBase.
-   */
-  private Configuration hbaseConf;
 
   /**
    * Creates the {@link HBaseTableClient} when it is needed.
@@ -111,7 +105,6 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     // hbase
     tableName = HBASE_TABLE_NAME.get(properties, String.class);
     durability = HBASE_WRITE_DURABILITY.get(properties, Durability.class);
-    hbaseConf = HBaseConfiguration.create();
 
     // connection factory
     String factoryImpl = HBASE_CONNECTION_FACTORY.get(properties, String.class);
@@ -119,7 +112,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
 
     // client creator
     String creatorImpl = HBASE_CLIENT_CREATOR.get(properties, String.class);
-    hbaseClientCreator = HBaseClientCreator.newInstance(creatorImpl, () -> new HBaseTableClientCreator());
+    hbaseClientCreator = HBaseClientCreator.byName(creatorImpl, () -> new HBaseTableClientCreator());
   }
 
   /**
@@ -138,7 +131,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     if(measurements.size() > 0) {
 
       // open an HBase connection
-      try (HBaseClient client = hbaseClientCreator.create(connectionFactory, hbaseConf, tableName)) {
+      try (HBaseClient client = hbaseClientCreator.create(connectionFactory, HBaseConfiguration.create(), tableName)) {
 
         for (ProfileMeasurementAdapter adapter : measurements) {
           ProfileMeasurement m = adapter.toProfileMeasurement();
