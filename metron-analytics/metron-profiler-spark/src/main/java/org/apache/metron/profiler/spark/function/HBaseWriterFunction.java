@@ -68,6 +68,11 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
   private HBaseConnectionFactory connectionFactory;
 
   /**
+   * The HBase configuration used to establish connections to HBase.
+   */
+  private Configuration hbaseConf;
+
+  /**
    * Creates the {@link HBaseTableClient} when it is needed.
    */
   private HBaseClientCreator hbaseClientCreator;
@@ -106,6 +111,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     // hbase
     tableName = HBASE_TABLE_NAME.get(properties, String.class);
     durability = HBASE_WRITE_DURABILITY.get(properties, Durability.class);
+    hbaseConf = HBaseConfiguration.create();
 
     // connection factory
     String factoryImpl = HBASE_CONNECTION_FACTORY.get(properties, String.class);
@@ -132,8 +138,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     if(measurements.size() > 0) {
 
       // open an HBase connection
-      Configuration config = HBaseConfiguration.create();
-      try (HBaseClient client = hbaseClientCreator.create(connectionFactory, config, tableName)) {
+      try (HBaseClient client = hbaseClientCreator.create(connectionFactory, hbaseConf, tableName)) {
 
         for (ProfileMeasurementAdapter adapter : measurements) {
           ProfileMeasurement m = adapter.toProfileMeasurement();
@@ -174,6 +179,16 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
 
   protected HBaseWriterFunction withClientCreator(HBaseClientCreator clientCreator) {
     this.hbaseClientCreator = clientCreator;
+    return this;
+  }
+
+  protected HBaseWriterFunction withRowKeyBuilder(RowKeyBuilder rowKeyBuilder) {
+    this.rowKeyBuilder = rowKeyBuilder;
+    return this;
+  }
+
+  protected HBaseWriterFunction withColumnBuilder(ColumnBuilder columnBuilder) {
+    this.columnBuilder = columnBuilder;
     return this;
   }
 }

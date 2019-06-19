@@ -51,15 +51,30 @@ public class FakeHBaseClient implements HBaseClient {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
-   * The records that have been persisted.  This is static so that all
-   * instantiated clients 'see' the same set of records.
+   * The mutations that have been persisted.  Represents mutations that would
+   * have been written to HBase.
+   *
+   * <p>This is static so that all instantiated clients 'see' the same set of records.
    */
-  private static Map<ByteBuffer, ColumnList> records = Collections.synchronizedMap(new HashMap<>());
+  private static Map<ByteBuffer, ColumnList> persisted = Collections.synchronizedMap(new HashMap<>());
+
+  /**
+   * Represents a mutation that was submitted to the {@link FakeHBaseClient}.
+   */
+  public static class Mutation {
+    public byte[] rowKey;
+    public ColumnList columnList;
+
+    public Mutation(byte[] rowKey, ColumnList columnList) {
+      this.rowKey = rowKey;
+      this.columnList = columnList;
+    }
+  }
 
   /**
    * The set of queued or pending mutations.
    */
-  private Map<ByteBuffer, ColumnList> queuedMutations;
+  private List<Mutation> queuedMutations;
 
   /**
    * The set of queued or pending gets.
@@ -68,14 +83,24 @@ public class FakeHBaseClient implements HBaseClient {
 
   public FakeHBaseClient() {
     queuedGets = new ArrayList<>();
-    queuedMutations = new HashMap<>();
+    queuedMutations = new ArrayList<>();
   }
 
   /**
-   * Deletes all persisted records.
+   * Deletes all records persisted in the static, in-memory collection.
    */
   public void deleteAll() {
-    records.clear();
+    persisted.clear();
+  }
+
+  /**
+   * Returns all mutations that have been persisted in the static, in-memory collection.
+   */
+  public List<Mutation> getAllPersisted() {
+    return persisted.entrySet()
+            .stream()
+            .map(entry -> new Mutation(entry.getKey().array(), entry.getValue()))
+            .collect(Collectors.toList());
   }
 
   @Override
@@ -90,8 +115,8 @@ public class FakeHBaseClient implements HBaseClient {
     for (int i = 0; i < queuedGets.size(); i++) {
       ByteBuffer rowKey = queuedGets.get(i);
       Result result;
-      if (records.containsKey(rowKey)) {
-        ColumnList cols = records.get(rowKey);
+      if (persisted.containsKey(rowKey)) {
+        ColumnList cols = persisted.get(rowKey);
         result = matchingResult(cols);
 
       } else {
@@ -136,7 +161,7 @@ public class FakeHBaseClient implements HBaseClient {
 
   @Override
   public List<String> scanRowKeys() {
-    return records.keySet()
+    return persisted.keySet()
             .stream()
             .map(bytes -> String.valueOf(bytes))
             .collect(Collectors.toList());
@@ -147,11 +172,9 @@ public class FakeHBaseClient implements HBaseClient {
     for (ColumnList.Column column : cols.getColumns()) {
       String family = Bytes.toString(column.getFamily());
       String qualifier = Bytes.toString(column.getQualifier());
-      //int value = Bytes.toInt(column.getValue());
       LOG.debug("Queuing mutation column; {}:{}", family, qualifier);
     }
-
-    queuedMutations.put(ByteBuffer.wrap(rowKey), cols);
+    queuedMutations.add(new Mutation(rowKey, cols));
   }
 
   @Override
@@ -169,9 +192,12 @@ public class FakeHBaseClient implements HBaseClient {
   @Override
   public int mutate() {
     int numberOfMutations = queuedMutations.size();
-    records.putAll(queuedMutations);
+
+    // persist each queued mutation
+    queuedMutations.forEach(mutation -> persisted.put(ByteBuffer.wrap(mutation.rowKey), mutation.columnList));
     clearMutations();
-    LOG.debug("Wrote {} record(s); now have {} record(s) in all", numberOfMutations, records.size());
+
+    LOG.debug("Wrote {} record(s); now have {} record(s) in all", numberOfMutations, persisted.size());
     return numberOfMutations;
   }
 

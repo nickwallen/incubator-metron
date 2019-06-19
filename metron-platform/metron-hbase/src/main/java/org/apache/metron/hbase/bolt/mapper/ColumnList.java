@@ -23,7 +23,9 @@ package org.apache.metron.hbase.bolt.mapper;
 import org.apache.hadoop.hbase.util.Bytes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents a list of HBase columns.
@@ -78,6 +80,30 @@ public class ColumnList {
     public long getTs() {
       return ts;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof Column)) return false;
+      Column column = (Column) o;
+      return ts == column.ts &&
+              Arrays.equals(value, column.value);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = Objects.hash(ts);
+      result = 31 * result + Arrays.hashCode(value);
+      return result;
+    }
+
+    @Override
+    public String toString() {
+      return "Column{" +
+              "value=" + Arrays.toString(value) +
+              ", ts=" + ts +
+              '}';
+    }
   }
 
   public static class Counter extends AbstractColumn {
@@ -89,6 +115,26 @@ public class ColumnList {
 
     public long getIncrement() {
       return incr;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (!(o instanceof Counter)) return false;
+      Counter counter = (Counter) o;
+      return incr == counter.incr;
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(incr);
+    }
+
+    @Override
+    public String toString() {
+      return "Counter{" +
+              "incr=" + incr +
+              '}';
     }
   }
 
@@ -184,5 +230,27 @@ public class ColumnList {
    */
   public List<Counter> getCounters(){
     return this.counters;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof ColumnList)) return false;
+    ColumnList that = (ColumnList) o;
+    return Objects.equals(columns, that.columns) &&
+            Objects.equals(counters, that.counters);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(columns, counters);
+  }
+
+  @Override
+  public String toString() {
+    return "ColumnList{" +
+            "columns=" + columns +
+            ", counters=" + counters +
+            '}';
   }
 }
