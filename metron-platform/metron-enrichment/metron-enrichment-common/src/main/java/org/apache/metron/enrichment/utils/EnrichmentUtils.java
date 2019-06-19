@@ -95,28 +95,6 @@ public class EnrichmentUtils {
     return Iterables.getLast(Splitter.on('.').split(field));
   }
 
-  public static HBaseConnectionFactory getConnectionFactory(String factoryImpl, HBaseConnectionFactory defaultImpl) {
-    if(factoryImpl == null || factoryImpl.length() == 0 || factoryImpl.charAt(0) == '$') {
-      return defaultImpl;
-    } else {
-      try {
-        Class<? extends HBaseConnectionFactory> clazz =
-                (Class<? extends HBaseConnectionFactory>) Class.forName(factoryImpl);
-        return clazz.getConstructor().newInstance();
-      } catch (InstantiationException e) {
-        throw new IllegalStateException("Unable to instantiate connector.", e);
-      } catch (IllegalAccessException e) {
-        throw new IllegalStateException("Unable to instantiate connector: illegal access", e);
-      } catch (InvocationTargetException e) {
-        throw new IllegalStateException("Unable to instantiate connector", e);
-      } catch (NoSuchMethodException e) {
-        throw new IllegalStateException("Unable to instantiate connector: no such method", e);
-      } catch (ClassNotFoundException e) {
-        throw new IllegalStateException("Unable to instantiate connector: class not found", e);
-      }
-    }
-  }
-
   public static JSONObject adjustKeys(JSONObject enrichedMessage, JSONObject enrichedField, String field, String prefix) {
     if ( !enrichedField.isEmpty()) {
       for (Object enrichedKey : enrichedField.keySet()) {
