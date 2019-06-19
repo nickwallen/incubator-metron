@@ -95,7 +95,6 @@ public class FakeEnrichmentLookup implements EnrichmentLookup {
         results.add(get(key));
       }
     }
-
     return results;
   }
 
@@ -103,5 +102,4 @@ public class FakeEnrichmentLookup implements EnrichmentLookup {
   public void close() throws IOException {
     // nothing to do
   }
-
 }

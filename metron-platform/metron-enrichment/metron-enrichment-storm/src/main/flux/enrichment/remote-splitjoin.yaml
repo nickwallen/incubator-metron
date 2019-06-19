@@ -192,7 +192,7 @@ components:
             -   name: "withProducerConfigs"
                 args: 
                     - ref: "kafkaWriterProps"
-#indexing
+    #indexing
     -   id: "kafkaWriter"
         className: "org.apache.metron.writer.kafka.KafkaWriter"
         configMethods:
@@ -206,7 +206,7 @@ components:
                 args: 
                     - ref: "kafkaWriterProps"
 
-#kafka/zookeeper
+    #kafka/zookeeper
     # Any kafka props for the consumer go here.
     -   id: "kafkaProps"
         className: "java.util.HashMap"
@@ -229,7 +229,7 @@ components:
                   - "${kafka.security.protocol}"
 
 
-  # The fields to pull out of the kafka messages
+    # The fields to pull out of the kafka messages
     -   id: "fields"
         className: "java.util.ArrayList"
         configMethods:
@@ -259,7 +259,7 @@ spouts:
         parallelism: ${kafka.spout.parallelism}
 
 bolts:
-# Enrichment Bolts
+    # Enrichment Bolts
     -   id: "enrichmentSplitBolt"
         className: "org.apache.metron.enrichment.bolt.EnrichmentSplitterBolt"
         constructorArgs:
@@ -345,7 +345,7 @@ bolts:
                     - ref: "enrichmentErrorKafkaWriter"
 
 
-# Threat Intel Bolts
+    # Threat Intel Bolts
     -   id: "threatIntelSplitBolt"
         className: "org.apache.metron.enrichment.bolt.ThreatIntelSplitterBolt"
         constructorArgs:

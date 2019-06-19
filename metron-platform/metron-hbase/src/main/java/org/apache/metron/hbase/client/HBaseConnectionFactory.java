@@ -22,15 +22,19 @@ package org.apache.metron.hbase.client;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.ConnectionFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.InvocationTargetException;
 
 /**
  * Establishes a {@link Connection} to HBase.
  */
 public class HBaseConnectionFactory implements Serializable {
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   public Connection createConnection(Configuration configuration) throws IOException {
     return ConnectionFactory.createConnection(configuration);
@@ -43,6 +47,7 @@ public class HBaseConnectionFactory implements Serializable {
    * @return A {@link HBaseConnectionFactory}.
    */
   public static HBaseConnectionFactory byName(String className) {
+    LOG.debug("Initializing HBase connection factory; className={}", className);
     try {
       Class<? extends HBaseConnectionFactory> clazz = (Class<? extends HBaseConnectionFactory>) Class.forName(className);
       return clazz.getConstructor().newInstance();
