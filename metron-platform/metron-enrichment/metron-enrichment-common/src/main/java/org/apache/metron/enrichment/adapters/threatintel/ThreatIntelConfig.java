@@ -17,6 +17,7 @@
  */
 package org.apache.metron.enrichment.adapters.threatintel;
 
+import org.apache.metron.enrichment.adapters.simplehbase.SimpleHBaseConfig;
 import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.EnrichmentLookups;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
@@ -68,8 +69,12 @@ public class ThreatIntelConfig implements Serializable {
     return connectionFactory;
   }
 
-  public ThreatIntelConfig withProviderImpl(String connectorImpl) {
-    connectionFactory = EnrichmentUtils.getConnectionFactory(connectorImpl, new HBaseConnectionFactory());
+  public EnrichmentLookupCreator getEnrichmentLookupCreator() {
+    return enrichmentLookupCreator;
+  }
+
+  public ThreatIntelConfig withConnectionFactoryImpl(String connectorImpl) {
+    connectionFactory = HBaseConnectionFactory.byName(connectorImpl);
     return this;
   }
 
@@ -114,7 +119,6 @@ public class ThreatIntelConfig implements Serializable {
 
   public ThreatIntelConfig withEnrichmentLookupCreator(String creatorImpl) {
     this.enrichmentLookupCreator = EnrichmentLookupCreator.byName(creatorImpl);
-    //this.enrichmentLookupCreator = EnrichmentLookups.valueOf(creatorImpl);
     return this;
   }
 }

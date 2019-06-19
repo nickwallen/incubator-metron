@@ -34,6 +34,7 @@ import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.TrackedEnrichmentLookup;
@@ -125,28 +126,9 @@ public class ThreatIntelAdapter implements EnrichmentAdapter<CacheKey>,Serializa
   @Override
   public boolean initializeAdapter(Map<String, Object> configuration) {
     if(lookup == null) {
-      String hbaseTable = config.getHBaseTable();
-      int expectedInsertions = config.getExpectedInsertions();
-      double falsePositives = config.getFalsePositiveRate();
-      long millisecondsBetweenPersist = config.getMillisecondsBetweenPersists();
-      BloomAccessTracker bat = new BloomAccessTracker(hbaseTable, expectedInsertions, falsePositives);
-      Configuration hbaseConfig = HBaseConfiguration.create();
-      HBaseConnectionFactory connectionFactory = config.getConnectionFactory();
       try {
-        String trackerHBaseTable = config.getTrackerHBaseTable();
-        String trackerHBaseCF = config.getTrackerHBaseCF();
-        PersistentAccessTracker accessTracker = new PersistentAccessTracker( hbaseTable
-                , UUID.randomUUID().toString()
-                , trackerHBaseTable
-                , trackerHBaseCF
-                , bat
-                , millisecondsBetweenPersist
-                , config.getConnectionFactory()
-                , hbaseConfig
-        );
-
-        EnrichmentLookup hbaseLookup = new HBaseEnrichmentLookup(connectionFactory, hbaseTable, config.getHBaseCF());
-        lookup = new TrackedEnrichmentLookup(hbaseLookup, accessTracker);
+        EnrichmentLookupCreator creator = config.getEnrichmentLookupCreator();
+        lookup = creator.create(config.getConnectionFactory(), config.getHBaseTable(), config.getHBaseCF(), null);
 
       } catch (IOException e) {
         LOG.error("Unable to initialize adapter", e);
