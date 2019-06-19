@@ -145,10 +145,12 @@ public abstract class BaseFunctionResolver implements FunctionResolver, Serializ
    */
   @Override
   public StellarFunction apply(String functionName) {
+    LOG.debug("Resolving function; functionName={}", functionName);
     StellarFunctionInfo info = functions.get().get(functionName);
     if(info == null) {
       throw new IllegalStateException(format("Unknown function: `%s`", functionName));
     }
+    LOG.debug("Found function; functionName={}, function={}", functionName, info.getFunction());
     return info.getFunction();
   }
 
@@ -156,7 +158,7 @@ public abstract class BaseFunctionResolver implements FunctionResolver, Serializ
    * Performs the core process of function resolution.
    */
   protected Map<String, StellarFunctionInfo> resolveFunctions() {
-
+    LOG.debug("Performing function resolution");
     // maps a function name to its definition
     Map<String, StellarFunctionInfo> functions = new HashMap<>();
 
@@ -174,6 +176,7 @@ public abstract class BaseFunctionResolver implements FunctionResolver, Serializ
       }
     }
 
+    LOG.debug("Done with function resolution");
     return functions;
   }
 
@@ -241,5 +244,25 @@ public abstract class BaseFunctionResolver implements FunctionResolver, Serializ
       LOG.error("Unable to load {} because {}", clazz.getName(), e.getMessage(), e);
       return null;
     }
+  }
+
+  /**
+   * Attempts to resolve a function defined within the provided {@link StellarFunction}
+   * instance.
+   *
+   * @param function The Stellar function to resolve.
+   */
+  @Override
+  public BaseFunctionResolver withInstance(StellarFunction function) {
+    // perform function resolution on the instance that was passed in
+    StellarFunctionInfo functionInfo = resolveFunction(function.getClass());
+    functionInfo.setFunction(function);
+
+    // add the function to the set of resolvable functions
+    Map<String, StellarFunctionInfo> currentFunctions = this.functions.get();
+    currentFunctions.put(functionInfo.getName(), functionInfo);
+
+    this.functions = Suppliers.memoize(() -> currentFunctions);
+    return this;
   }
 }

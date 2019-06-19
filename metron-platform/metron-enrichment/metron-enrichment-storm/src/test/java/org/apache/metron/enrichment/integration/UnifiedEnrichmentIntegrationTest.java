@@ -61,7 +61,6 @@ public class UnifiedEnrichmentIntegrationTest extends EnrichmentIntegrationTest 
       setProperty("threatintel_error_topic", ERROR_TOPIC);
 
       // enrichment
-//      setProperty("enrichment_hbase_provider_impl", "" + MockHBaseTableProvider.class.getName());
       setProperty("enrichment_hbase_table", enrichmentsTableName);
       setProperty("enrichment_hbase_cf", cf);
       setProperty("enrichment_host_known_hosts", "[{\"ip\":\"10.1.128.236\", \"local\":\"YES\", \"type\":\"webserver\", \"asset_value\" : \"important\"}," +
