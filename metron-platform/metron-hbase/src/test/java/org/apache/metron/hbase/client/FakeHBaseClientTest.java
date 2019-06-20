@@ -1,70 +1,26 @@
-/*
- *
- *  Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
- *  distributed with this work for additional information
- *  regarding copyright ownership.  The ASF licenses this file
- *  to you under the Apache License, Version 2.0 (the
- *  "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- */
+package org.apache.metron.hbase.client;
 
-package org.apache.metron.hbase.client.integration;
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseProjectionCriteria;
-import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseTableClient;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
-import org.junit.After;
-import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.anyListOf;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
- * An integration test for the {@link HBaseTableClient}.
+ * Tests the {@link FakeHBaseClient} class.
  */
-public class HBaseTableClientIntegrationTest {
-  private static final String tableName = "widgets";
+public class FakeHBaseClientTest {
   private static final String columnFamily = "W";
   private static final byte[] columnFamilyB = Bytes.toBytes(columnFamily);
   private static final String columnQualifier = "column";
@@ -73,48 +29,13 @@ public class HBaseTableClientIntegrationTest {
   private static final byte[] rowKey1 = Bytes.toBytes(rowKey1String);
   private static final String rowKey2String = "row-key-2";
   private static final byte[] rowKey2 = Bytes.toBytes(rowKey2String);
-  private static HBaseTestingUtility util;
-  private static Table table;
-  private HBaseTableClient client;
 
-  @BeforeClass
-  public static void startHBase() throws Exception {
-    Configuration config = HBaseConfiguration.create();
-    config.set("hbase.master.hostname", "localhost");
-    config.set("hbase.regionserver.hostname", "localhost");
-
-    util = new HBaseTestingUtility(config);
-    util.startMiniCluster();
-
-    // create the table
-    table = util.createTable(TableName.valueOf(tableName), columnFamily);
-    util.waitTableEnabled(table.getName());
-  }
-
-  @AfterClass
-  public static void stopHBase() throws Exception {
-    util.deleteTable(table.getName());
-    util.shutdownMiniCluster();
-    util.cleanupTestDir();
-  }
+  private FakeHBaseClient client;
 
   @Before
-  public void setup() throws IOException {
-    client = new HBaseTableClient(new HBaseConnectionFactory(), util.getConfiguration(), tableName);
-  }
-
-  @After
-  public void tearDown() throws Exception {
-    // delete all records in the table
-    List<Delete> deletions = new ArrayList<>();
-    for(Result r : table.getScanner(new Scan())) {
-      deletions.add(new Delete(r.getRow()));
-    }
-    table.delete(deletions);
-
-    if(client != null) {
-      client.close();
-    }
+  public void setup() {
+    client = new FakeHBaseClient();
+    client.deleteAll();
   }
 
   @Test

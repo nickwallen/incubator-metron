@@ -41,8 +41,8 @@ public class HBaseTableClientCreator implements HBaseClientCreator {
   public HBaseClient create(HBaseConnectionFactory factory,
                             Configuration configuration,
                             String tableName) {
-
     try {
+      LOG.debug("Creating HBase client; table={}", tableName);
       return new HBaseTableClient(factory, configuration, tableName);
 
     } catch (Exception e) {

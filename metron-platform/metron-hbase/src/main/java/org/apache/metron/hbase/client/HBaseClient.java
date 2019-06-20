@@ -61,6 +61,17 @@ public interface HBaseClient extends Closeable {
   List<String> scanRowKeys() throws IOException;
 
   /**
+   * Scans the table and returns each result.
+   *
+   * <p><b>**WARNING**:</b> Do not use this method unless you're absolutely crystal clear about the performance
+   * impact. Doing full table scans in HBase can adversely impact performance.
+   *
+   * @return The results from the scan.
+   * @throws IOException
+   */
+  Result[] scan(int numRows) throws IOException;
+
+  /**
    * Enqueues a {@link org.apache.hadoop.hbase.client.Mutation} such as a put or
    * increment.  The operation is enqueued for later execution.
    *
@@ -101,4 +112,19 @@ public interface HBaseClient extends Closeable {
    * Clears all pending mutations.
    */
   void clearMutations();
+
+  /**
+   * Delete a record by row key.
+   *
+   * @param rowKey The row key to delete.
+   */
+  void delete(byte[] rowKey);
+
+  /**
+   * Delete a column or set of columns by row key.
+   *
+   * @param rowKey The row key to delete.
+   * @param columnList The set of columns to delete.
+   */
+  void delete(byte[] rowKey, ColumnList columnList);
 }

@@ -171,6 +171,16 @@ public class ColumnList {
     return this;
   }
 
+  public ColumnList addColumn(byte[] family, byte[] qualifier){
+    addColumn(new Column(family, qualifier, -1, null));
+    return this;
+  }
+
+  public ColumnList addColumn(String family, String qualifier){
+    addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier));
+    return this;
+  }
+
   public ColumnList addColumn(String family, String qualifier, byte[] value){
     return addColumn(Bytes.toBytes(family), Bytes.toBytes(qualifier), value);
   }
@@ -185,6 +195,11 @@ public class ColumnList {
    */
   public ColumnList addColumn(IColumn column){
     return this.addColumn(column.family(), column.qualifier(), column.timestamp(), column.value());
+  }
+
+  public ColumnList addColumn(Column column){
+    columns().add(column);
+    return this;
   }
 
   /**

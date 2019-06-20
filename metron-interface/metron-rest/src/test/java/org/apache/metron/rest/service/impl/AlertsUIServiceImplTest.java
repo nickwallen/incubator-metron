@@ -41,6 +41,7 @@ import org.apache.metron.common.system.FakeClock;
 import org.apache.metron.rest.MetronRestConstants;
 import org.apache.metron.rest.model.AlertsUIUserSettings;
 import org.apache.metron.rest.service.KafkaService;
+import org.apache.metron.rest.user.HBaseUserSettingsClient;
 import org.apache.metron.rest.user.UserSettingsClient;
 import org.junit.Before;
 import org.junit.Test;
@@ -85,7 +86,7 @@ public class AlertsUIServiceImplTest {
   public void setUp() throws Exception {
     kafkaService = mock(KafkaService.class);
     environment = mock(Environment.class);
-    userSettingsClient = mock(UserSettingsClient.class);
+    userSettingsClient = mock(HBaseUserSettingsClient.class);
     alertsUIService = new AlertsUIServiceImpl(kafkaService, environment, userSettingsClient);
 
     // use a fake clock for testing

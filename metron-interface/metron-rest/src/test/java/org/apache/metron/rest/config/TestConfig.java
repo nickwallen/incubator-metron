@@ -23,10 +23,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import kafka.admin.AdminUtils$;
@@ -39,13 +36,14 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.client.HTableInterface;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.zookeeper.ConfigurationsCache;
 import org.apache.metron.common.zookeeper.ZKConfigurationsCache;
+import org.apache.metron.hbase.client.FakeHBaseClient;
+import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.KafkaComponent;
@@ -60,6 +58,7 @@ import org.apache.metron.rest.mock.MockStormCLIClientWrapper;
 import org.apache.metron.rest.mock.MockStormRestTemplate;
 import org.apache.metron.rest.service.impl.PcapToPdmlScriptWrapper;
 import org.apache.metron.rest.service.impl.StormCLIWrapper;
+import org.apache.metron.rest.user.HBaseUserSettingsClient;
 import org.apache.metron.rest.user.UserSettingsClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -190,13 +189,25 @@ public class TestConfig {
     return AdminUtils$.MODULE$;
   }
 
-//  @Bean()
-//  public UserSettingsClient userSettingsClient() throws RestException, IOException {
-//    return new UserSettingsClient(new MockHBaseTableProvider().addToCache("user_settings", "cf"), Bytes.toBytes("cf"));
-//  }
+  @Bean()
+  public UserSettingsClient userSettingsClient() throws RestException, IOException {
+    //return new UserSettingsClient(new MockHBaseTableProvider().addToCache("user_settings", "cf"), Bytes.toBytes("cf"));
+    Map<String, Object> globals = new HashMap<String, Object>() {{
+      put(HBaseUserSettingsClient.USER_SETTINGS_HBASE_TABLE, "user_settings");
+      put(HBaseUserSettingsClient.USER_SETTINGS_HBASE_CF, "cf");
+    }};
+    return new HBaseUserSettingsClient(
+            () -> globals,
+            new FakeHBaseClientCreator(),
+            new MockHBaseConnectionFactory(),
+            HBaseConfiguration.create());
+  }
+
+  @Bean()
+  public HBaseClient hBaseClient() {
+    return new FakeHBaseClient();
 //
-//  @Bean()
-//  public SyncHBaseClient hBaseClient() throws RestException, IOException {
+//
 //    final String cf = "t";
 //    final String cq = "v";
 //    HTableInterface table = MockHBaseTableProvider.addToCache("enrichment_list", cf);
@@ -212,7 +223,7 @@ public class TestConfig {
 //    }
 //    return new SyncHBaseClient(new MockHBaseTableProvider(), HBaseConfiguration.create(),
 //        "enrichment_list");
-//  }
+  }
 
   @Bean
   public JobManager jobManager() {

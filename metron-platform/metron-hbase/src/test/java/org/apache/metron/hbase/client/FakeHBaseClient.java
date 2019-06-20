@@ -24,16 +24,22 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.bolt.mapper.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseProjectionCriteria;
+import org.mockito.AdditionalMatchers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 import static org.mockito.Matchers.any;
@@ -110,14 +116,14 @@ public class FakeHBaseClient implements HBaseClient {
 
   @Override
   public Result[] getAll() {
-    LOG.debug("Looking for {} record(s)", queuedGets.size());
+    LOG.error("Looking for {} get(s) amongst {} persisted record(s)", queuedGets.size(), persisted.size());
     List<Result> results = new ArrayList<>();
     for (int i = 0; i < queuedGets.size(); i++) {
       ByteBuffer rowKey = queuedGets.get(i);
       Result result;
       if (persisted.containsKey(rowKey)) {
         ColumnList cols = persisted.get(rowKey);
-        result = matchingResult(cols);
+        result = matchingResult(rowKey.array(), cols);
 
       } else {
         result = emptyResult();
@@ -129,19 +135,56 @@ public class FakeHBaseClient implements HBaseClient {
     return results.stream().toArray(Result[]::new);
   }
 
-  private static Result matchingResult(ColumnList columns) {
+  /**
+   * Builds a mock {@link Result} that will respond correctly to the following methods calls.
+   *
+   * Result.containsColumn(family, qualifier)
+   * Result.getValue(family, qualifier)
+   * Result.getFamilyMap(family)
+   *
+   * @param columns The columns.
+   * @return A {@link Result}.
+   */
+  private static Result matchingResult(byte[] rowKey, ColumnList columns) {
+    // Result.getRow() should return the row key
     Result result = mock(Result.class);
+    when(result.getRow())
+            .thenReturn(rowKey);
+
+    // find all column families
+    Set<ByteBuffer> families = new HashSet<>();
     for (ColumnList.Column column : columns.getColumns()) {
-      LOG.debug("Found matching column; {}:{}", Bytes.toString(column.getFamily()),
-              Bytes.toString(column.getQualifier()));
+      families.add(ByteBuffer.wrap(column.getFamily()));
+    }
 
-      // Result.containsColumn(family, qualifier) should return true
-      when(result.containsColumn(eq(column.getFamily()), eq(column.getQualifier())))
-              .thenReturn(true);
+    // for each column family
+    for (ByteBuffer family: families) {
 
-      // Result.getValue(family, qualifier) should return the value
-      when(result.getValue(eq(column.getFamily()), eq(column.getQualifier())))
-              .thenReturn(column.getValue());
+      // build the family map
+      NavigableMap<byte[], byte[]> familyMap = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+      for (ColumnList.Column column : columns.getColumns()) {
+
+        // is this column in the current family?
+        if (family.equals(ByteBuffer.wrap(column.getFamily()))) {
+          LOG.debug("Found column in family; {}:{}", Bytes.toString(column.getFamily()),
+                  Bytes.toString(column.getQualifier()));
+
+          // Result.containsColumn(family, qualifier) should return true
+          when(result.containsColumn(eq(column.getFamily()), eq(column.getQualifier())))
+                  .thenReturn(true);
+
+          // Result.getValue(family, qualifier) should return the value
+          when(result.getValue(eq(column.getFamily()), eq(column.getQualifier())))
+                  .thenReturn(column.getValue());
+
+          familyMap.put(column.getQualifier(), column.getValue());
+        }
+      }
+      LOG.debug("Built family map; family={}, size={}", Bytes.toString(family.array()), familyMap.size());
+
+      // Result.getFamilyMap(family) should return all values in that family
+      when(result.getFamilyMap(AdditionalMatchers.aryEq(family.array())))
+              .thenReturn(familyMap);
     }
 
     return result;
@@ -151,6 +194,8 @@ public class FakeHBaseClient implements HBaseClient {
     Result result = mock(Result.class);
     when(result.containsColumn(any(), any()))
             .thenReturn(false);
+    when(result.isEmpty())
+            .thenReturn(true);
     return result;
   }
 
@@ -161,10 +206,21 @@ public class FakeHBaseClient implements HBaseClient {
 
   @Override
   public List<String> scanRowKeys() {
-    return persisted.keySet()
+    return persisted
+            .keySet()
             .stream()
-            .map(bytes -> String.valueOf(bytes))
+            .map(buffer -> Bytes.toString(buffer.array()))
             .collect(Collectors.toList());
+  }
+
+  @Override
+  public Result[] scan(int numRows) throws IOException {
+    return persisted
+            .entrySet()
+            .stream()
+            .limit(numRows)
+            .map((entry) -> matchingResult(entry.getKey().array(), entry.getValue()))
+            .toArray(Result[]::new);
   }
 
   @Override
@@ -194,7 +250,20 @@ public class FakeHBaseClient implements HBaseClient {
     int numberOfMutations = queuedMutations.size();
 
     // persist each queued mutation
-    queuedMutations.forEach(mutation -> persisted.put(ByteBuffer.wrap(mutation.rowKey), mutation.columnList));
+    for(Mutation mutation: queuedMutations) {
+      ByteBuffer key = ByteBuffer.wrap(mutation.rowKey);
+      ColumnList columns = mutation.columnList;
+
+      // if there are existing columns, need to merge the columns
+      ColumnList existing = persisted.get(key);
+      if(existing != null) {
+        for(ColumnList.Column col: existing.getColumns()) {
+          columns.addColumn(col);
+        }
+      }
+
+      persisted.put(key, columns);
+    }
     clearMutations();
 
     LOG.debug("Wrote {} record(s); now have {} record(s) in all", numberOfMutations, persisted.size());
@@ -204,6 +273,47 @@ public class FakeHBaseClient implements HBaseClient {
   @Override
   public void clearMutations() {
     queuedMutations.clear();
+  }
+
+  @Override
+  public void delete(byte[] rowKey) {
+    persisted.remove(ByteBuffer.wrap(rowKey));
+  }
+
+  @Override
+  public void delete(byte[] rowKey, ColumnList toDelete) {
+    ColumnList existingColumns = persisted.get(ByteBuffer.wrap(rowKey));
+    if(existingColumns != null) {
+      // the names of columns that need deleted
+      List<String> columnsToDelete = toDelete
+              .getColumns()
+              .stream()
+              .map(col -> nameOf(col))
+              .collect(Collectors.toList());
+
+      // build a new set of columns that removes any columns that need deleted
+      ColumnList newColumns = new ColumnList();
+      for(ColumnList.Column existing: existingColumns.getColumns()) {
+
+        // only keep the columns that do not need to be deleted
+        boolean keepColumn = !columnsToDelete.contains(nameOf(existing));
+        if(keepColumn) {
+          newColumns.addColumn(existing);
+        } else {
+          LOG.debug("Column was deleted; column={}", existing);
+        }
+      }
+
+      // persist the new columns
+      persisted.put(ByteBuffer.wrap(rowKey), newColumns);
+
+    } else {
+      LOG.debug("Nothing to delete");
+    }
+  }
+
+  private String nameOf(ColumnList.Column column) {
+    return Bytes.toString(column.getFamily()) + ":" + Bytes.toString(column.getQualifier());
   }
 
   @Override

@@ -22,6 +22,7 @@ package org.apache.metron.hbase.client;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Increment;
@@ -112,13 +113,23 @@ public class HBaseTableClient implements HBaseClient {
 
   @Override
   public List<String> scanRowKeys() throws IOException {
-    Scan scan = new Scan();
-    ResultScanner scanner = table.getScanner(scan);
-    List<String> rows = new ArrayList<>();
+    List<String> rowKeys = new ArrayList<>();
+    ResultScanner scanner = getScanner();
     for (Result r = scanner.next(); r != null; r = scanner.next()) {
-      rows.add(Bytes.toString(r.getRow()));
+      String rowKeyAsString = Bytes.toString(r.getRow());
+      rowKeys.add(rowKeyAsString);
     }
-    return rows;
+    return rowKeys;
+  }
+
+  @Override
+  public Result[] scan(int numRows) throws IOException {
+    return getScanner().next(numRows);
+  }
+
+  private ResultScanner getScanner() throws IOException {
+    Scan scan = new Scan();
+    return table.getScanner(scan);
   }
 
   /**
@@ -184,6 +195,35 @@ public class HBaseTableClient implements HBaseClient {
     }
 
     return mutationCount;
+  }
+
+  @Override
+  public void delete(byte[] rowKey) {
+    try {
+      Delete delete = new Delete(rowKey);
+      table.delete(delete);
+
+    } catch (Exception e) {
+      String msg = String.format("Unable to delete; table={}", tableName(table));
+      LOG.error(msg, e);
+      throw new RuntimeException(msg, e);
+    }
+  }
+
+  @Override
+  public void delete(byte[] rowKey, ColumnList columnList) {
+    try {
+      Delete delete = new Delete(rowKey);
+      for(ColumnList.Column column: columnList.getColumns()) {
+        delete.addColumn(column.getFamily(), column.getQualifier());
+      }
+      table.delete(delete);
+
+    } catch (Exception e) {
+      String msg = String.format("Unable to delete; table={}", tableName(table));
+      LOG.error(msg, e);
+      throw new RuntimeException(msg, e);
+    }
   }
 
   private void doMutate() {

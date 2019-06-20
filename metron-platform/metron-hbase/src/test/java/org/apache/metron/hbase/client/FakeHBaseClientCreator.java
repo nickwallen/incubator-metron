@@ -26,8 +26,18 @@ import org.apache.hadoop.conf.Configuration;
  */
 public class FakeHBaseClientCreator implements HBaseClientCreator {
 
+  private FakeHBaseClient hBaseClient;
+
+  public FakeHBaseClientCreator() {
+    this(new FakeHBaseClient());
+  }
+
+  public FakeHBaseClientCreator(FakeHBaseClient hBaseClient) {
+    this.hBaseClient = hBaseClient;
+  }
+
   @Override
   public HBaseClient create(HBaseConnectionFactory factory, Configuration configuration, String tableName) {
-    return new FakeHBaseClient();
+    return hBaseClient;
   }
 }

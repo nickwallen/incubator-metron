@@ -24,6 +24,7 @@ import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.service.GlobalConfigService;
+import org.apache.metron.rest.user.HBaseUserSettingsClient;
 import org.apache.metron.rest.user.UserSettingsClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -72,7 +73,8 @@ public class HBaseConfig {
 
   @Bean(destroyMethod = "close")
   public UserSettingsClient userSettingsClient() {
-    UserSettingsClient userSettingsClient = new UserSettingsClient(globals, hBaseConnectionFactory, hBaseConfiguration);
+    UserSettingsClient userSettingsClient = new HBaseUserSettingsClient(
+            globals, hBaseClientCreator, hBaseConnectionFactory, hBaseConfiguration);
     userSettingsClient.init();
     return userSettingsClient;
   }

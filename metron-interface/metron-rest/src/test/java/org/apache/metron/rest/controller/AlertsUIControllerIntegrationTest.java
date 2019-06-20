@@ -169,20 +169,20 @@ public class AlertsUIControllerIntegrationTest {
     stopKafka();
   }
 
-  @Test
-  public void testAlertProfiles() throws Exception {
-    emptyProfileShouldReturnNotFound();
-    alertsProfilesShouldBeCreatedOrUpdated();
-    alertsProfilesShouldBeProperlyDeleted();
-  }
+//  @Test
+//  public void testAlertProfiles() throws Exception {
+//    emptyProfileShouldReturnNotFound();
+//    alertsProfilesShouldBeCreatedOrUpdated();
+//    alertsProfilesShouldBeProperlyDeleted();
+//  }
 
-  /** Ensures a 404 is returned when an alerts profile cannot be found.  In the case of an admin getting
+  /**
+   * Ensures a 404 is returned when an alerts profile cannot be found.  In the case of an admin getting
    * all profiles, an empty list should be returned.  This tests depends on the alertsProfileRepository
    * being empty.
-   *
-   * @throws Exception
    */
-  private void emptyProfileShouldReturnNotFound() throws Exception {
+  @Test
+  public void emptyProfileShouldReturnNotFound() throws Exception {
 
     // user1 should get a 404 because an alerts profile has not been created
     this.mockMvc.perform(get(alertUrl + "/settings").with(httpBasic(user1, password)))
@@ -200,15 +200,15 @@ public class AlertsUIControllerIntegrationTest {
             .andExpect(jsonPath("$.*", hasSize(0)));
   }
 
-  /** Ensures users can update their profiles independently of other users.  When user1 updates an
+  /**
+   * Ensures users can update their profiles independently of other users.  When user1 updates an
    * alerts profile, alerts profile for user2 should not be affected.  Tests that an initial update
    * returns a 201 status and subsequent updates return 200 statuses.  A call to get all alerts profiles
    * by an admin user should also work properly.  This tests depends on the alertsProfileRepository
    * being empty initially.
-   *
-   * @throws Exception
    */
-  private void alertsProfilesShouldBeCreatedOrUpdated() throws Exception {
+  @Test
+  public void alertsProfilesShouldBeCreatedOrUpdated() throws Exception {
 
     // user1 creates their alerts profile
     this.mockMvc.perform(post(alertUrl + "/settings").with(httpBasic(user1, password)).with(csrf())
@@ -274,7 +274,8 @@ public class AlertsUIControllerIntegrationTest {
    *
    * @throws Exception
    */
-  private void alertsProfilesShouldBeProperlyDeleted() throws Exception {
+  @Test
+  public void alertsProfilesShouldBeProperlyDeleted() throws Exception {
 
     // user1 deletes their profile
     this.mockMvc.perform(delete(alertUrl + "/settings/user1").with(httpBasic(admin, password)))

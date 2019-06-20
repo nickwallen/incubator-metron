@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -17,186 +17,85 @@
  */
 package org.apache.metron.rest.user;
 
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.client.Connection;
-import org.apache.hadoop.hbase.client.Delete;
-import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.client.ResultScanner;
-import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.client.Table;
-import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.Closeable;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Optional;
-import java.util.function.Supplier;
 
-public class UserSettingsClient implements Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
-  public static final String USER_SETTINGS_HBASE_TABLE = "user.settings.hbase.table";
-  public static final String USER_SETTINGS_HBASE_CF = "user.settings.hbase.cf";
+/**
+ * A client that interacts with persisted user settings data.  Enables create, read, and
+ * delete operations on user settings.
+ */
+public interface UserSettingsClient extends Closeable {
 
-  private Table userSettingsTable;
-  private byte[] columnFamily;
-  private Supplier<Map<String, Object>> globalConfigSupplier;
-  private HBaseConnectionFactory connectionFactory;
-  private Configuration configuration;
-  private Connection connection;
+  /**
+   * Initialize the client.
+   */
+  void init();
 
-  public UserSettingsClient(Supplier<Map<String, Object>> globalConfigSupplier,
-                            HBaseConnectionFactory connectionFactory,
-                            Configuration configuration) {
-    this.globalConfigSupplier = globalConfigSupplier;
-    this.connectionFactory = connectionFactory;
-    this.configuration = configuration;
-  }
+  /**
+   * Finds all settings for a particular user.
+   *
+   * <p>There may be more than one type of setting associated with each user. This returns all
+   * setting types for a particular user.
+   *
+   * @param user The user.
+   * @return All of the user's settings.
+   * @throws IOException
+   */
+  Map<String, String> findOne(String user) throws IOException;
 
-  public synchronized void init() {
-    if (this.userSettingsTable == null) {
-      Map<String, Object> globalConfig = getGlobals();
-      String table = getTableName(globalConfig);
-      this.columnFamily = getColumnFamily(globalConfig).getBytes();
-      try {
-        connection = connectionFactory.createConnection(configuration);
-        userSettingsTable = connection.getTable(TableName.valueOf(table));
+  /**
+   * Finds one setting for a particular user.
+   *
+   * @param user The user.
+   * @param type The setting type.
+   * @return The value of the setting.
+   * @throws IOException
+   */
+  Optional<String> findOne(String user, String type) throws IOException;
 
-      } catch (IOException e) {
-        throw new IllegalStateException("Unable to initialize HBaseDao: " + e.getMessage(), e);
-      }
-    }
-  }
+  /**
+   * Finds all settings for all users.
+   *
+   * @return All settings value for all users.
+   * @throws IOException
+   */
+  Map<String, Map<String, String>> findAll() throws IOException;
 
-  @Override
-  public synchronized void close() throws IOException {
-    if(userSettingsTable != null) {
-      userSettingsTable.close();
-    }
-    if(connection != null) {
-      connection.close();
-    }
-  }
+  /**
+   * Finds the value of a particular setting type for all users.
+   *
+   * @param type The setting type.
+   * @return The value of the setting type for all users.
+   * @throws IOException
+   */
+  Map<String, Optional<String>> findAll(String type) throws IOException;
 
-  private Map<String, Object> getGlobals() {
-    Map<String, Object> globalConfig = globalConfigSupplier.get();
-    if(globalConfig == null) {
-      throw new IllegalStateException("Cannot find the global config.");
-    }
-    return globalConfig;
-  }
+  /**
+   * Save a user setting.
+   *
+   * @param user The user.
+   * @param type The setting type.
+   * @param value The value of the user setting.
+   * @throws IOException
+   */
+  void save(String user, String type, String value) throws IOException;
 
-  private static String getTableName(Map<String, Object> globalConfig) {
-    String table = (String) globalConfig.get(USER_SETTINGS_HBASE_TABLE);
-    if(table == null) {
-      throw new IllegalStateException("You must configure " + USER_SETTINGS_HBASE_TABLE + "in the global config.");
-    }
-    return table;
-  }
+  /**
+   * Delete all user settings for a particular user.
+   *
+   * @param user The user.
+   * @throws IOException
+   */
+  void delete(String user) throws IOException;
 
-  private static String getColumnFamily(Map<String, Object> globalConfig) {
-    String cf = (String) globalConfig.get(USER_SETTINGS_HBASE_CF);
-    if(cf == null) {
-      throw new IllegalStateException("You must configure " + USER_SETTINGS_HBASE_CF + " in the global config.");
-    }
-
-    return cf;
-  }
-
-  protected Table getTable() {
-    if(userSettingsTable == null) {
-      init();
-    }
-    return userSettingsTable;
-  }
-
-  public Map<String, String> findOne(String user) throws IOException {
-    Result result = getResult(user);
-    return getAllUserSettings(result);
-  }
-
-  public Optional<String> findOne(String user, String type) throws IOException {
-    Result result = getResult(user);
-    return getUserSettings(result, type);
-  }
-
-  public Map<String, Map<String, String>> findAll() throws IOException {
-    Scan scan = new Scan();
-    ResultScanner results = getTable().getScanner(scan);
-    Map<String, Map<String, String>> allUserSettings = new HashMap<>();
-    for (Result result : results) {
-      allUserSettings.put(new String(result.getRow()), getAllUserSettings(result));
-    }
-    return allUserSettings;
-  }
-
-  public Map<String, Optional<String>> findAll(String type) throws IOException {
-    Scan scan = new Scan();
-    ResultScanner results = getTable().getScanner(scan);
-    Map<String, Optional<String>> allUserSettings = new HashMap<>();
-    for (Result result : results) {
-      allUserSettings.put(new String(result.getRow()), getUserSettings(result, type));
-    }
-    return allUserSettings;
-  }
-
-  public void save(String user, String type, String userSettings) throws IOException {
-    byte[] rowKey = Bytes.toBytes(user);
-    Put put = new Put(rowKey);
-    put.addColumn(columnFamily, Bytes.toBytes(type), Bytes.toBytes(userSettings));
-    getTable().put(put);
-  }
-
-  public void delete(String user) throws IOException {
-    Delete delete = new Delete(Bytes.toBytes(user));
-    getTable().delete(delete);
-  }
-
-  public void delete(String user, String type) throws IOException {
-    Delete delete = new Delete(Bytes.toBytes(user));
-    delete.addColumn(columnFamily, Bytes.toBytes(type));
-    getTable().delete(delete);
-  }
-
-  private Result getResult(String user) throws IOException {
-    byte[] rowKey = Bytes.toBytes(user);
-    Get get = new Get(rowKey);
-    get.addFamily(columnFamily);
-    return getTable().get(get);
-  }
-
-  private Optional<String> getUserSettings(Result result, String type) throws IOException {
-    Optional<String> userSettings = Optional.empty();
-    if (result != null) {
-      byte[] value = result.getValue(columnFamily, Bytes.toBytes(type));
-      if (value != null) {
-        userSettings = Optional.of(new String(value, StandardCharsets.UTF_8));
-      }
-    }
-    return userSettings;
-  }
-
-  public Map<String, String> getAllUserSettings(Result result) {
-    if (result == null) {
-      return new HashMap<>();
-    }
-    NavigableMap<byte[], byte[]> columns = result.getFamilyMap(columnFamily);
-    if(columns == null || columns.size() == 0) {
-      return new HashMap<>();
-    }
-    Map<String, String> userSettingsMap = new HashMap<>();
-    for(Map.Entry<byte[], byte[]> column: columns.entrySet()) {
-      userSettingsMap.put(new String(column.getKey(), StandardCharsets.UTF_8), new String(column.getValue(), StandardCharsets.UTF_8));
-    }
-    return userSettingsMap;
-  }
+  /**
+   * Delete one user setting value.
+   *
+   * @param user The user.
+   * @param type The setting type.
+   * @throws IOException
+   */
+  void delete(String user, String type) throws IOException;
 }
