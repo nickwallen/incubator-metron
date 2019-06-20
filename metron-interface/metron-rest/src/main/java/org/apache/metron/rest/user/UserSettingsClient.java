@@ -48,7 +48,7 @@ public class UserSettingsClient implements Closeable {
   public static final String USER_SETTINGS_HBASE_CF = "user.settings.hbase.cf";
 
   private Table userSettingsTable;
-  private byte[] cf;
+  private byte[] columnFamily;
   private Supplier<Map<String, Object>> globalConfigSupplier;
   private HBaseConnectionFactory connectionFactory;
   private Configuration configuration;
@@ -66,7 +66,7 @@ public class UserSettingsClient implements Closeable {
     if (this.userSettingsTable == null) {
       Map<String, Object> globalConfig = getGlobals();
       String table = getTableName(globalConfig);
-      this.cf = getColumnFamily(globalConfig).getBytes();
+      this.columnFamily = getColumnFamily(globalConfig).getBytes();
       try {
         connection = connectionFactory.createConnection(configuration);
         userSettingsTable = connection.getTable(TableName.valueOf(table));
@@ -152,7 +152,7 @@ public class UserSettingsClient implements Closeable {
   public void save(String user, String type, String userSettings) throws IOException {
     byte[] rowKey = Bytes.toBytes(user);
     Put put = new Put(rowKey);
-    put.addColumn(cf, Bytes.toBytes(type), Bytes.toBytes(userSettings));
+    put.addColumn(columnFamily, Bytes.toBytes(type), Bytes.toBytes(userSettings));
     getTable().put(put);
   }
 
@@ -163,21 +163,21 @@ public class UserSettingsClient implements Closeable {
 
   public void delete(String user, String type) throws IOException {
     Delete delete = new Delete(Bytes.toBytes(user));
-    delete.addColumn(cf, Bytes.toBytes(type));
+    delete.addColumn(columnFamily, Bytes.toBytes(type));
     getTable().delete(delete);
   }
 
   private Result getResult(String user) throws IOException {
     byte[] rowKey = Bytes.toBytes(user);
     Get get = new Get(rowKey);
-    get.addFamily(cf);
+    get.addFamily(columnFamily);
     return getTable().get(get);
   }
 
   private Optional<String> getUserSettings(Result result, String type) throws IOException {
     Optional<String> userSettings = Optional.empty();
     if (result != null) {
-      byte[] value = result.getValue(cf, Bytes.toBytes(type));
+      byte[] value = result.getValue(columnFamily, Bytes.toBytes(type));
       if (value != null) {
         userSettings = Optional.of(new String(value, StandardCharsets.UTF_8));
       }
@@ -189,7 +189,7 @@ public class UserSettingsClient implements Closeable {
     if (result == null) {
       return new HashMap<>();
     }
-    NavigableMap<byte[], byte[]> columns = result.getFamilyMap(cf);
+    NavigableMap<byte[], byte[]> columns = result.getFamilyMap(columnFamily);
     if(columns == null || columns.size() == 0) {
       return new HashMap<>();
     }

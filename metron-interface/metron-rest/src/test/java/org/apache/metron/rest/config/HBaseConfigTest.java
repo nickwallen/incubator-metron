@@ -21,17 +21,27 @@ import static org.apache.metron.rest.user.UserSettingsClient.USER_SETTINGS_HBASE
 import static org.apache.metron.rest.user.UserSettingsClient.USER_SETTINGS_HBASE_TABLE;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.when;
 import static org.powermock.api.mockito.PowerMockito.mockStatic;
 import static org.powermock.api.mockito.PowerMockito.whenNew;
 
+import java.io.IOException;
 import java.util.HashMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
 import org.apache.metron.common.configuration.EnrichmentConfigurations;
+import org.apache.metron.hbase.client.FakeHBaseClient;
+import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClient;
+import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.apache.metron.rest.service.GlobalConfigService;
+import org.apache.metron.rest.user.UserSettingsClient;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,47 +53,62 @@ import org.powermock.modules.junit4.PowerMockRunner;
 @PrepareForTest({Table.class, HBaseConfiguration.class, HBaseConfig.class})
 public class HBaseConfigTest {
 
+  private HBaseConnectionFactory hBaseConnectionFactory;
+  private HBaseClientCreator hBaseClientCreator;
+  private HBaseConfiguration hBaseConfiguration;
+  private Configuration configuration;
   private GlobalConfigService globalConfigService;
   private HBaseConfig hBaseConfig;
+  private Connection connection;
+  private Table table;
 
   @Before
-  public void setUp() throws Exception {
+  public void setUp() throws IOException {
+    connection = mock(Connection.class);
+    table = mock(Table.class);
+    hBaseConnectionFactory = mock(HBaseConnectionFactory.class);
+    configuration = mock(Configuration.class);
+    hBaseConfiguration = mock(HBaseConfiguration.class);
+    hBaseClientCreator = mock(FakeHBaseClientCreator.class);
     globalConfigService = mock(GlobalConfigService.class);
-//    hBaseConfig = new HBaseConfig(globalConfigService);
+    hBaseConfig = new HBaseConfig(globalConfigService, hBaseConnectionFactory, hBaseConfiguration, hBaseClientCreator);
     mockStatic(HBaseConfiguration.class);
-  }
-
-  @Test
-  public void userSettingsTableShouldBeReturnedFromGlobalConfigByDefault() throws Exception {
-    when(globalConfigService.get()).thenReturn(new HashMap<String, Object>() {{
-      put(USER_SETTINGS_HBASE_TABLE, "global_config_user_settings_table");
-      put(USER_SETTINGS_HBASE_CF, "global_config_user_settings_cf");
-    }});
-//    HTableProvider htableProvider = mock(HTableProvider.class);
-//    whenNew(HTableProvider.class).withNoArguments().thenReturn(htableProvider);
-    Configuration configuration = mock(Configuration.class);
     when(HBaseConfiguration.create()).thenReturn(configuration);
-
-    hBaseConfig.userSettingsClient();
-//    verify(htableProvider).getTable(configuration, "global_config_user_settings_table");
-//    verifyZeroInteractions(htableProvider);
   }
 
   @Test
-  public void hBaseClientShouldBeCreatedWithDefaultProvider() throws Exception {
+  public void userSettingsShouldBeCreated() throws Exception {
+    final String expectedTable = "hbase-table-name";
+    final String expectedColumnFamily = "hbase-column-family";
     when(globalConfigService.get()).thenReturn(new HashMap<String, Object>() {{
-      put(EnrichmentConfigurations.TABLE_NAME, "enrichment_list_hbase_table_name");
+      put(USER_SETTINGS_HBASE_TABLE, expectedTable);
+      put(USER_SETTINGS_HBASE_CF, expectedColumnFamily);
     }});
-    Assert.assertNotNull(hBaseConfig.hBaseClient());
+
+    // connection factory needs to return the mock connection
+    when(hBaseConnectionFactory.createConnection(any()))
+            .thenReturn(connection);
+
+    // connection should return the table, if the expected table name is used
+    when(connection.getTable(eq(TableName.valueOf(expectedTable))))
+            .thenReturn(table);
+
+    UserSettingsClient client = hBaseConfig.userSettingsClient();
+    Assert.assertNotNull(client);
   }
 
   @Test
-  public void hBaseClientShouldBeCreatedWithSpecifiedProvider() throws Exception {
+  public void hBaseClientShouldBeCreated() throws Exception {
+    final String expectedTableName = "some_table_name";
     when(globalConfigService.get()).thenReturn(new HashMap<String, Object>() {{
-//      put(EnrichmentConfigurations.TABLE_PROVIDER, MockHBaseTableProvider.class.getName());
-      put(EnrichmentConfigurations.TABLE_NAME, "enrichment_list_hbase_table_name");
+      put(EnrichmentConfigurations.TABLE_NAME, expectedTableName);
     }});
-    Assert.assertNotNull(hBaseConfig.hBaseClient());
-  }
 
+    FakeHBaseClient expected = new FakeHBaseClient();
+    when(hBaseClientCreator.create(eq(hBaseConnectionFactory), eq(hBaseConfiguration), eq(expectedTableName)))
+            .thenReturn(expected);
+
+    HBaseClient client = hBaseConfig.hBaseClient();
+    Assert.assertEquals(expected, client);
+  }
 }
