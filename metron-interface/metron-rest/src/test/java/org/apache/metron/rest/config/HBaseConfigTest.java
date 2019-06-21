@@ -95,19 +95,4 @@ public class HBaseConfigTest {
     UserSettingsClient client = hBaseConfig.userSettingsClient();
     Assert.assertNotNull(client);
   }
-
-  @Test
-  public void hBaseClientShouldBeCreated() throws Exception {
-    final String expectedTableName = "some_table_name";
-    when(globalConfigService.get()).thenReturn(new HashMap<String, Object>() {{
-      put(EnrichmentConfigurations.TABLE_NAME, expectedTableName);
-    }});
-
-    FakeHBaseClient expected = new FakeHBaseClient();
-    when(hBaseClientCreator.create(eq(hBaseConnectionFactory), eq(hBaseConfiguration), eq(expectedTableName)))
-            .thenReturn(expected);
-
-    HBaseClient client = hBaseConfig.hBaseClient();
-    Assert.assertEquals(expected, client);
-  }
 }

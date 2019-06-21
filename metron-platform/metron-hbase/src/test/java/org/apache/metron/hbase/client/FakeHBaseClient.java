@@ -285,11 +285,8 @@ public class FakeHBaseClient implements HBaseClient {
     ColumnList existingColumns = persisted.get(ByteBuffer.wrap(rowKey));
     if(existingColumns != null) {
       // the names of columns that need deleted
-      List<String> columnsToDelete = toDelete
-              .getColumns()
-              .stream()
-              .map(col -> nameOf(col))
-              .collect(Collectors.toList());
+      List<String> columnsToDelete = nameOf(toDelete);
+      LOG.debug("About to delete columns; existing={}, toDelete={}", nameOf(existingColumns), columnsToDelete);
 
       // build a new set of columns that removes any columns that need deleted
       ColumnList newColumns = new ColumnList();
@@ -304,12 +301,26 @@ public class FakeHBaseClient implements HBaseClient {
         }
       }
 
-      // persist the new columns
-      persisted.put(ByteBuffer.wrap(rowKey), newColumns);
+      if(newColumns.hasColumns()) {
+        // persist the new columns
+        persisted.put(ByteBuffer.wrap(rowKey), newColumns);
+
+      } else {
+        // there are no columns left, so remove the row
+        persisted.remove(ByteBuffer.wrap(rowKey));
+      }
 
     } else {
       LOG.debug("Nothing to delete");
     }
+  }
+
+  private List<String> nameOf(ColumnList columnList) {
+    return columnList
+            .getColumns()
+            .stream()
+            .map(col -> nameOf(col))
+            .collect(Collectors.toList());
   }
 
   private String nameOf(ColumnList.Column column) {

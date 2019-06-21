@@ -271,6 +271,12 @@ public class HBaseTableClientIntegrationTest {
   }
 
   @Test
+  public void testDeleteNothing() {
+    // nothing should blow-up if we attempt to delete something that does not exist
+    client.delete(rowKey1);
+  }
+
+  @Test
   public void testDeleteColumn() {
     // write some values
     ColumnList columns = new ColumnList()
@@ -290,6 +296,29 @@ public class HBaseTableClientIntegrationTest {
     assertEquals(1, results.length);
     assertNull(getValue(results[0], columnFamily, "col1"));
     assertEquals("value2", getValue(results[0], columnFamily, "col2"));
+  }
+
+  @Test
+  public void testDeleteAllColumns() {
+    // write some values
+    ColumnList columns = new ColumnList()
+            .addColumn(columnFamily, "col1", "value1")
+            .addColumn(columnFamily, "col2", "value2");
+    client.addMutation(rowKey1, columns, Durability.SKIP_WAL);
+    client.mutate();
+
+    // delete both columns individually
+    client.delete(rowKey1, new ColumnList().addColumn(columnFamily, "col1"));
+    client.delete(rowKey1, new ColumnList().addColumn(columnFamily, "col2"));
+
+    // read back the value
+    client.addGet(rowKey1, new HBaseProjectionCriteria().addColumnFamily(columnFamily));
+    Result[] results = client.getAll();
+
+    // validate
+    assertEquals(1, results.length);
+    assertNull(getValue(results[0], columnFamily, "col1"));
+    assertNull(getValue(results[0], columnFamily, "col2"));
   }
 
   private String getValue(Result result, String columnFamily, String columnQualifier) {

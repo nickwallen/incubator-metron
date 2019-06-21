@@ -223,14 +223,14 @@ public class ColumnList {
    * Query to determine if we have column definitions.
    */
   public boolean hasColumns(){
-    return this.columns != null;
+    return columns != null && columns.size() > 0;
   }
 
   /**
    * Query to determine if we have counter definitions.
    */
   public boolean hasCounters(){
-    return this.counters != null;
+    return this.counters != null && counters.size() > 0;
   }
 
   /**

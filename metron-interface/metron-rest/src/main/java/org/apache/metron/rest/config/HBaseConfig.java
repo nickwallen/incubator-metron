@@ -18,10 +18,9 @@
 package org.apache.metron.rest.config;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.metron.common.configuration.EnrichmentConfigurations;
-import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
+import org.apache.metron.hbase.client.HBaseTableClientCreator;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.service.GlobalConfigService;
 import org.apache.metron.rest.user.HBaseUserSettingsClient;
@@ -47,7 +46,7 @@ public class HBaseConfig {
   private HBaseConnectionFactory hBaseConnectionFactory;
 
   @Autowired
-  private HBaseConfiguration hBaseConfiguration;
+  private org.apache.hadoop.conf.Configuration hBaseConfiguration;
 
   @Autowired
   private HBaseClientCreator hBaseClientCreator;
@@ -63,7 +62,7 @@ public class HBaseConfig {
   @Autowired
   public HBaseConfig(GlobalConfigService globalConfigService,
                      HBaseConnectionFactory hBaseConnectionFactory,
-                     HBaseConfiguration hBaseConfiguration,
+                     org.apache.hadoop.conf.Configuration hBaseConfiguration,
                      HBaseClientCreator hBaseClientCreator) {
     this.globalConfigService = globalConfigService;
     this.hBaseConnectionFactory = hBaseConnectionFactory;
@@ -71,17 +70,29 @@ public class HBaseConfig {
     this.hBaseClientCreator = hBaseClientCreator;
   }
 
+  @Bean
+  public HBaseConnectionFactory hBaseConnectionFactory() {
+    return new HBaseConnectionFactory();
+  }
+
+  @Bean
+  org.apache.hadoop.conf.Configuration hBaseConfiguration() {
+    return HBaseConfiguration.create();
+  }
+
+  @Bean
+  HBaseClientCreator hBaseClientCreator() {
+    return new HBaseTableClientCreator();
+  }
+
   @Bean(destroyMethod = "close")
   public UserSettingsClient userSettingsClient() {
     UserSettingsClient userSettingsClient = new HBaseUserSettingsClient(
-            globals, hBaseClientCreator, hBaseConnectionFactory, hBaseConfiguration);
+            globals,
+            hBaseClientCreator,
+            hBaseConnectionFactory,
+            hBaseConfiguration);
     userSettingsClient.init();
     return userSettingsClient;
-  }
-
-  @Bean()
-  public HBaseClient hBaseClient() {
-    String tableName = (String) globals.get().get(EnrichmentConfigurations.TABLE_NAME);
-    return hBaseClientCreator.create(hBaseConnectionFactory, hBaseConfiguration, tableName);
   }
 }
