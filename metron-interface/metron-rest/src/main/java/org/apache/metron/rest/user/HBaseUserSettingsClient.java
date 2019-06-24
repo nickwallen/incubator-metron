@@ -209,7 +209,8 @@ public class HBaseUserSettingsClient implements UserSettingsClient {
   private static int getMaxScanCount(Map<String, Object> globals) {
     Integer maxScanCount = 100_000;
     if(globals.containsKey(USER_SETTINGS_MAX_SCAN)) {
-      maxScanCount = (Integer) globals.get(USER_SETTINGS_MAX_SCAN);
+      String value = (String) globals.get(USER_SETTINGS_MAX_SCAN);
+      maxScanCount = Integer.valueOf(value);
     }
     return maxScanCount;
   }

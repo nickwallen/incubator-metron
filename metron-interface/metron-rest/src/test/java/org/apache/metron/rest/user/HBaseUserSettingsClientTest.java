@@ -39,7 +39,6 @@ import static org.apache.metron.rest.user.HBaseUserSettingsClient.USER_SETTINGS_
 import static org.apache.metron.rest.user.HBaseUserSettingsClient.USER_SETTINGS_MAX_SCAN;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class HBaseUserSettingsClientTest {
 
@@ -58,7 +57,7 @@ public class HBaseUserSettingsClientTest {
     globals = new HashMap<String, Object>() {{
       put(USER_SETTINGS_HBASE_TABLE, tableName);
       put(USER_SETTINGS_HBASE_CF, columnFamily);
-      put(USER_SETTINGS_MAX_SCAN, 100_000);
+      put(USER_SETTINGS_MAX_SCAN, "100000");
     }};
 
     hBaseClient = new FakeHBaseClient();
