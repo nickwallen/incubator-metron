@@ -33,6 +33,16 @@
         <guava.version>${global_hbase_guava_version}</guava.version>
     </properties>
     <dependencies>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${global_jackson_version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>${global_jackson_version}</version>
+        </dependency>
 
         <!-- Metron -->
 
@@ -201,16 +211,6 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
             <version>${global_caffeine_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${global_jackson_version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-            <version>${global_jackson_version}</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
