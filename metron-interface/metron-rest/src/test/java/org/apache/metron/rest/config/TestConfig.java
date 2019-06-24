@@ -48,6 +48,7 @@ import org.apache.metron.rest.mock.MockPcapJobSupplier;
 import org.apache.metron.rest.mock.MockPcapToPdmlScriptWrapper;
 import org.apache.metron.rest.mock.MockStormCLIClientWrapper;
 import org.apache.metron.rest.mock.MockStormRestTemplate;
+import org.apache.metron.rest.service.MetaAlertService;
 import org.apache.metron.rest.service.impl.PcapToPdmlScriptWrapper;
 import org.apache.metron.rest.service.impl.StormCLIWrapper;
 import org.apache.metron.rest.user.HBaseUserSettingsClient;
