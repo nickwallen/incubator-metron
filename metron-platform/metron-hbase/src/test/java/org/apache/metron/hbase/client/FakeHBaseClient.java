@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.lang.invoke.MethodHandles;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -53,7 +54,7 @@ import static org.mockito.Mockito.when;
  * <p>Maintains a static, in-memory set of records to mimic the behavior of
  * an {@link HBaseClient} that interacts with HBase.
  */
-public class FakeHBaseClient implements HBaseClient {
+public class FakeHBaseClient implements HBaseClient, Serializable {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
