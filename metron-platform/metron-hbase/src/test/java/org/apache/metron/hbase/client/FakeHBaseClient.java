@@ -117,7 +117,7 @@ public class FakeHBaseClient implements HBaseClient, Serializable {
 
   @Override
   public Result[] getAll() {
-    LOG.error("Looking for {} get(s) amongst {} persisted record(s)", queuedGets.size(), persisted.size());
+    LOG.debug("Looking for {} get(s) amongst {} persisted record(s)", queuedGets.size(), persisted.size());
     List<Result> results = new ArrayList<>();
     for (int i = 0; i < queuedGets.size(); i++) {
       ByteBuffer rowKey = queuedGets.get(i);
