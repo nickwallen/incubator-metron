@@ -204,7 +204,7 @@ public class HBaseTableClient implements HBaseClient {
       table.delete(delete);
 
     } catch (Exception e) {
-      String msg = String.format("Unable to delete; table={}", tableName(table));
+      String msg = String.format("Unable to delete; table=%s", tableName(table));
       LOG.error(msg, e);
       throw new RuntimeException(msg, e);
     }
@@ -220,7 +220,7 @@ public class HBaseTableClient implements HBaseClient {
       table.delete(delete);
 
     } catch (Exception e) {
-      String msg = String.format("Unable to delete; table={}", tableName(table));
+      String msg = String.format("Unable to delete; table=%s", tableName(table));
       LOG.error(msg, e);
       throw new RuntimeException(msg, e);
     }
