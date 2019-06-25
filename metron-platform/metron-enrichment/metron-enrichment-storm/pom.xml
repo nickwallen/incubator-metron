@@ -33,6 +33,9 @@
         <guava.version>${global_hbase_guava_version}</guava.version>
     </properties>
     <dependencies>
+
+        <!-- pull in jackson preferentially; order matters here -->
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
