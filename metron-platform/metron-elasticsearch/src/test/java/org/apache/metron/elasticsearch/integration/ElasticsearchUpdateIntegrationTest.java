@@ -52,7 +52,6 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
 
   private static final String TABLE_NAME = "modifications";
   private static final String CF = "p";
-  private static IndexDao hbaseDao;
   private static IndexDao elasticsearchDao;
   private static AccessConfig accessConfig;
   private static Map<String, Object> globalConfig;
@@ -63,9 +62,7 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
   }
 
   @BeforeClass
-  public static void setupBeforeClass() throws UnableToStartException, IOException {
-    Configuration config = HBaseConfiguration.create();
-
+  public static void setupBeforeClass() throws UnableToStartException {
     globalConfig = new HashMap<>();
     globalConfig.put("es.clustername", "metron");
     globalConfig.put("es.port", "9200");
@@ -87,9 +84,8 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
 
   @Before
   public void setup() {
-    hbaseDao = new HBaseDao();
     elasticsearchDao = new ElasticsearchDao();
-    MultiIndexDao dao = new MultiIndexDao(hbaseDao, elasticsearchDao);
+    MultiIndexDao dao = new MultiIndexDao(elasticsearchDao);
     dao.init(accessConfig);
     setDao(dao);
   }

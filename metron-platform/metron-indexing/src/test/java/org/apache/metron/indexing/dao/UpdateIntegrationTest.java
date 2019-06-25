@@ -32,9 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-import static org.apache.metron.indexing.dao.IndexDao.COMMENTS_FIELD;
 import static org.hamcrest.CoreMatchers.hasItem;
 
 public abstract class UpdateIntegrationTest {
@@ -64,7 +62,7 @@ public abstract class UpdateIntegrationTest {
   protected static final String SENSOR_NAME = "test";
   private static final String CF = "p";
 
-  private MultiIndexDao dao;
+  private IndexDao dao;
 
   @Test
   public void testUpdate() throws Exception {
@@ -129,7 +127,7 @@ public abstract class UpdateIntegrationTest {
     Document withComment = addAlertComment(document.getGuid(), commentText, commentUser, commentTimestamp);
     {
       // validate that the comment was made on the returned document
-      List<AlertComment> comments = getComments(withComment);
+      List<AlertComment> comments = withComment.getComments();
       Assert.assertEquals(1, comments.size());
       Assert.assertEquals(commentText, comments.get(0).getComment());
       Assert.assertEquals(commentUser, comments.get(0).getUsername());
@@ -138,7 +136,7 @@ public abstract class UpdateIntegrationTest {
     {
       // validate that the comment was made on the indexed document
       Document indexed = findUpdatedDoc(withComment.getDocument(), withComment.getGuid(), SENSOR_NAME);
-      List<AlertComment> comments = getComments(indexed);
+      List<AlertComment> comments = indexed.getComments();
       Assert.assertEquals(1, comments.size());
       Assert.assertEquals(commentText, comments.get(0).getComment());
       Assert.assertEquals(commentUser, comments.get(0).getUsername());
@@ -186,20 +184,20 @@ public abstract class UpdateIntegrationTest {
 
     // add a comment on the document
     Document withComments = addAlertComment(guid, "comment", "user1", 1526401584951L);
-    Assert.assertEquals(1, getComments(withComments).size());
+    Assert.assertEquals(1, withComments.getComments().size());
 
     // ensure the comment was added to the document in the index
     Document indexedWithComments = findUpdatedDoc(withComments.getDocument(), withComments.getGuid(), withComments.getSensorType());
-    Assert.assertEquals(1, getComments(indexedWithComments).size());
+    Assert.assertEquals(1, indexedWithComments.getComments().size());
 
     // remove a comment from the document
-    AlertComment toRemove = getComments(withComments).get(0);
+    AlertComment toRemove = withComments.getComments().get(0);
     Document noComments = removeAlertComment(guid, toRemove.getComment(), toRemove.getUsername(), toRemove.getTimestamp());
-    Assert.assertEquals(0, getComments(noComments).size());
+    Assert.assertEquals(0, noComments.getComments().size());
 
     // ensure the comment was removed from the index
     Document indexedNoComments = findUpdatedDoc(noComments.getDocument(), withComments.getGuid(), withComments.getSensorType());
-    Assert.assertEquals(0, getComments(indexedNoComments).size());
+    Assert.assertEquals(0, indexedNoComments.getComments().size());
   }
 
   protected Document addAlertComment(String guid, String comment, String username, long timestamp)
@@ -247,29 +245,18 @@ public abstract class UpdateIntegrationTest {
     return new Document(message1, guid, SENSOR_NAME, timestamp);
   }
 
-  private List<AlertComment> getComments(Document withComment) {
-    List<Map<String, Object>> commentsField = List.class.cast(withComment.getDocument().get(COMMENTS_FIELD));
-    List<AlertComment> comments = new ArrayList<>();
-    if(commentsField != null) {
-      comments = commentsField
-              .stream()
-              .map(map -> new AlertComment(map))
-              .collect(Collectors.toList());
-    }
-
-    return comments;
-  }
-
-  protected Document findUpdatedDoc(Map<String, Object> message0, String guid, String sensorType)
+  protected Document findUpdatedDoc(Map<String, Object> expected, String guid, String sensorType)
       throws InterruptedException, IOException, OriginalNotFoundException {
     for (int t = 0; t < MAX_RETRIES; ++t, Thread.sleep(SLEEP_MS)) {
-      Document doc = getDao().getLatest(guid, sensorType);
-      if (doc != null && message0.equals(doc.getDocument())) {
-        return doc;
+      Document found = getDao().getLatest(guid, sensorType);
+
+//      if (found != null && guid.equals(found.getGuid())) {
+      if (found != null && expected.equals(found.getDocument())) {
+        return found;
       }
       if (t == MAX_RETRIES -1) {
-        MapUtils.debugPrint(System.out, "Expected", message0);
-        MapUtils.debugPrint(System.out, "actual", doc.getDocument());
+        MapUtils.debugPrint(System.out, "Expected", expected);
+        MapUtils.debugPrint(System.out, "Actual", found.getDocument());
       }
     }
     throw new OriginalNotFoundException("Count not find " + guid + " after " + MAX_RETRIES + " tries");
@@ -279,7 +266,7 @@ public abstract class UpdateIntegrationTest {
     return dao;
   }
 
-  protected void setDao(MultiIndexDao dao) {
+  protected void setDao(IndexDao dao) {
     this.dao = dao;
   }
 

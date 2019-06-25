@@ -21,6 +21,8 @@ import org.apache.solr.common.SolrInputDocument;
 import org.hamcrest.Description;
 import org.mockito.ArgumentMatcher;
 
+import java.util.Objects;
+
 public class SolrInputDocumentMatcher extends ArgumentMatcher<SolrInputDocument> {
 
   private SolrInputDocument expectedSolrInputDocument;
@@ -31,13 +33,20 @@ public class SolrInputDocumentMatcher extends ArgumentMatcher<SolrInputDocument>
 
   @Override
   public boolean matches(Object o) {
-    SolrInputDocument solrInputDocument = (SolrInputDocument) o;
-    for(String field: solrInputDocument.getFieldNames()) {
-      Object expectedValue = expectedSolrInputDocument.getField(field).getValue();
-      Object value = solrInputDocument.getField(field).getValue();
-      boolean matches = expectedValue != null ? expectedValue.equals(value) : value == null;
-      if (!matches) {
-        return false;
+    SolrInputDocument actual = (SolrInputDocument) o;
+    for(String expectedField: expectedSolrInputDocument.getFieldNames()) {
+      Object expectedValue = expectedSolrInputDocument.getField(expectedField).getValue();
+
+      // does it even have the expected field?
+      boolean hasField = actual.getField(expectedField) != null;
+      if(hasField) {
+
+        // is the field value the same?
+        Object actualValue = actual.getField(expectedField).getValue();
+        boolean matches = Objects.equals(expectedValue, actualValue);
+        if (!matches) {
+          return false;
+        }
       }
     }
     return true;

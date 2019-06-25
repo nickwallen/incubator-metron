@@ -218,8 +218,7 @@ public class SolrMetaAlertUpdateDao extends AbstractLuceneMetaAlertUpdateDao imp
       throws IOException, IllegalStateException {
     Document metaAlert = getRetrieveLatestDao()
         .getLatest(metaAlertGuid, MetaAlertConstants.METAALERT_TYPE);
-    if (MetaAlertStatus.ACTIVE.getStatusString()
-        .equals(metaAlert.getDocument().get(MetaAlertConstants.STATUS_FIELD))) {
+    if (MetaAlertStatus.ACTIVE.getStatusString().equals(metaAlert.getDocument().get(MetaAlertConstants.STATUS_FIELD))) {
       Iterable<Document> alerts = getRetrieveLatestDao().getAllLatest(alertRequests);
       Map<Document, Optional<String>> updates = buildAddAlertToMetaAlertUpdates(metaAlert, alerts);
       update(updates);

@@ -21,10 +21,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.zookeeper.ZKConfigurationsCache;
+import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
 import org.apache.metron.indexing.dao.AccessConfig;
 import org.apache.metron.indexing.dao.HBaseDao;
-import org.apache.metron.indexing.dao.IndexDao;
-import org.apache.metron.indexing.dao.MultiIndexDao;
 import org.apache.metron.indexing.dao.UpdateIntegrationTest;
 import org.apache.metron.indexing.dao.update.Document;
 import org.apache.metron.indexing.util.IndexingCacheUtil;
@@ -56,7 +55,6 @@ public class SolrUpdateIntegrationTest extends UpdateIntegrationTest {
 
   private static final String TABLE_NAME = "modifications";
   private static final String CF = "p";
-  private static IndexDao hbaseDao;
 
   @BeforeClass
   public static void setupBeforeClass() throws Exception {
@@ -69,23 +67,22 @@ public class SolrUpdateIntegrationTest extends UpdateIntegrationTest {
     solrComponent.addCollection(SENSOR_NAME, "../metron-solr/src/test/resources/config/test/conf");
     solrComponent.addCollection("error", "../metron-solr/src/main/config/schema/error");
 
-    hbaseDao = new HBaseDao();
-    AccessConfig accessConfig = new AccessConfig();
-
     Map<String, Object> globalConfig = createGlobalConfig();
     globalConfig.put(HBaseDao.HBASE_TABLE, TABLE_NAME);
     globalConfig.put(HBaseDao.HBASE_CF, CF);
-    accessConfig.setGlobalConfigSupplier(() -> globalConfig);
-    accessConfig.setIndexSupplier(s -> s);
 
-    CuratorFramework client = ConfigurationsUtils
-        .getClient(solrComponent.getZookeeperUrl());
+    CuratorFramework client = ConfigurationsUtils.getClient(solrComponent.getZookeeperUrl());
     client.start();
     ZKConfigurationsCache cache = new ZKConfigurationsCache(client);
     cache.start();
-    accessConfig.setIndexSupplier(IndexingCacheUtil.getIndexLookupFunction(cache, "solr"));
 
-    MultiIndexDao dao = new MultiIndexDao(hbaseDao, new SolrDao());
+    AccessConfig accessConfig = new AccessConfig();
+    accessConfig.setGlobalConfigSupplier(() -> globalConfig);
+    accessConfig.setIndexSupplier(s -> s);
+    accessConfig.setIndexSupplier(IndexingCacheUtil.getIndexLookupFunction(cache, "solr"));
+    accessConfig.setHbaseConnectionFactory(new MockHBaseConnectionFactory());
+
+    SolrDao dao = new SolrDao();
     dao.init(accessConfig);
     setDao(dao);
   }
@@ -171,6 +168,7 @@ public class SolrUpdateIntegrationTest extends UpdateIntegrationTest {
 
     exception.expect(IOException.class);
     exception.expectMessage("Document contains at least one immense term in field=\"error_hash\"");
+
     getDao().update(errorDoc, Optional.of("error"));
   }
 }
