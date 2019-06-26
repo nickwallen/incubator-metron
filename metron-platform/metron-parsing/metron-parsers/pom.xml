@@ -30,6 +30,18 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
   </properties>
   <dependencies>
+    <!-- pull in jackson preferentially; order matters here -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${global_jackson_version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${global_jackson_version}</version>
+    </dependency>
+
     <!-- Metron Dependencies -->
     <dependency>
       <groupId>org.apache.metron</groupId>
