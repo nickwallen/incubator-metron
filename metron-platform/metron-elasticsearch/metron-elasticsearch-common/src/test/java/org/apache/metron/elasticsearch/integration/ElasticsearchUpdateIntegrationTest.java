@@ -32,6 +32,7 @@ import org.apache.metron.indexing.dao.IndexDao;
 import org.apache.metron.indexing.dao.MultiIndexDao;
 import org.apache.metron.indexing.dao.UpdateIntegrationTest;
 import org.apache.metron.integration.UnableToStartException;
+import org.elasticsearch.action.support.WriteRequest;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -94,7 +95,8 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
 
   @Before
   public void setup() {
-    ElasticsearchDao dao = new ElasticsearchDao();
+    ElasticsearchDao dao = new ElasticsearchDao()
+            .withRefreshPolicy(WriteRequest.RefreshPolicy.WAIT_UNTIL);
     dao.init(accessConfig);
     setDao(dao);
   }
