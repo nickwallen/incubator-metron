@@ -261,16 +261,20 @@ public abstract class UpdateIntegrationTest {
     return comments;
   }
 
-  protected Document findUpdatedDoc(Map<String, Object> message0, String guid, String sensorType)
+  protected Document findUpdatedDoc(Map<String, Object> expected, String guid, String sensorType)
       throws InterruptedException, IOException, OriginalNotFoundException {
     for (int t = 0; t < MAX_RETRIES; ++t, Thread.sleep(SLEEP_MS)) {
-      Document doc = getDao().getLatest(guid, sensorType);
-      if (doc != null && message0.equals(doc.getDocument())) {
-        return doc;
+      Document found = getDao().getLatest(guid, sensorType);
+      if (found != null && expected.equals(found.getDocument())) {
+        return found;
       }
       if (t == MAX_RETRIES -1) {
-        MapUtils.debugPrint(System.out, "Expected", message0);
-        MapUtils.debugPrint(System.out, "actual", doc.getDocument());
+        MapUtils.debugPrint(System.out, "Expected", expected);
+        if(found != null) {
+          MapUtils.debugPrint(System.out, "Actual", found.getDocument());
+        } else {
+          System.out.println(String.format("Actual = \nNo documents found where guid=%s, type=%s", guid, sensorType));
+        }
       }
     }
     throw new OriginalNotFoundException("Count not find " + guid + " after " + MAX_RETRIES + " tries");
