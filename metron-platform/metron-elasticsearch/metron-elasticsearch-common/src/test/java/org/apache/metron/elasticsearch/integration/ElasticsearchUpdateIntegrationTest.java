@@ -94,8 +94,7 @@ public class ElasticsearchUpdateIntegrationTest extends UpdateIntegrationTest {
 
   @Before
   public void setup() {
-    elasticsearchDao = new ElasticsearchDao();
-    MultiIndexDao dao = new MultiIndexDao(elasticsearchDao);
+    ElasticsearchDao dao = new ElasticsearchDao();
     dao.init(accessConfig);
     setDao(dao);
   }

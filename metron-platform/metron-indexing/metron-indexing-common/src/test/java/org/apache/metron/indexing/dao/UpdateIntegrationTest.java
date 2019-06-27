@@ -65,7 +65,7 @@ public abstract class UpdateIntegrationTest {
   protected static final String SENSOR_NAME = "test";
   private static final String CF = "p";
 
-  private MultiIndexDao dao;
+  private IndexDao dao;
 
   @Test
   public void testUpdate() throws Exception {
@@ -284,7 +284,7 @@ public abstract class UpdateIntegrationTest {
     return dao;
   }
 
-  protected void setDao(MultiIndexDao dao) {
+  protected void setDao(IndexDao dao) {
     this.dao = dao;
   }
 
