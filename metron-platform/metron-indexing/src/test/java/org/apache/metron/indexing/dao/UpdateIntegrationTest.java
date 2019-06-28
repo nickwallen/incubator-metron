@@ -70,16 +70,13 @@ public abstract class UpdateIntegrationTest {
     final String guid = UUID.randomUUID().toString();
     final Long timestamp = 1526306463050L;
     Document toUpdate = createDocument(guid, timestamp);
-    {
-      // update the document and validate
-      Document updated = getDao().update(toUpdate, Optional.of(SENSOR_NAME));
-      Assert.assertEquals(toUpdate, updated);
-    }
-    {
-      // ensure the document is updated in the index
-      Document indexed = findUpdatedDoc(toUpdate.getDocument(), guid, SENSOR_NAME);
-      Assert.assertEquals(toUpdate, indexed);
-    }
+
+    // update the document and validate
+    Document updated = getDao().update(toUpdate, Optional.of(SENSOR_NAME));
+    Assert.assertEquals(toUpdate, updated);
+
+    // ensure the document was updated in the index
+    assertDocumentIndexed(toUpdate);
   }
 
   @Test
@@ -111,9 +108,9 @@ public abstract class UpdateIntegrationTest {
     Assert.assertThat(updated.keySet(), hasItem(document3));
 
     // ensure the documents were written to the index
-    Assert.assertEquals(document1, findUpdatedDoc(document1.getDocument(), guid1, SENSOR_NAME));
-    Assert.assertEquals(document2, findUpdatedDoc(document2.getDocument(), guid2, SENSOR_NAME));
-    Assert.assertEquals(document3, findUpdatedDoc(document3.getDocument(), guid3, SENSOR_NAME));
+    assertDocumentIndexed(document1);
+    assertDocumentIndexed(document2);
+    assertDocumentIndexed(document3);
   }
 
   @Test
@@ -223,6 +220,33 @@ public abstract class UpdateIntegrationTest {
     return request;
   }
 
+  /**
+   * Ensures that a document was correctly indexed.
+   * @param expected The document that should have been indexed.
+   * @return The document that was retrieved from the index.
+   */
+  private Document assertDocumentIndexed(Document expected) throws Exception {
+    // search the index for the document
+    Document actual = findUpdatedDoc(expected.getDocument(), expected.getGuid(), expected.getSensorType());
+
+    // most fields should match exactly, except the documentID
+    Assert.assertEquals(expected.getGuid(), actual.getGuid());
+    Assert.assertEquals(expected.getTimestamp(), actual.getTimestamp());
+    Assert.assertEquals(expected.getSensorType(), actual.getSensorType());
+    Assert.assertEquals(expected.getDocument(), actual.getDocument());
+
+    if(expected.getDocumentID().isPresent()) {
+      // the documentID was already defined in 'expected', this ID should have been used when the document was indexed
+      Assert.assertEquals(expected.getDocumentID().get(), actual.getDocumentID());
+
+    } else {
+      // if the documentID was not defined, the indexer should have created one
+      Assert.assertNotNull(expected.getDocumentID());
+    }
+
+    return actual;
+  }
+
   private Document createAndIndexDocument(String guid) throws Exception {
     // create the document
     Long timestamp = 1526306463050L;
@@ -233,7 +257,7 @@ public abstract class UpdateIntegrationTest {
     Assert.assertEquals(toCreate, created);
 
     // ensure the document is indexed
-    return findUpdatedDoc(toCreate.getDocument(), guid, SENSOR_NAME);
+    return assertDocumentIndexed(created);
   }
 
   protected Document createDocument(String guid, Long timestamp) {
