@@ -19,10 +19,9 @@ package org.apache.metron.enrichment.converter;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Get;
-import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 
 import java.io.IOException;
 

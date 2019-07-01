@@ -22,7 +22,7 @@ import com.github.benmanes.caffeine.cache.CacheWriter;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;

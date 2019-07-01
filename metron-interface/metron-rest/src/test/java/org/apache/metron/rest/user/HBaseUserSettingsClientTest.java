@@ -22,7 +22,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.client.FakeHBaseClient;
 import org.apache.metron.hbase.client.FakeHBaseClientCreator;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;

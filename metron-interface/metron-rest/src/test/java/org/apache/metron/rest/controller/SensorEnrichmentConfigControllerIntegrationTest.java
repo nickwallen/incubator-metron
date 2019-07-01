@@ -19,7 +19,7 @@ package org.apache.metron.rest.controller;
 
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.FakeHBaseClient;
 import org.apache.metron.rest.service.SensorEnrichmentConfigService;
 import org.hamcrest.core.IsCollectionContaining;
@@ -36,9 +36,6 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
-
-import java.util.Arrays;
-import java.util.List;
 
 import static org.apache.metron.integration.utils.TestUtils.assertEventually;
 import static org.apache.metron.rest.MetronRestConstants.TEST_PROFILE;

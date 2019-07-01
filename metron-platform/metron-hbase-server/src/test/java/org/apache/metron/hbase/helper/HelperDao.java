@@ -36,7 +36,7 @@ import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

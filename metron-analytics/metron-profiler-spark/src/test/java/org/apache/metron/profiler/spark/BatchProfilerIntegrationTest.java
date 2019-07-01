@@ -22,7 +22,7 @@ package org.apache.metron.profiler.spark;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.hbase.client.FakeHBaseClient;
 import org.apache.metron.hbase.client.FakeHBaseClientCreator;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.profiler.client.HBaseProfilerClient;
 import org.apache.metron.profiler.client.ProfilerClient;
 import org.apache.metron.profiler.client.stellar.FixedLookback;

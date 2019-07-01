@@ -26,7 +26,7 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.json.simple.JSONObject;
 import org.junit.Assert;
 import org.junit.Before;

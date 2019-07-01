@@ -35,6 +35,7 @@ import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.FakeEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.FakeEnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
+import org.apache.metron.enrichment.lookup.accesstracker.PersistentBloomTrackerCreator;
 import org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions;
 import org.apache.metron.enrichment.utils.ThreatIntelUtils;
 import org.apache.metron.integration.BaseIntegrationTest;
@@ -53,13 +54,10 @@ import org.json.simple.parser.ParseException;
 import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
-import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -70,15 +68,14 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.apache.metron.common.Constants.INDEXING_TOPIC;
-import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentExists;
 import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentGet;
+import static org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions.EnrichmentExists;
 
 /**
- * Integration test for the 'Split-Join' enrichment topology.
+ * Integration test for the enrichment topology.
  */
 public class EnrichmentIntegrationTest extends BaseIntegrationTest {
-  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+
   public static final String ERROR_TOPIC = "enrichment_error";
   public static final String SRC_IP = "ip_src_addr";
   public static final String DST_IP = "ip_dst_addr";
@@ -106,12 +103,8 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
   private static File geoHdfsFile;
   private static File asnHdfsFile;
 
-  protected String fluxPath() {
-    return "src/main/flux/enrichment/remote-splitjoin.yaml";
-  }
-
   private static List<byte[]> getInputMessages(String path){
-    try{
+    try {
       List<byte[]> ret = TestUtils.readSampleData(path);
       {
         //we want one of the fields without a destination IP to ensure that enrichments can function
@@ -121,7 +114,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
         ret.add(JSONUtils.INSTANCE.toJSONPretty(sansDestinationIp));
       }
       return ret;
-    }catch(IOException ioe){
+    } catch(IOException ioe){
       return null;
     }
   }
@@ -134,54 +127,69 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
   }
 
   /**
-   * Returns the path to the topology properties template.
-   *
    * @return The path to the topology properties template.
    */
   public String getTemplatePath() {
-    return "src/main/config/enrichment-splitjoin.properties.j2";
+    return "src/main/config/enrichment.properties.j2";
   }
 
   /**
-   * Properties for the 'Split-Join' topology.
-   *
+   * @return The path to the flux file defining the topology.
+   */
+  public String fluxPath() {
+    return "src/main/flux/enrichment/remote.yaml";
+  }
+
+  /**
    * @return The topology properties.
    */
   public Properties getTopologyProperties() {
     return new Properties() {{
+
+      // storm
       setProperty("enrichment_workers", "1");
       setProperty("enrichment_acker_executors", "0");
       setProperty("enrichment_topology_worker_childopts", "");
       setProperty("topology_auto_credentials", "[]");
-      setProperty("enrichment_topology_max_spout_pending", "");
-      setProperty("enrichment_kafka_start", "UNCOMMITTED_EARLIEST");
+      setProperty("enrichment_topology_max_spout_pending", "500");
+
+      // kafka - zookeeper_quorum, kafka_brokers set elsewhere
       setProperty("kafka_security_protocol", "PLAINTEXT");
+      setProperty("enrichment_kafka_start", "UNCOMMITTED_EARLIEST");
       setProperty("enrichment_input_topic", Constants.ENRICHMENT_TOPIC);
       setProperty("enrichment_output_topic", Constants.INDEXING_TOPIC);
       setProperty("enrichment_error_topic", ERROR_TOPIC);
       setProperty("threatintel_error_topic", ERROR_TOPIC);
-      setProperty("enrichment_join_cache_size", "1000");
-      setProperty("threatintel_join_cache_size", "1000");
-//      setProperty("enrichment_hbase_provider_impl", "" + MockHBaseTableProvider.class.getName());
+
+      // enrichment
       setProperty("enrichment_hbase_table", enrichmentsTableName);
       setProperty("enrichment_hbase_cf", cf);
       setProperty("enrichment_host_known_hosts", "[{\"ip\":\"10.1.128.236\", \"local\":\"YES\", \"type\":\"webserver\", \"asset_value\" : \"important\"}," +
               "{\"ip\":\"10.1.128.237\", \"local\":\"UNKNOWN\", \"type\":\"unknown\", \"asset_value\" : \"important\"}," +
               "{\"ip\":\"10.60.10.254\", \"local\":\"YES\", \"type\":\"printer\", \"asset_value\" : \"important\"}," +
               "{\"ip\":\"10.0.2.15\", \"local\":\"YES\", \"type\":\"printer\", \"asset_value\" : \"important\"}]");
+      setProperty("enrichment_lookup_creator", FakeEnrichmentLookupCreator.class.getName());
+
+      // threat intel
       setProperty("threatintel_hbase_table", threatIntelTableName);
       setProperty("threatintel_hbase_cf", cf);
-      setProperty("enrichment_kafka_spout_parallelism", "1");
-      setProperty("enrichment_split_parallelism", "1");
-      setProperty("enrichment_stellar_parallelism", "1");
-      setProperty("enrichment_join_parallelism", "1");
-      setProperty("threat_intel_split_parallelism", "1");
-      setProperty("threat_intel_stellar_parallelism", "1");
-      setProperty("threat_intel_join_parallelism", "1");
-      setProperty("kafka_writer_parallelism", "1");
-      setProperty("enrichment_lookup_creator", FakeEnrichmentLookupCreator.class.getName());
+
+      // parallelism
+      setProperty("unified_kafka_spout_parallelism", "1");
+      setProperty("unified_enrichment_parallelism", "1");
+      setProperty("unified_threat_intel_parallelism", "1");
+      setProperty("unified_kafka_writer_parallelism", "1");
+
+      // caches
+      setProperty("unified_enrichment_cache_size", "1000");
+      setProperty("unified_threat_intel_cache_size", "1000");
+
+      // threads
+      setProperty("unified_enrichment_threadpool_size", "1");
+      setProperty("unified_enrichment_threadpool_type", "FIXED");
     }};
   }
+
 
   @Test
   public void test() throws Exception {
@@ -215,7 +223,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
             .withEnrichment(
                     new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3"),
                     new EnrichmentValue(PLAYFUL_ENRICHMENT));
-    EnrichmentLookupCreator lookupCreator = (w,x,y,z) -> lookup;
+    EnrichmentLookupCreator lookupCreator = (w, x, y, z) -> lookup;
 
     // the enrichment stellar functions need to access the same global, static enrichment values
     StellarFunctions.FUNCTION_RESOLVER()
@@ -244,29 +252,30 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
       runner.start();
       fluxComponent.submitTopology();
 
-      // write the input telemetry to kafka
       kafkaComponent.writeMessages(Constants.ENRICHMENT_TOPIC, inputMessages);
-
-      // read the messages output by the enrichment topology
-      ProcessorResult<Map<String, List<Map<String, Object>>>> result = runner.process(getKafkaProcessor());
+      ProcessorResult<Map<String, List<Map<String, Object>>>> result = runner.process(getProcessor());
       Map<String,List<Map<String, Object>>> outputMessages = result.getResult();
-
-      // validate the successfully enriched messages
       List<Map<String, Object>> docs = outputMessages.get(Constants.INDEXING_TOPIC);
       Assert.assertEquals(inputMessages.size(), docs.size());
       validateAll(docs);
-
-      // validate the error messages
       List<Map<String, Object>> errors = outputMessages.get(ERROR_TOPIC);
       Assert.assertEquals(inputMessages.size(), errors.size());
       validateErrors(errors);
-
     } finally {
       runner.stop();
     }
   }
 
+  public void dumpParsedMessages(List<Map<String,Object>> outputMessages, StringBuffer buffer) {
+    for (Map<String,Object> map  : outputMessages) {
+      for( String json : map.keySet()) {
+        buffer.append(json).append("\n");
+      }
+    }
+  }
+
   public static void validateAll(List<Map<String, Object>> docs) {
+
     for (Map<String, Object> doc : docs) {
       baseValidation(doc);
       hostEnrichmentValidation(doc);
@@ -572,7 +581,8 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
     return tmp;
   }
   @SuppressWarnings("unchecked")
-  private KafkaProcessor<Map<String,List<Map<String, Object>>>> getKafkaProcessor(){
+  private KafkaProcessor<Map<String,List<Map<String, Object>>>> getProcessor(){
+
     return new KafkaProcessor<>()
             .withKafkaComponentName("kafka")
             .withReadTopic(Constants.INDEXING_TOPIC)
@@ -581,13 +591,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
               @Nullable
               @Override
               public Boolean apply(@Nullable KafkaMessageSet messageSet) {
-                int expected = inputMessages.size();
-                int actualSuccesses = messageSet.getMessages().size();
-                int actualErrors = messageSet.getErrors().size();
-                LOG.debug("Got {} of {} successful message(s) and {} of {} error message(s)",
-                        actualSuccesses, expected, actualErrors, expected);
-
-                return (actualSuccesses == expected) && (actualErrors == expected);
+                return (messageSet.getMessages().size() == inputMessages.size()) && (messageSet.getErrors().size() == inputMessages.size());
               }
             })
             .withProvideResult(new Function<KafkaMessageSet,Map<String,List<Map<String, Object>>>>(){
@@ -595,7 +599,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
               @Override
               public Map<String,List<Map<String, Object>>> apply(@Nullable KafkaMessageSet messageSet) {
                 return new HashMap<String, List<Map<String, Object>>>() {{
-                  put(INDEXING_TOPIC, loadMessages(messageSet.getMessages()));
+                  put(Constants.INDEXING_TOPIC, loadMessages(messageSet.getMessages()));
                   put(ERROR_TOPIC, loadMessages(messageSet.getErrors()));
                 }};
               }

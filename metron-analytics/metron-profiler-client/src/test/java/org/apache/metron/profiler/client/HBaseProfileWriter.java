@@ -21,7 +21,7 @@
 package org.apache.metron.profiler.client;
 
 import org.apache.hadoop.hbase.client.Durability;
-import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;

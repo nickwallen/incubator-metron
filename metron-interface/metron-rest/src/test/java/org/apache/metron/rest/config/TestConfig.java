@@ -36,7 +36,7 @@ import org.apache.metron.hbase.client.FakeHBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.integration.ComponentRunner;
 import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.KafkaComponent;
@@ -48,12 +48,14 @@ import org.apache.metron.rest.mock.MockPcapJobSupplier;
 import org.apache.metron.rest.mock.MockPcapToPdmlScriptWrapper;
 import org.apache.metron.rest.mock.MockStormCLIClientWrapper;
 import org.apache.metron.rest.mock.MockStormRestTemplate;
-import org.apache.metron.rest.service.MetaAlertService;
+import org.apache.metron.rest.service.StormStatusService;
+import org.apache.metron.rest.service.impl.CachedStormStatusServiceImpl;
 import org.apache.metron.rest.service.impl.PcapToPdmlScriptWrapper;
 import org.apache.metron.rest.service.impl.StormCLIWrapper;
 import org.apache.metron.rest.user.HBaseUserSettingsClient;
 import org.apache.metron.rest.user.UserSettingsClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -255,5 +257,13 @@ public class TestConfig {
   @Bean
   public PcapToPdmlScriptWrapper pcapToPdmlScriptWrapper() {
     return new MockPcapToPdmlScriptWrapper();
+  }
+
+  @Bean
+  public StormStatusService stormStatusService(
+      @Autowired @Qualifier("StormStatusServiceImpl") StormStatusService wrappedService) {
+    long maxCacheSize = 0L;
+    long maxCacheTimeoutSeconds = 0L;
+    return new CachedStormStatusServiceImpl(wrappedService, maxCacheSize, maxCacheTimeoutSeconds);
   }
 }

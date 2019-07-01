@@ -41,7 +41,7 @@ import org.adrianwalker.multilinestring.Multiline;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.common.system.FakeClock;
 import org.apache.metron.hbase.client.FakeHBaseClientCreator;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.rest.MetronRestConstants;
 import org.apache.metron.rest.model.AlertsUIUserSettings;
 import org.apache.metron.rest.service.KafkaService;

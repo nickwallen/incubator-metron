@@ -20,13 +20,10 @@
 package org.apache.metron.profiler.spark.function;
 
 import org.apache.commons.collections4.IteratorUtils;
-import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
-import org.apache.metron.hbase.bolt.mapper.ColumnList;
+import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.FakeHBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
-import org.apache.metron.hbase.client.HBaseTableClient;
-import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
@@ -45,11 +42,6 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.metron.hbase.client.FakeHBaseClient.Mutation;
-
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_COLUMN_FAMILY;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_TABLE_NAME;
-import static org.apache.metron.profiler.spark.BatchProfilerConfig.HBASE_WRITE_DURABILITY;
-import static org.mockito.Mockito.*;
 
 public class HBaseWriterFunctionTest {
 

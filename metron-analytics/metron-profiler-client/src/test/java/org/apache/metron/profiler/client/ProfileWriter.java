@@ -21,9 +21,6 @@ package org.apache.metron.profiler.client;
 
 import org.apache.metron.profiler.ProfileMeasurement;
 
-import java.util.List;
-import java.util.function.Function;
-
 /**
  * Responsible for writing {@link ProfileMeasurement} values to persistent storage.
  */

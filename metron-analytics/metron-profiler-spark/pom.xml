@@ -18,7 +18,7 @@
     <parent>
         <groupId>org.apache.metron</groupId>
         <artifactId>metron-analytics</artifactId>
-        <version>0.7.1</version>
+        <version>0.7.2</version>
     </parent>
     <artifactId>metron-profiler-spark</artifactId>
     <url>https://metron.apache.org/</url>
@@ -81,7 +81,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.metron</groupId>
-            <artifactId>metron-hbase</artifactId>
+            <artifactId>metron-hbase-common</artifactId>
             <version>${project.parent.version}</version>
             <exclusions>
                 <exclusion>
@@ -96,7 +96,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.metron</groupId>
-            <artifactId>metron-hbase</artifactId>
+            <artifactId>metron-hbase-common</artifactId>
             <version>${project.parent.version}</version>
             <scope>test</scope>
             <type>test-jar</type>
@@ -147,6 +147,13 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <version>${global_mockito_version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-integration-test</artifactId>
+            <version>${project.parent.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

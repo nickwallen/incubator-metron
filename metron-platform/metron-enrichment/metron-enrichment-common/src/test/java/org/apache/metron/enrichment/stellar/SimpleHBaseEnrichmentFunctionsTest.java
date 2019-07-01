@@ -23,7 +23,7 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
-import org.apache.metron.hbase.mock.StaticMockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.StaticMockHBaseConnectionFactory;
 import org.apache.metron.stellar.common.StellarProcessor;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.DefaultVariableResolver;

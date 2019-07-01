@@ -23,7 +23,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientCreator;
-import org.apache.metron.hbase.mock.MockHBaseConnectionFactory;
+import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.junit.Before;
 import org.junit.Test;
 
