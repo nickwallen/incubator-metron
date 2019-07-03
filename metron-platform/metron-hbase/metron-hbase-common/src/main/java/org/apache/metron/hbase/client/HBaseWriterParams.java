@@ -1,4 +1,4 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -15,19 +15,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.metron.hbase.client;
 
-package org.apache.metron.hbase.coprocessor;
-
-import java.util.Map;
+import org.apache.hadoop.hbase.client.Durability;
 
 /**
- * A service that retrieves the global configuration.
+ * Parameters that define how the {@link HBaseWriter} writes to HBase.
  */
-public interface GlobalConfigService {
+public class HBaseWriterParams {
+  private Durability durability;
+  private Long timeToLiveMillis;
 
-  /**
-   * @param zookeeperUrl The zookeeper URL.
-   * @return The global configuration.
-   */
-  Map<String, Object> get(String zookeeperUrl);
+  public HBaseWriterParams() {
+    durability = Durability.USE_DEFAULT;
+    timeToLiveMillis = 0L;
+  }
+
+  public HBaseWriterParams withDurability(Durability durability) {
+    this.durability = durability;
+    return this;
+  }
+
+  public HBaseWriterParams withTimeToLive(Long timeToLiveMillis) {
+    this.timeToLiveMillis = timeToLiveMillis;
+    return this;
+  }
+
+  public Durability getDurability() {
+    return durability;
+  }
+
+  public Long getTimeToLiveMillis() {
+    return timeToLiveMillis;
+  }
 }
