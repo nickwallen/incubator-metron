@@ -24,10 +24,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.hbase.client.HBaseTableClient;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
@@ -69,7 +69,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
   /**
    * Creates the {@link HBaseTableClient} when it is needed.
    */
-  private HBaseClientCreator hbaseClientCreator;
+  private HBaseClientFactory hbaseClientCreator;
 
   /**
    * The name of the HBase table to write to.
@@ -112,7 +112,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
 
     // client creator
     String creatorImpl = HBASE_CLIENT_CREATOR.get(properties, String.class);
-    hbaseClientCreator = HBaseClientCreator.byName(creatorImpl, () -> new HBaseTableClientCreator());
+    hbaseClientCreator = HBaseClientFactory.byName(creatorImpl, () -> new HBaseTableClientFactory());
   }
 
   /**
@@ -170,7 +170,7 @@ public class HBaseWriterFunction implements MapPartitionsFunction<ProfileMeasure
     return this;
   }
 
-  protected HBaseWriterFunction withClientCreator(HBaseClientCreator clientCreator) {
+  protected HBaseWriterFunction withClientCreator(HBaseClientFactory clientCreator) {
     this.hbaseClientCreator = clientCreator;
     return this;
   }

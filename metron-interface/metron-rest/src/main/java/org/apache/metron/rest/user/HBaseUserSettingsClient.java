@@ -23,7 +23,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.HBaseProjectionCriteria;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,12 +50,12 @@ public class HBaseUserSettingsClient implements UserSettingsClient {
   private Supplier<Map<String, Object>> globalConfigSupplier;
   private HBaseConnectionFactory hBaseConnectionFactory;
   private Configuration hBaseConfiguration;
-  private HBaseClientCreator hBaseClientCreator;
+  private HBaseClientFactory hBaseClientCreator;
   private HBaseClient hBaseClient;
   private int maxScanCount;
 
   public HBaseUserSettingsClient(Supplier<Map<String, Object>> globalConfigSupplier,
-                                 HBaseClientCreator hBaseClientCreator,
+                                 HBaseClientFactory hBaseClientCreator,
                                  HBaseConnectionFactory hBaseConnectionFactory,
                                  Configuration hBaseConfiguration) {
     this.globalConfigSupplier = globalConfigSupplier;

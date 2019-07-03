@@ -25,9 +25,9 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +44,7 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
   private HBaseConnectionFactory connectionFactory;
   private Configuration conf;
-  private HBaseClientCreator clientCreator;
+  private HBaseClientFactory clientCreator;
   private final String tableName;
   private final String columnFamily;
   private final String columnQualifier;
@@ -59,7 +59,7 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
                           String tableName,
                           String columnFamily,
                           String columnQualifier) {
-    this(new HBaseTableClientCreator(), new HBaseConnectionFactory(), conf, tableName, columnFamily, columnQualifier);
+    this(new HBaseTableClientFactory(), new HBaseConnectionFactory(), conf, tableName, columnFamily, columnQualifier);
   }
 
   /**
@@ -72,7 +72,7 @@ public class HBaseCacheWriter implements CacheWriter<String, String> {
    * @param columnFamily The column family within the table.
    * @param columnQualifier The column qualifier within the family.
    */
-  public HBaseCacheWriter(HBaseClientCreator clientCreator,
+  public HBaseCacheWriter(HBaseClientFactory clientCreator,
                           HBaseConnectionFactory connectionFactory,
                           Configuration conf,
                           String tableName,

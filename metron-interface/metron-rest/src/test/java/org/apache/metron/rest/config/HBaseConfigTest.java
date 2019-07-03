@@ -22,11 +22,8 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Connection;
 import org.apache.hadoop.hbase.client.Table;
-import org.apache.metron.common.configuration.EnrichmentConfigurations;
-import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
-import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.rest.service.GlobalConfigService;
 import org.apache.metron.rest.user.UserSettingsClient;
@@ -53,7 +50,7 @@ import static org.powermock.api.mockito.PowerMockito.mockStatic;
 public class HBaseConfigTest {
 
   private HBaseConnectionFactory hBaseConnectionFactory;
-  private HBaseClientCreator hBaseClientCreator;
+  private HBaseClientFactory hBaseClientCreator;
   private HBaseConfiguration hBaseConfiguration;
   private Configuration configuration;
   private GlobalConfigService globalConfigService;
@@ -68,7 +65,7 @@ public class HBaseConfigTest {
     hBaseConnectionFactory = mock(HBaseConnectionFactory.class);
     configuration = mock(Configuration.class);
     hBaseConfiguration = mock(HBaseConfiguration.class);
-    hBaseClientCreator = mock(FakeHBaseClientCreator.class);
+    hBaseClientCreator = mock(FakeHBaseClientFactory.class);
     globalConfigService = mock(GlobalConfigService.class);
     hBaseConfig = new HBaseConfig(globalConfigService, hBaseConnectionFactory, hBaseConfiguration, hBaseClientCreator);
     mockStatic(HBaseConfiguration.class);

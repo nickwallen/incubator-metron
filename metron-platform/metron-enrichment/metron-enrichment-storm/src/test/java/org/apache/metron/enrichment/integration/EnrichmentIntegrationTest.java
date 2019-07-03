@@ -31,11 +31,10 @@ import org.apache.metron.enrichment.adapters.maxmind.asn.GeoLiteAsnDatabase;
 import org.apache.metron.enrichment.adapters.maxmind.geo.GeoLiteCityDatabase;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.FakeEnrichmentLookup;
 import org.apache.metron.enrichment.lookup.FakeEnrichmentLookupCreator;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
-import org.apache.metron.enrichment.lookup.accesstracker.PersistentBloomTrackerCreator;
 import org.apache.metron.enrichment.stellar.SimpleHBaseEnrichmentFunctions;
 import org.apache.metron.enrichment.utils.ThreatIntelUtils;
 import org.apache.metron.integration.BaseIntegrationTest;
@@ -223,7 +222,7 @@ public class EnrichmentIntegrationTest extends BaseIntegrationTest {
             .withEnrichment(
                     new EnrichmentKey(PLAYFUL_CLASSIFICATION_TYPE, "10.0.2.3"),
                     new EnrichmentValue(PLAYFUL_ENRICHMENT));
-    EnrichmentLookupCreator lookupCreator = (w, x, y, z) -> lookup;
+    EnrichmentLookupFactory lookupCreator = (w, x, y, z) -> lookup;
 
     // the enrichment stellar functions need to access the same global, static enrichment values
     StellarFunctions.FUNCTION_RESOLVER()

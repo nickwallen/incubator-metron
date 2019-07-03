@@ -32,9 +32,9 @@ import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.common.zookeeper.ConfigurationsCache;
 import org.apache.metron.common.zookeeper.ZKConfigurationsCache;
 import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.integration.ComponentRunner;
@@ -83,7 +83,7 @@ public class TestConfig {
   private org.apache.hadoop.conf.Configuration hBaseConfiguration;
 
   @Autowired
-  private HBaseClientCreator hBaseClientCreator;
+  private HBaseClientFactory hBaseClientCreator;
 
   @Bean
   public Properties zkProperties() {
@@ -228,8 +228,8 @@ public class TestConfig {
   }
 
   @Bean
-  HBaseClientCreator hBaseClientCreator() {
-    return new FakeHBaseClientCreator();
+  HBaseClientFactory hBaseClientCreator() {
+    return new FakeHBaseClientFactory();
   }
 
   @Bean(destroyMethod = "close")

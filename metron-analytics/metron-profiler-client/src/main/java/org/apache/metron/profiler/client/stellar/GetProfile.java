@@ -23,7 +23,7 @@ package org.apache.metron.profiler.client.stellar;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
 import org.apache.metron.profiler.client.ProfilerClient;
-import org.apache.metron.profiler.client.ProfilerClientCreator;
+import org.apache.metron.profiler.client.ProfilerClientFactory;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -99,7 +99,7 @@ public class GetProfile implements StellarFunction {
   /**
    * Creates the {@link ProfilerClient} used by this function.
    */
-  private ProfilerClientCreator profilerClientCreator;
+  private ProfilerClientFactory profilerClientCreator;
 
   /**
    * Last known global configuration used to create the {@link ProfilerClient}. If the
@@ -214,7 +214,7 @@ public class GetProfile implements StellarFunction {
             .orElse(Collections.emptyMap());
   }
 
-  public GetProfile withProfilerClientCreator(ProfilerClientCreator creator) {
+  public GetProfile withProfilerClientCreator(ProfilerClientFactory creator) {
     this.profilerClientCreator = creator;
     return this;
   }

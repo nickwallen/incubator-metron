@@ -23,7 +23,7 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.EnrichmentLookups;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
@@ -150,13 +150,13 @@ public class SimpleHBaseEnrichmentFunctions {
 
     boolean initialized = false;
     private static Cache<Table, EnrichmentLookup> lookupCache = createCache();
-    private EnrichmentLookupCreator creator;
+    private EnrichmentLookupFactory creator;
 
     public EnrichmentExists() {
       this.creator = EnrichmentLookups.HBASE;
     }
 
-    public EnrichmentExists withEnrichmentLookupCreator(EnrichmentLookupCreator creator) {
+    public EnrichmentExists withEnrichmentLookupCreator(EnrichmentLookupFactory creator) {
       this.creator = creator;
       return this;
     }
@@ -247,13 +247,13 @@ public class SimpleHBaseEnrichmentFunctions {
   public static class EnrichmentGet implements StellarFunction {
     boolean initialized = false;
     private static Cache<Table, EnrichmentLookup> lookupCache = createCache();
-    private EnrichmentLookupCreator creator;
+    private EnrichmentLookupFactory creator;
 
     public EnrichmentGet() {
       this.creator = EnrichmentLookups.HBASE;
     }
 
-    public EnrichmentGet withEnrichmentLookupCreator(EnrichmentLookupCreator creator) {
+    public EnrichmentGet withEnrichmentLookupCreator(EnrichmentLookupFactory creator) {
       this.creator = creator;
       return this;
     }

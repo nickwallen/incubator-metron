@@ -40,9 +40,9 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.metron.common.utils.RuntimeErrors;
 import org.apache.metron.dataloads.extractor.Extractor;
-import org.apache.metron.enrichment.converter.DefaultEnrichmentConverterCreator;
+import org.apache.metron.enrichment.converter.DefaultEnrichmentConverterFactory;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
-import org.apache.metron.enrichment.converter.EnrichmentConverterCreator;
+import org.apache.metron.enrichment.converter.EnrichmentConverterFactory;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
 import org.mitre.taxii.client.HttpClient;
 import org.mitre.taxii.messages.xml11.AnyMixedContentType;
@@ -122,17 +122,17 @@ public class TaxiiHandler extends TimerTask {
   private Configuration config;
   private boolean inProgress = false;
   private Set<String> allowedIndicatorTypes;
-  private EnrichmentConverterCreator creator;
+  private EnrichmentConverterFactory creator;
 
   public TaxiiHandler( TaxiiConnectionConfig connectionConfig,
                        Extractor extractor,
                        Configuration config) throws Exception {
-    this(connectionConfig, extractor, new DefaultEnrichmentConverterCreator(), config);
+    this(connectionConfig, extractor, new DefaultEnrichmentConverterFactory(), config);
   }
 
   public TaxiiHandler( TaxiiConnectionConfig connectionConfig,
                        Extractor extractor,
-                       EnrichmentConverterCreator creator,
+                       EnrichmentConverterFactory creator,
                        Configuration config) throws Exception {
     LOG.info("Loading configuration: {}", connectionConfig);
     this.allowedIndicatorTypes = connectionConfig.getAllowedIndicatorTypes();

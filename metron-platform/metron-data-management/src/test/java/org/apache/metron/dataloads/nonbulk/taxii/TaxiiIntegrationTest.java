@@ -29,7 +29,7 @@ import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.dataloads.extractor.TransformFilterExtractorDecorator;
 import org.apache.metron.dataloads.extractor.stix.StixExtractor;
 import org.apache.metron.enrichment.converter.MockEnrichmentConverter;
-import org.apache.metron.enrichment.converter.MockEnrichmentConverterCreator;
+import org.apache.metron.enrichment.converter.MockEnrichmentConverterFactory;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -111,7 +111,7 @@ public class TaxiiIntegrationTest {
 //        MockHBaseTableProvider.clear();
 
         MockEnrichmentConverter converter = new MockEnrichmentConverter();
-        MockEnrichmentConverterCreator creator = new MockEnrichmentConverterCreator(converter);
+        MockEnrichmentConverterFactory creator = new MockEnrichmentConverterFactory(converter);
 
         final Configuration config = HBaseConfiguration.create();
         Extractor extractor = new TransformFilterExtractorDecorator(new StixExtractor());

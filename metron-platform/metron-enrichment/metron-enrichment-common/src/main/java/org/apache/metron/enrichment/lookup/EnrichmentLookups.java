@@ -22,7 +22,7 @@ import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
 import java.io.IOException;
 
-public enum EnrichmentLookups implements EnrichmentLookupCreator {
+public enum EnrichmentLookups implements EnrichmentLookupFactory {
 
   HBASE((connFactory, table, columnFamily, accessTracker) -> {
     return new HBaseEnrichmentLookup(connFactory, table, columnFamily);
@@ -37,9 +37,9 @@ public enum EnrichmentLookups implements EnrichmentLookupCreator {
     return new InMemoryEnrichmentLookup();
   });
 
-  private EnrichmentLookupCreator creator;
+  private EnrichmentLookupFactory creator;
 
-  EnrichmentLookups(EnrichmentLookupCreator creator) {
+  EnrichmentLookups(EnrichmentLookupFactory creator) {
     this.creator = creator;
   }
 

@@ -22,7 +22,7 @@ import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.client.HBaseTableClient;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.junit.Before;
 import org.junit.Test;
@@ -58,7 +58,7 @@ public class HBaseCacheWriterTest {
     HBaseClient client = mock(HBaseTableClient.class);
 
     // the creator needs to return the mock HBaseClient
-    HBaseClientCreator creator = mock(HBaseClientCreator.class);
+    HBaseClientFactory creator = mock(HBaseClientFactory.class);
     when(creator.create(any(), any(), any())).thenReturn(client);
 
     cacheWriter = new HBaseCacheWriter(creator, connectionFactory, conf, tableName, columnFamily, columnQualifier);

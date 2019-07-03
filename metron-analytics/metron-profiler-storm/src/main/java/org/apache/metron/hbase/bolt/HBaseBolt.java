@@ -25,10 +25,10 @@ import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.bolt.mapper.HBaseMapper;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 import org.apache.metron.hbase.client.HBaseTableClient;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.apache.storm.Config;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -89,7 +89,7 @@ public class HBaseBolt extends BaseRichBolt {
   /**
    * Creates the {@link HBaseTableClient} used by this bolt.
    */
-  private HBaseClientCreator hbaseClientCreator;
+  private HBaseClientFactory hbaseClientCreator;
 
   /**
    * Used to write to HBase.
@@ -102,7 +102,7 @@ public class HBaseBolt extends BaseRichBolt {
     this.tableName = tableName;
     this.mapper = mapper;
     this.connectionFactory = new HBaseConnectionFactory();
-    this.hbaseClientCreator = new HBaseTableClientCreator();
+    this.hbaseClientCreator = new HBaseTableClientFactory();
   }
 
   public HBaseBolt writeToWAL(boolean writeToWAL) {
@@ -130,7 +130,7 @@ public class HBaseBolt extends BaseRichBolt {
     return this;
   }
 
-  public HBaseBolt withHBaseClientCreator(HBaseClientCreator clientCreator) {
+  public HBaseBolt withHBaseClientCreator(HBaseClientFactory clientCreator) {
     this.hbaseClientCreator = clientCreator;
     return this;
   }

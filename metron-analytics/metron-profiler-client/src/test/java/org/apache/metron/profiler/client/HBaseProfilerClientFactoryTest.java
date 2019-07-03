@@ -38,9 +38,9 @@ import static org.apache.metron.profiler.client.stellar.ProfilerClientConfig.PRO
 import static org.junit.Assert.assertEquals;
 
 /**
- * Tests the {@link HBaseProfilerClientCreator}.
+ * Tests the {@link HBaseProfilerClientFactory}.
  */
-public class HBaseProfilerClientCreatorTest {
+public class HBaseProfilerClientFactoryTest {
 
   private static final String tableName = "table";
   private static final String columnFamily = "columnFamily";
@@ -48,11 +48,11 @@ public class HBaseProfilerClientCreatorTest {
   private static final TimeUnit periodDurationUnits = TimeUnit.MINUTES;
   private static final Integer saltDivisor = 1000;
   private static final long periodDurationMillis = periodDurationUnits.toMillis(23);
-  private HBaseProfilerClientCreator creator;
+  private HBaseProfilerClientFactory creator;
 
   @Before
   public void setup() {
-    creator = new HBaseProfilerClientCreator();
+    creator = new HBaseProfilerClientFactory();
   }
 
   @Test

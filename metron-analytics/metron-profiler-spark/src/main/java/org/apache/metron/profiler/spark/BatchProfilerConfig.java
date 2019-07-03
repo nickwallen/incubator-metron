@@ -21,7 +21,7 @@ package org.apache.metron.profiler.spark;
 
 import org.apache.hadoop.hbase.client.Durability;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.apache.metron.stellar.common.utils.ConversionUtils;
 
 import java.util.Map;
@@ -42,7 +42,7 @@ public enum BatchProfilerConfig {
 
   HBASE_CONNECTION_FACTORY("profiler.hbase.connection.provider", HBaseConnectionFactory.class.getName(), String.class),
 
-  HBASE_CLIENT_CREATOR("profiler.hbase.client.creator", HBaseTableClientCreator.class, String.class),
+  HBASE_CLIENT_CREATOR("profiler.hbase.client.creator", HBaseTableClientFactory.class, String.class),
 
   HBASE_TABLE_NAME("profiler.hbase.table", "profiler", String.class),
 

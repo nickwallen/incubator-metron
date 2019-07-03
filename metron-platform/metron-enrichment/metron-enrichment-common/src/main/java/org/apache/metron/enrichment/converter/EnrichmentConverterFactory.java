@@ -20,7 +20,7 @@ package org.apache.metron.enrichment.converter;
 /**
  * Creates an {@link EnrichmentConverter}.
  */
-public interface EnrichmentConverterCreator {
+public interface EnrichmentConverterFactory {
 
   // TODO should this return an HBaseConverter instead?
 

@@ -21,7 +21,7 @@ package org.apache.metron.profiler.spark;
 
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.profiler.client.HBaseProfilerClient;
 import org.apache.metron.profiler.client.ProfilerClient;
@@ -121,7 +121,7 @@ public class BatchProfilerIntegrationTest {
     }};
 
     // the batch profiler needs to use the `FakeHBaseClient` for these tests
-    profilerProperties.put(HBASE_CLIENT_CREATOR.getKey(), FakeHBaseClientCreator.class.getName());
+    profilerProperties.put(HBASE_CLIENT_CREATOR.getKey(), FakeHBaseClientFactory.class.getName());
 
     // ensure that all of the static records are deleted before running the test
     FakeHBaseClient hbaseClient = new FakeHBaseClient();

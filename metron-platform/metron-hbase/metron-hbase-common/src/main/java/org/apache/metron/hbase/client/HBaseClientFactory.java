@@ -31,7 +31,7 @@ import java.util.function.Supplier;
 /**
  * Responsible for creating an {@link HBaseTableClient}.
  */
-public interface HBaseClientCreator extends Serializable {
+public interface HBaseClientFactory extends Serializable {
   Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**
@@ -43,13 +43,13 @@ public interface HBaseClientCreator extends Serializable {
   HBaseClient create(HBaseConnectionFactory factory, Configuration configuration, String tableName);
 
   /**
-   * Instantiates a new {@link HBaseClientCreator} by class name.
+   * Instantiates a new {@link HBaseClientFactory} by class name.
    *
-   * @param className The class name of the {@link HBaseClientCreator} to instantiate.
+   * @param className The class name of the {@link HBaseClientFactory} to instantiate.
    * @param defaultImpl The default instance to instantiate if the className is invalid.
-   * @return A new {@link HBaseClientCreator}.
+   * @return A new {@link HBaseClientFactory}.
    */
-  static HBaseClientCreator byName(String className, Supplier<HBaseClientCreator> defaultImpl) {
+  static HBaseClientFactory byName(String className, Supplier<HBaseClientFactory> defaultImpl) {
     LOG.debug("Creating HBase client creator; className={}", className);
 
     if(className == null || className.length() == 0 || className.charAt(0) == '$') {
@@ -58,7 +58,7 @@ public interface HBaseClientCreator extends Serializable {
 
     } else {
       try {
-        Class<? extends HBaseClientCreator> clazz = (Class<? extends HBaseClientCreator>) Class.forName(className);
+        Class<? extends HBaseClientFactory> clazz = (Class<? extends HBaseClientFactory>) Class.forName(className);
         return clazz.getConstructor().newInstance();
 
       } catch(InstantiationException | IllegalAccessException | InvocationTargetException |

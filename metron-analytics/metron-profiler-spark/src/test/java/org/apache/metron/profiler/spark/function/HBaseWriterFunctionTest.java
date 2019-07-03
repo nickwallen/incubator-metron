@@ -23,7 +23,7 @@ import org.apache.commons.collections4.IteratorUtils;
 import org.apache.metron.common.configuration.profiler.ProfileConfig;
 import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
@@ -50,7 +50,7 @@ public class HBaseWriterFunctionTest {
   private RowKeyBuilder rowKeyBuilder;
   private ColumnBuilder columnBuilder;
   private FakeHBaseClient hbaseClient;
-  private HBaseClientCreator hBaseClientCreator;
+  private HBaseClientFactory hBaseClientCreator;
 
   private static final JSONObject message = getMessage();
   private static final String entity = (String) message.get("ip_src_addr");

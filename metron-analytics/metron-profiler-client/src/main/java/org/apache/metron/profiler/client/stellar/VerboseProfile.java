@@ -20,9 +20,9 @@ package org.apache.metron.profiler.client.stellar;
 
 import org.apache.metron.profiler.ProfileMeasurement;
 import org.apache.metron.profiler.ProfilePeriod;
-import org.apache.metron.profiler.client.HBaseProfilerClientCreator;
+import org.apache.metron.profiler.client.HBaseProfilerClientFactory;
 import org.apache.metron.profiler.client.ProfilerClient;
-import org.apache.metron.profiler.client.ProfilerClientCreator;
+import org.apache.metron.profiler.client.ProfilerClientFactory;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.ParseException;
 import org.apache.metron.stellar.dsl.Stellar;
@@ -85,7 +85,7 @@ public class VerboseProfile implements StellarFunction {
   protected static final String GROUPS_KEY = "groups";
 
   public VerboseProfile() {
-    this.profilerClientCreator = new HBaseProfilerClientCreator();
+    this.profilerClientCreator = new HBaseProfilerClientFactory();
   }
 
   /**
@@ -96,7 +96,7 @@ public class VerboseProfile implements StellarFunction {
   /**
    * Creates the {@link ProfilerClient} used by this function.
    */
-  private ProfilerClientCreator profilerClientCreator;
+  private ProfilerClientFactory profilerClientCreator;
 
   @Override
   public void initialize(Context context) {
@@ -167,7 +167,7 @@ public class VerboseProfile implements StellarFunction {
     return view;
   }
 
-  public VerboseProfile withProfilerClientCreator(ProfilerClientCreator creator) {
+  public VerboseProfile withProfilerClientCreator(ProfilerClientFactory creator) {
     this.profilerClientCreator = creator;
     return this;
   }

@@ -17,7 +17,7 @@
  */
 package org.apache.metron.enrichment.adapters.simplehbase;
 
-import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.EnrichmentLookups;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
 
@@ -30,7 +30,7 @@ public class SimpleHBaseConfig implements Serializable {
   private String hBaseTable;
   private String hBaseCF;
   private HBaseConnectionFactory connectionFactory = new HBaseConnectionFactory();
-  private EnrichmentLookupCreator enrichmentLookupCreator = EnrichmentLookups.HBASE;
+  private EnrichmentLookupFactory enrichmentLookupCreator = EnrichmentLookups.HBASE;
 
   public String getHBaseTable() {
     return hBaseTable;
@@ -59,17 +59,17 @@ public class SimpleHBaseConfig implements Serializable {
     return this;
   }
 
-  public EnrichmentLookupCreator getEnrichmentLookupCreator() {
+  public EnrichmentLookupFactory getEnrichmentLookupCreator() {
     return enrichmentLookupCreator;
   }
 
-  public SimpleHBaseConfig withEnrichmentLookupCreator(EnrichmentLookupCreator enrichmentLookupCreator) {
+  public SimpleHBaseConfig withEnrichmentLookupCreator(EnrichmentLookupFactory enrichmentLookupCreator) {
     this.enrichmentLookupCreator = enrichmentLookupCreator;
     return this;
   }
 
   public SimpleHBaseConfig withEnrichmentLookupCreator(String creatorImpl) {
-    this.enrichmentLookupCreator = EnrichmentLookupCreator.byName(creatorImpl);
+    this.enrichmentLookupCreator = EnrichmentLookupFactory.byName(creatorImpl);
     //this.enrichmentLookupCreator = EnrichmentLookups.valueOf(creatorImpl);
     return this;
   }

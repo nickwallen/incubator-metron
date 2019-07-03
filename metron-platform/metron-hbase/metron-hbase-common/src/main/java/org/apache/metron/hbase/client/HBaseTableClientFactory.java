@@ -28,7 +28,7 @@ import java.lang.invoke.MethodHandles;
 /**
  * Creates an {@link HBaseTableClient}.
  */
-public class HBaseTableClientCreator implements HBaseClientCreator {
+public class HBaseTableClientFactory implements HBaseClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
   /**

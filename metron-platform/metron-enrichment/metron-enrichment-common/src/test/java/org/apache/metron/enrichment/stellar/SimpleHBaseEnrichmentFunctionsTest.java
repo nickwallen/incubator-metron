@@ -21,7 +21,7 @@ package org.apache.metron.enrichment.stellar;
 import com.google.common.collect.ImmutableMap;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.InMemoryEnrichmentLookup;
 import org.apache.metron.hbase.client.StaticMockHBaseConnectionFactory;
 import org.apache.metron.stellar.common.StellarProcessor;
@@ -67,7 +67,7 @@ public class SimpleHBaseEnrichmentFunctionsTest {
             .withEnrichment(new EnrichmentKey(ENRICHMENT_TYPE, "indicator3"), new EnrichmentValue(of("key3", "value3")))
             .withEnrichment(new EnrichmentKey(ENRICHMENT_TYPE, "indicator4"), new EnrichmentValue(of("key4", "value4")));
 
-    EnrichmentLookupCreator lookupCreator = (connFactory, tableName, columnFamily, accessTracker) -> lookup;
+    EnrichmentLookupFactory lookupCreator = (connFactory, tableName, columnFamily, accessTracker) -> lookup;
 
     // the ENRICHMENT_EXIST function to test
     existsFunction = new EnrichmentExists()

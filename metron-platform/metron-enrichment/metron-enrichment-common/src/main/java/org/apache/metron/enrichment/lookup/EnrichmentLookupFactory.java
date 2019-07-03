@@ -28,7 +28,7 @@ import java.lang.reflect.InvocationTargetException;
 /**
  * Responsible for creating an {@link EnrichmentLookup}.
  */
-public interface EnrichmentLookupCreator extends Serializable {
+public interface EnrichmentLookupFactory extends Serializable {
 
   EnrichmentLookup create(HBaseConnectionFactory connectionFactory,
                           String tableName,
@@ -36,14 +36,14 @@ public interface EnrichmentLookupCreator extends Serializable {
                           AccessTracker accessTracker) throws IOException;
 
   /**
-   * Creates an {@link EnrichmentLookupCreator} based on a fully-qualified class name.
+   * Creates an {@link EnrichmentLookupFactory} based on a fully-qualified class name.
    *
    * @param className The fully-qualified class name to instantiate.
-   * @return A {@link EnrichmentLookupCreator}.
+   * @return A {@link EnrichmentLookupFactory}.
    */
-  static EnrichmentLookupCreator byName(String className) {
+  static EnrichmentLookupFactory byName(String className) {
       try {
-        Class<? extends EnrichmentLookupCreator> clazz = (Class<? extends EnrichmentLookupCreator>) Class.forName(className);
+        Class<? extends EnrichmentLookupFactory> clazz = (Class<? extends EnrichmentLookupFactory>) Class.forName(className);
         return clazz.getConstructor().newInstance();
 
       } catch (InstantiationException | NoSuchMethodException | IllegalAccessException | ClassNotFoundException | InvocationTargetException e) {

@@ -17,20 +17,27 @@
  *  limitations under the License.
  *
  */
-package org.apache.metron.profiler.client;
+package org.apache.metron.hbase.client;
 
-import java.util.Map;
+import org.apache.hadoop.conf.Configuration;
 
 /**
- * Responsible for creating a {@link ProfilerClient}.
+ * Creates a {@link FakeHBaseClient}.
  */
-public interface ProfilerClientCreator {
+public class FakeHBaseClientFactory implements HBaseClientFactory {
 
-  /**
-   * Create a {@link ProfilerClient}.
-   *
-   * @param globals The global configuration.
-   * @return The {@link ProfilerClient}.
-   */
-  ProfilerClient create(Map<String, Object> globals);
+  private FakeHBaseClient hBaseClient;
+
+  public FakeHBaseClientFactory() {
+    this(new FakeHBaseClient());
+  }
+
+  public FakeHBaseClientFactory(FakeHBaseClient hBaseClient) {
+    this.hBaseClient = hBaseClient;
+  }
+
+  @Override
+  public HBaseClient create(HBaseConnectionFactory factory, Configuration configuration, String tableName) {
+    return hBaseClient;
+  }
 }

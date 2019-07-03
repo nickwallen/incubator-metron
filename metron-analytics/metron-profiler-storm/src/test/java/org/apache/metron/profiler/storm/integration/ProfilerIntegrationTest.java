@@ -25,7 +25,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.profiler.ProfilerConfig;
 import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.integration.BaseIntegrationTest;
 import org.apache.metron.integration.ComponentRunner;
@@ -33,7 +33,7 @@ import org.apache.metron.integration.UnableToStartException;
 import org.apache.metron.integration.components.FluxTopologyComponent;
 import org.apache.metron.integration.components.KafkaComponent;
 import org.apache.metron.integration.components.ZKServerComponent;
-import org.apache.metron.profiler.client.HBaseProfilerClientCreator;
+import org.apache.metron.profiler.client.HBaseProfilerClientFactory;
 import org.apache.metron.profiler.client.stellar.FixedLookback;
 import org.apache.metron.profiler.client.stellar.GetProfile;
 import org.apache.metron.profiler.client.stellar.WindowLookback;
@@ -428,7 +428,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
       setProperty("profiler.hbase.batch", "10");
       setProperty("profiler.hbase.flush.interval.seconds", "1");
       setProperty("hbase.provider.impl", MockHBaseConnectionFactory.class.getName());
-      setProperty("profiler.hbase.client.creator", FakeHBaseClientCreator.class.getName());
+      setProperty("profiler.hbase.client.creator", FakeHBaseClientFactory.class.getName());
 
       // profile settings
       setProperty("profiler.period.duration", Long.toString(periodDurationMillis));
@@ -501,7 +501,7 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
 
     // create the GET_PROFILE function
     GetProfile getProfileFunction = new GetProfile()
-            .withProfilerClientCreator(new HBaseProfilerClientCreator(new FakeHBaseClientCreator()));
+            .withProfilerClientCreator(new HBaseProfilerClientFactory(new FakeHBaseClientFactory()));
 
     // ensure the functions that we need can be resolved
     SimpleFunctionResolver functionResolver = new SimpleFunctionResolver()

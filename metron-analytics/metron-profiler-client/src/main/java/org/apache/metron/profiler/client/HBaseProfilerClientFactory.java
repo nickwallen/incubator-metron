@@ -22,9 +22,9 @@ package org.apache.metron.profiler.client;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.hbase.client.HBaseClient;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.apache.metron.profiler.hbase.ColumnBuilder;
 import org.apache.metron.profiler.hbase.RowKeyBuilder;
 import org.apache.metron.profiler.hbase.SaltyRowKeyBuilder;
@@ -42,15 +42,15 @@ import static org.apache.metron.profiler.client.stellar.Util.getPeriodDurationIn
 /**
  * Creates an {@link HBaseProfilerClient}.
  */
-public class HBaseProfilerClientCreator implements ProfilerClientCreator {
+public class HBaseProfilerClientFactory implements ProfilerClientFactory {
 
-  private HBaseClientCreator hbaseClientCreator;
+  private HBaseClientFactory hbaseClientCreator;
 
-  public HBaseProfilerClientCreator() {
-    this(new HBaseTableClientCreator());
+  public HBaseProfilerClientFactory() {
+    this(new HBaseTableClientFactory());
   }
 
-  public HBaseProfilerClientCreator(HBaseClientCreator hbaseClientCreator) {
+  public HBaseProfilerClientFactory(HBaseClientFactory hbaseClientCreator) {
     this.hbaseClientCreator = hbaseClientCreator;
   }
 

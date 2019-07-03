@@ -24,9 +24,8 @@ import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.EnrichmentLookupCreator;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
-import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
@@ -114,7 +113,7 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>, Serializ
   public boolean initializeAdapter(Map<String, Object> configuration) {
     try {
       if(lookup == null) {
-        EnrichmentLookupCreator creator = config.getEnrichmentLookupCreator();
+        EnrichmentLookupFactory creator = config.getEnrichmentLookupCreator();
         lookup = creator.create(config.getConnectionFactory(), config.getHBaseTable(), config.getHBaseCF(), null);
       }
     } catch (IOException e) {

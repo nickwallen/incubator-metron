@@ -21,7 +21,7 @@ package org.apache.metron.rest.user;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.metron.hbase.client.FakeHBaseClient;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.junit.After;
 import org.junit.Before;
@@ -65,7 +65,7 @@ public class HBaseUserSettingsClientTest {
 
     userSettingsClient = new HBaseUserSettingsClient(
             () -> globals,
-            new FakeHBaseClientCreator(hBaseClient),
+            new FakeHBaseClientFactory(hBaseClient),
             new MockHBaseConnectionFactory(),
             HBaseConfiguration.create());
     userSettingsClient.init();

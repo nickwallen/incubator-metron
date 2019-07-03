@@ -17,11 +17,11 @@
  */
 package org.apache.metron.enrichment.converter;
 
-public class MockEnrichmentConverterCreator implements EnrichmentConverterCreator {
+public class MockEnrichmentConverterFactory implements EnrichmentConverterFactory {
 
   private EnrichmentConverter converter;
 
-  public MockEnrichmentConverterCreator(EnrichmentConverter converter) {
+  public MockEnrichmentConverterFactory(EnrichmentConverter converter) {
     this.converter = converter;
   }
 

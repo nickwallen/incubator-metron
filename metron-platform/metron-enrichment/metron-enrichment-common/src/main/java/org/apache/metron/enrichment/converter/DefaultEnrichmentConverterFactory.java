@@ -17,7 +17,7 @@
  */
 package org.apache.metron.enrichment.converter;
 
-public class DefaultEnrichmentConverterCreator implements EnrichmentConverterCreator {
+public class DefaultEnrichmentConverterFactory implements EnrichmentConverterFactory {
   @Override
   public EnrichmentConverter create(String tableName) {
     return new EnrichmentConverter(tableName);

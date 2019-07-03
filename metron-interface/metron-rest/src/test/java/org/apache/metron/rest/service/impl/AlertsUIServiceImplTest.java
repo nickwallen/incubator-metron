@@ -21,9 +21,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 import static org.powermock.api.mockito.PowerMockito.mock;
@@ -31,16 +29,16 @@ import static org.powermock.api.mockito.PowerMockito.mock;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
+
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.adrianwalker.multilinestring.Multiline;
+
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.metron.common.system.FakeClock;
-import org.apache.metron.hbase.client.FakeHBaseClientCreator;
+import org.apache.metron.hbase.client.FakeHBaseClientFactory;
 import org.apache.metron.hbase.client.MockHBaseConnectionFactory;
 import org.apache.metron.rest.MetronRestConstants;
 import org.apache.metron.rest.model.AlertsUIUserSettings;
@@ -93,7 +91,7 @@ public class AlertsUIServiceImplTest {
 
     userSettingsClient = new HBaseUserSettingsClient(
             () -> globals,
-            new FakeHBaseClientCreator(),
+            new FakeHBaseClientFactory(),
             new MockHBaseConnectionFactory(),
             HBaseConfiguration.create());
     userSettingsClient.init();

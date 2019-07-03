@@ -18,9 +18,9 @@
 package org.apache.metron.rest.config;
 
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.metron.hbase.client.HBaseClientCreator;
+import org.apache.metron.hbase.client.HBaseClientFactory;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
-import org.apache.metron.hbase.client.HBaseTableClientCreator;
+import org.apache.metron.hbase.client.HBaseTableClientFactory;
 import org.apache.metron.rest.RestException;
 import org.apache.metron.rest.service.GlobalConfigService;
 import org.apache.metron.rest.user.HBaseUserSettingsClient;
@@ -49,7 +49,7 @@ public class HBaseConfig {
   private org.apache.hadoop.conf.Configuration hBaseConfiguration;
 
   @Autowired
-  private HBaseClientCreator hBaseClientCreator;
+  private HBaseClientFactory hBaseClientCreator;
 
   private Supplier<Map<String, Object>> globals = () -> {
     try {
@@ -63,7 +63,7 @@ public class HBaseConfig {
   public HBaseConfig(GlobalConfigService globalConfigService,
                      HBaseConnectionFactory hBaseConnectionFactory,
                      org.apache.hadoop.conf.Configuration hBaseConfiguration,
-                     HBaseClientCreator hBaseClientCreator) {
+                     HBaseClientFactory hBaseClientCreator) {
     this.globalConfigService = globalConfigService;
     this.hBaseConnectionFactory = hBaseConnectionFactory;
     this.hBaseConfiguration = hBaseConfiguration;
@@ -81,8 +81,8 @@ public class HBaseConfig {
   }
 
   @Bean
-  HBaseClientCreator hBaseClientCreator() {
-    return new HBaseTableClientCreator();
+  HBaseClientFactory hBaseClientCreator() {
+    return new HBaseTableClientFactory();
   }
 
   @Bean(destroyMethod = "close")
