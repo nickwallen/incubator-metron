@@ -131,7 +131,7 @@ public class EnrichmentCoprocessorTest {
     Map<String, Object> globalConfig = new HashMap<String, Object>() {{
       put(EnrichmentConfigurations.TABLE_PROVIDER, TestTableProvider.class.getName());
     }};
-    when(globalConfigService.get()).thenReturn(globalConfig);
+    when(globalConfigService.get(any())).thenReturn(globalConfig);
     cop.start(copEnv);
     assertThat(instantiatedCustomTableProvider, equalTo(true));
   }
