@@ -18,13 +18,15 @@
 package org.apache.metron.enrichment.lookup;
 
 import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 /**
  * Performs a lookup to find the value of an enrichment.
  */
-public interface EnrichmentLookup {
+public interface EnrichmentLookup extends Closeable {
 
   /**
    * @return True, if initialization has been completed.  Otherwise, false.
@@ -56,7 +58,7 @@ public interface EnrichmentLookup {
    * @return The value of the enrichment.
    * @throws IOException
    */
-  EnrichmentResult get(EnrichmentKey key) throws IOException;
+  LookupKV<EnrichmentKey, EnrichmentValue> get(EnrichmentKey key) throws IOException;
 
   /**
    * Retrieves the value of multiple enrichments.
@@ -65,10 +67,5 @@ public interface EnrichmentLookup {
    * @return The value of the enrichments.
    * @throws IOException
    */
-  Iterable<EnrichmentResult> get(Iterable<EnrichmentKey> keys) throws IOException;
-
-  /**
-   * Close and clean-up resources.
-   */
-  void close() throws IOException;
+  Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> get(Iterable<EnrichmentKey> keys) throws IOException;
 }

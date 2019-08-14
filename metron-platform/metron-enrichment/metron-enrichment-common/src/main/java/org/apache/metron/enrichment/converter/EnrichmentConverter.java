@@ -19,19 +19,19 @@ package org.apache.metron.enrichment.converter;
 
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 
 import java.io.IOException;
 
-public class EnrichmentConverter extends AbstractConverter {
+public class EnrichmentConverter extends AbstractConverter<EnrichmentKey, EnrichmentValue> {
 
   @Override
-  public EnrichmentResult fromPut(Put put, String columnFamily) throws IOException {
+  public LookupKV<EnrichmentKey, EnrichmentValue> fromPut(Put put, String columnFamily) throws IOException {
     return fromPut(put, columnFamily, new EnrichmentKey(), new EnrichmentValue());
   }
 
   @Override
-  public EnrichmentResult fromResult(Result result, String columnFamily) throws IOException {
+  public LookupKV<EnrichmentKey, EnrichmentValue> fromResult(Result result, String columnFamily) throws IOException {
     return fromResult(result, columnFamily, new EnrichmentKey(), new EnrichmentValue());
   }
 }

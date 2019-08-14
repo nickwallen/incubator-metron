@@ -43,7 +43,7 @@ import org.apache.metron.common.utils.RuntimeErrors;
 import org.apache.metron.dataloads.extractor.Extractor;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.hbase.ColumnList;
 import org.apache.metron.hbase.client.HBaseClient;
 import org.apache.metron.hbase.client.HBaseClientFactory;
@@ -233,8 +233,8 @@ public class TaxiiHandler extends TimerTask {
               if(LOG.isDebugEnabled() && Math.random() < 0.01) {
                 LOG.debug("Random Stix doc: {}", xml);
               }
-              for (EnrichmentResult kv : extractor.extract(xml)) {
-                if(allowedIndicatorTypes.isEmpty() || allowedIndicatorTypes.contains(kv.getKey().getType())) {
+              for (LookupKV<EnrichmentKey, EnrichmentValue> kv : extractor.extract(xml)) {
+                if(allowedIndicatorTypes.isEmpty() || allowedIndicatorTypes.contains(kv.getKey().type)) {
                   kv.getValue().getMetadata().put("source_type", "taxii");
                   kv.getValue().getMetadata().put("taxii_url", endpoint.toString());
                   kv.getValue().getMetadata().put("taxii_collection", collection);

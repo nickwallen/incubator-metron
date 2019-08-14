@@ -64,7 +64,7 @@ public class HBaseEnrichmentLookup implements EnrichmentLookup {
   }
 
   @Override
-  public EnrichmentResult get(EnrichmentKey key) throws IOException {
+  public LookupKV<EnrichmentKey, EnrichmentValue> get(EnrichmentKey key) throws IOException {
     Get get = converter.toGet(columnFamily, key);
     Result result = table.get(get);
     return converter.fromResult(result, columnFamily);
@@ -80,8 +80,8 @@ public class HBaseEnrichmentLookup implements EnrichmentLookup {
   }
 
   @Override
-  public Iterable<EnrichmentResult> get(Iterable<EnrichmentKey> keys) throws IOException {
-    List<EnrichmentResult> results = new ArrayList<>();
+  public Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> get(Iterable<EnrichmentKey> keys) throws IOException {
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     List<Get> gets = keysToGets(keys);
     for(Result result : table.get(gets)) {
       results.add(converter.fromResult(result, columnFamily));

@@ -28,12 +28,12 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 public class EnrichmentKey implements LookupKey {
-  private String indicator;
-  private String type;
+  public String indicator;
+  public String type;
 
   public EnrichmentKey() {
-  }
 
+  }
   public EnrichmentKey(String type, String indicator) {
     this.indicator = indicator;
     this.type = type;
@@ -69,7 +69,7 @@ public class EnrichmentKey implements LookupKey {
       type = w.readUTF();
       indicator = w.readUTF();
     } catch (IOException e) {
-      throw new RuntimeException("Invalid enrichment key; Unable to parse type and indicator from row key", e);
+      throw new RuntimeException("Unable to convert type and indicator from bytes", e);
     }
   }
 
@@ -77,9 +77,12 @@ public class EnrichmentKey implements LookupKey {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
+
     EnrichmentKey that = (EnrichmentKey) o;
+
     if (indicator != null ? !indicator.equals(that.indicator) : that.indicator != null) return false;
     return type != null ? type.equals(that.type) : that.type == null;
+
   }
 
   @Override
@@ -105,14 +108,5 @@ public class EnrichmentKey implements LookupKey {
   @Override
   public void setIndicator(String indicator) {
     this.indicator = indicator;
-  }
-
-  public String getType() {
-    return type;
-  }
-
-  public EnrichmentKey setType(String type) {
-    this.type = type;
-    return this;
   }
 }

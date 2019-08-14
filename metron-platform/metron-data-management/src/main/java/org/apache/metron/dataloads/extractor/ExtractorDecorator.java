@@ -17,7 +17,7 @@
  */
 package org.apache.metron.dataloads.extractor;
 
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 
 import java.io.IOException;
 import java.util.Map;
@@ -31,7 +31,7 @@ public class ExtractorDecorator implements Extractor {
   }
 
   @Override
-  public Iterable<EnrichmentResult> extract(String line) throws IOException {
+  public Iterable<LookupKV> extract(String line) throws IOException {
     return decoratedExtractor.extract(line);
   }
 

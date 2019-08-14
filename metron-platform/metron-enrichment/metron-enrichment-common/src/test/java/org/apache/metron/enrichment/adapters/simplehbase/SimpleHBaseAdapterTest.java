@@ -187,7 +187,7 @@ public class SimpleHBaseAdapterTest {
   }
 
   @Test
-  public void testCleanup() throws IOException {
+  public void testCleanup() throws Exception {
     EnrichmentLookup mockLookup = mock(EnrichmentLookup.class);
     new SimpleHBaseAdapter()
             .withLookup(mockLookup)

@@ -197,8 +197,8 @@ public class EnrichmentCoprocessor implements RegionCoprocessor, RegionObserver 
     EnrichmentKey key = new EnrichmentKey();
     key.fromBytes(put.getRow());
 
-    LOG.trace("Enrichment type '{}' extracted from row key", key.getType());
-    return key.getType();
+    LOG.trace("Enrichment type '{}' extracted from row key", key.type);
+    return key.type;
   }
 
   private void addToCache(String cacheKey, String value) {

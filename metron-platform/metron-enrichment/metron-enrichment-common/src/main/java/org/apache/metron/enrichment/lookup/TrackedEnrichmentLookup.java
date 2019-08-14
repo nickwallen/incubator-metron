@@ -18,6 +18,7 @@
 package org.apache.metron.enrichment.lookup;
 
 import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 
 import java.io.IOException;
@@ -55,13 +56,13 @@ public class TrackedEnrichmentLookup implements EnrichmentLookup {
   }
 
   @Override
-  public EnrichmentResult get(EnrichmentKey key) throws IOException {
+  public LookupKV<EnrichmentKey, EnrichmentValue> get(EnrichmentKey key) throws IOException {
     accessTracker.logAccess(key);
     return lookup.get(key);
   }
 
   @Override
-  public Iterable<EnrichmentResult> get(Iterable<EnrichmentKey> keys) throws IOException {
+  public Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> get(Iterable<EnrichmentKey> keys) throws IOException {
     for(EnrichmentKey key: keys) {
       accessTracker.logAccess(key);
     }

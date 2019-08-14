@@ -25,11 +25,12 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
+import org.apache.metron.enrichment.lookup.LookupKey;
+import org.apache.metron.enrichment.lookup.LookupValue;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,9 +39,9 @@ import java.util.Map;
 import java.util.NavigableMap;
 
 
-public abstract class AbstractConverter implements HbaseConverter<EnrichmentKey, EnrichmentValue> {
-
+public abstract class AbstractConverter<KEY_T extends LookupKey, VALUE_T extends LookupValue> implements HbaseConverter<KEY_T,VALUE_T> {
   public static Function<Cell, Map.Entry<byte[], byte[]>> CELL_TO_ENTRY  = new Function<Cell, Map.Entry<byte[], byte[]>>() {
+
     @Nullable
     @Override
     public Map.Entry<byte[], byte[]> apply(@Nullable Cell cell) {
@@ -49,7 +50,7 @@ public abstract class AbstractConverter implements HbaseConverter<EnrichmentKey,
   };
 
   @Override
-  public Put toPut(String columnFamily, EnrichmentKey key, EnrichmentValue values) throws IOException {
+  public Put toPut(String columnFamily, KEY_T key, VALUE_T values) throws IOException {
     Put put = new Put(key.toBytes());
     byte[] cf = Bytes.toBytes(columnFamily);
     for(Map.Entry<byte[], byte[]> kv : values.toColumns()) {
@@ -79,20 +80,20 @@ public abstract class AbstractConverter implements HbaseConverter<EnrichmentKey,
     return bytes;
   }
 
-  public EnrichmentResult fromPut(Put put, String columnFamily, EnrichmentKey key, EnrichmentValue value) throws IOException {
+  public LookupKV<KEY_T, VALUE_T> fromPut(Put put, String columnFamily, KEY_T key, VALUE_T value) throws IOException {
     key.fromBytes(put.getRow());
     byte[] cf = Bytes.toBytes(columnFamily);
     value.fromColumns(Iterables.transform(put.getFamilyCellMap().get(cf), CELL_TO_ENTRY));
-    return new EnrichmentResult(key, value);
+    return new LookupKV<>(key, value);
   }
 
   @Override
-  public Result toResult(String columnFamily, EnrichmentKey key, EnrichmentValue values) throws IOException {
+  public Result toResult(String columnFamily, KEY_T key, VALUE_T values) throws IOException {
     Put put = toPut(columnFamily, key, values);
     return Result.create(put.getFamilyCellMap().get(Bytes.toBytes(columnFamily)));
   }
 
-  public EnrichmentResult fromResult(Result result, String columnFamily, EnrichmentKey key, EnrichmentValue value) throws IOException {
+  public LookupKV<KEY_T, VALUE_T> fromResult(Result result, String columnFamily, KEY_T key, VALUE_T value) throws IOException {
     if(result == null || result.getRow() == null) {
       return null;
     }
@@ -100,11 +101,11 @@ public abstract class AbstractConverter implements HbaseConverter<EnrichmentKey,
     byte[] cf = Bytes.toBytes(columnFamily);
     NavigableMap<byte[], byte[]> cols = result.getFamilyMap(cf);
     value.fromColumns(cols.entrySet());
-    return new EnrichmentResult(key, value);
+    return new LookupKV<>(key, value);
   }
 
   @Override
-  public Get toGet(String columnFamily, EnrichmentKey key) {
+  public Get toGet(String columnFamily, KEY_T key) {
     Get ret = new Get(key.toBytes());
     ret.addFamily(Bytes.toBytes(columnFamily));
     return ret;

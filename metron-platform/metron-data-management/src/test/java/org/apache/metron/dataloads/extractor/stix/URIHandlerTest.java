@@ -19,8 +19,11 @@ package org.apache.metron.dataloads.extractor.stix;
 
 import com.google.common.collect.Iterables;
 import org.adrianwalker.multilinestring.Multiline;
+import org.apache.metron.enrichment.configuration.Enrichment;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -84,11 +87,11 @@ public class URIHandlerTest {
   public void testURIHandler() throws Exception {
     StixExtractor extractor = new StixExtractor();
     extractor.initialize(new HashMap<>());
-    Iterable<EnrichmentResult> kvs = extractor.extract(uriHandlerObject);
+    Iterable<LookupKV> kvs = extractor.extract(uriHandlerObject);
     Assert.assertEquals(1, Iterables.size(kvs));
-    EnrichmentResult kv = Iterables.getFirst(kvs, null);
+    LookupKV<EnrichmentKey, EnrichmentValue> kv = Iterables.getFirst(kvs, null);
     EnrichmentKey key = (EnrichmentKey) kv.getKey();
     Assert.assertEquals("http://www.kotimi.com/alpha/gtex/", key.getIndicator());
-    Assert.assertEquals("uriobjecttype", key.getType());
+    Assert.assertEquals("uriobjecttype", key.type);
   }
 }

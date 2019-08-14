@@ -21,7 +21,6 @@ package org.apache.metron.writer.hbase;
 import com.google.common.collect.ImmutableMap;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.writer.BulkMessage;
-import org.apache.metron.enrichment.converter.EnrichmentConverter;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.hbase.ColumnList;
@@ -38,8 +37,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.Mockito.mock;
-
 public class SimpleHBaseEnrichmentWriterTest {
   private static final String SENSOR_TYPE= "dummy";
   private static final String TABLE_NAME= SENSOR_TYPE;
@@ -51,13 +48,11 @@ public class SimpleHBaseEnrichmentWriterTest {
     put(SimpleHbaseEnrichmentWriter.Configurations.ENRICHMENT_TYPE.getKey(), ENRICHMENT_TYPE);
   }};
 
-  private EnrichmentConverter converter;
   private List<BulkMessage<JSONObject>> messages;
   private FakeHBaseClient hBaseClient;
 
   @Before
   public void setup() {
-    converter = mock(EnrichmentConverter.class);
     messages = new ArrayList<>();
     messages.add(new BulkMessage<>("1", new JSONObject(ImmutableMap.of("ip", "localhost", "user", "cstella", "foo", "bar"))));
     hBaseClient = new FakeHBaseClient();
@@ -90,7 +85,7 @@ public class SimpleHBaseEnrichmentWriterTest {
     EnrichmentKey actualKey = new EnrichmentKey(SENSOR_TYPE, ENRICHMENT_TYPE);
     actualKey.fromBytes(actual.rowKey);
     Assert.assertEquals("localhost", actualKey.getIndicator());
-    Assert.assertEquals(ENRICHMENT_TYPE, actualKey.getType());
+    Assert.assertEquals(ENRICHMENT_TYPE, actualKey.type);
 
     // validate the enrichment value
     List<ColumnList.Column> columns = actual.columnList.getColumns();
@@ -131,7 +126,7 @@ public class SimpleHBaseEnrichmentWriterTest {
     EnrichmentKey actualKey = new EnrichmentKey(SENSOR_TYPE, ENRICHMENT_TYPE);
     actualKey.fromBytes(actual.rowKey);
     Assert.assertEquals("localhost", actualKey.getIndicator());
-    Assert.assertEquals(ENRICHMENT_TYPE, actualKey.getType());
+    Assert.assertEquals(ENRICHMENT_TYPE, actualKey.type);
 
     // validate the enrichment value
     List<ColumnList.Column> columns = actual.columnList.getColumns();

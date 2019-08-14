@@ -25,7 +25,7 @@ import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
 import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
 import org.json.simple.JSONObject;
 import org.slf4j.Logger;
@@ -94,7 +94,7 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>, Serializ
     JSONObject enriched = new JSONObject();
     try {
       Iterable<EnrichmentKey> enrichmentKeys = toEnrichmentKeys(value, value.getConfig().getEnrichment());
-      for (EnrichmentResult result: lookup.get(enrichmentKeys)) {
+      for (LookupKV<EnrichmentKey, EnrichmentValue> result: lookup.get(enrichmentKeys)) {
         appendEnrichment(enriched, result);
       }
 
@@ -142,19 +142,19 @@ public class SimpleHBaseAdapter implements EnrichmentAdapter<CacheKey>, Serializ
     return value.getField();
   }
 
-  private void appendEnrichment(JSONObject enriched, EnrichmentResult result) {
+  private void appendEnrichment(JSONObject enriched, LookupKV<EnrichmentKey, EnrichmentValue> result) {
     if(result == null || result.getValue() == null || result.getValue().getMetadata() == null) {
       return; // nothing to do
     }
 
     EnrichmentValue enrichmentValue = result.getValue();
     for (Map.Entry<String, Object> values : enrichmentValue.getMetadata().entrySet()) {
-      String fieldName = result.getKey().getType() + "." + values.getKey();
+      String fieldName = result.getKey().type + "." + values.getKey();
       enriched.put(fieldName, values.getValue());
     }
 
     LOG.debug("Found {} enrichment(s) for type={} and indicator={}",
-            enrichmentValue.getMetadata().entrySet().size(), result.getKey().getType(), result.getKey().getIndicator());
+            enrichmentValue.getMetadata().entrySet().size(), result.getKey().type, result.getKey().getIndicator());
   }
 
   private Iterable<EnrichmentKey> toEnrichmentKeys(CacheKey cacheKey, EnrichmentConfig config) {

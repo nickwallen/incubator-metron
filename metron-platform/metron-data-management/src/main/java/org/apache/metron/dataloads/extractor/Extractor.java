@@ -17,15 +17,16 @@
  */
 package org.apache.metron.dataloads.extractor;
 
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
 public interface Extractor {
-  Iterable<EnrichmentResult> extract(String line) throws IOException;
+  Iterable<LookupKV> extract(String line) throws IOException;
   void initialize(Map<String, Object> config);
   default Set<ExtractorCapabilities> getCapabilities() {
     return EnumSet.noneOf(ExtractorCapabilities.class);

@@ -80,14 +80,14 @@ public class FakeEnrichmentLookup implements EnrichmentLookup {
   }
 
   @Override
-  public EnrichmentResult get(EnrichmentKey key) {
-    EnrichmentValue enrichmentValue = enrichments.get(key);
-    return new EnrichmentResult(key, enrichmentValue);
+  public LookupKV<EnrichmentKey, EnrichmentValue> get(EnrichmentKey key) {
+    EnrichmentValue value = enrichments.get(key);
+    return new LookupKV<>(key, value);
   }
 
   @Override
-  public Iterable<EnrichmentResult> get(Iterable<EnrichmentKey> keys) throws IOException {
-    List<EnrichmentResult> results = new ArrayList<>();
+  public Iterable<LookupKV<EnrichmentKey, EnrichmentValue>> get(Iterable<EnrichmentKey> keys) throws IOException {
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for(EnrichmentKey key: keys) {
       if(enrichments.containsKey(key)) {
         results.add(get(key));

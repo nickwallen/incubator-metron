@@ -22,11 +22,12 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentLookup;
-import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.EnrichmentLookupFactories;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.EnrichmentLookupFactory;
 import org.apache.metron.enrichment.lookup.HBaseEnrichmentLookup;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackers;
 import org.apache.metron.hbase.client.HBaseConnectionFactory;
@@ -279,7 +280,7 @@ public class SimpleHBaseEnrichmentFunctions {
 
       EnrichmentLookup lookup = fromCache(table, columnFamily);
       try {
-        EnrichmentResult result = lookup.get(new EnrichmentKey(enrichmentType, indicator));
+        LookupKV<EnrichmentKey, EnrichmentValue> result = lookup.get(new EnrichmentKey(enrichmentType, indicator));
         if(result != null && result.getValue() != null && result.getValue().getMetadata() != null) {
           return result.getValue().getMetadata();
         } else {

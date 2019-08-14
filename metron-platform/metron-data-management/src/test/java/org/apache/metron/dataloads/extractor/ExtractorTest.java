@@ -20,7 +20,7 @@ package org.apache.metron.dataloads.extractor;
 import com.google.common.collect.Iterables;
 import org.apache.metron.enrichment.converter.EnrichmentKey;
 import org.apache.metron.enrichment.converter.EnrichmentValue;
-import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -35,13 +35,13 @@ public class ExtractorTest {
     {
 
         @Override
-        public Iterable<EnrichmentResult> extract(String line) throws IOException {
+        public Iterable<LookupKV> extract(String line) throws IOException {
             EnrichmentKey key = new EnrichmentKey();
-            key.setIndicator("dummy");
-            key.setType("type");
+            key.indicator = "dummy";
+            key.type = "type";
             Map<String, Object> value = new HashMap<>();
             value.put("indicator", "dummy");
-            return Arrays.asList(new EnrichmentResult(key, new EnrichmentValue(value)));
+            return Arrays.asList(new LookupKV(key, new EnrichmentValue(value)));
         }
 
         @Override
@@ -52,11 +52,11 @@ public class ExtractorTest {
     @Test
     public void testDummyExtractor() throws IllegalAccessException, InstantiationException, ClassNotFoundException, IOException, NoSuchMethodException, InvocationTargetException {
         Extractor extractor = Extractors.create(DummyExtractor.class.getName());
-        EnrichmentResult results = Iterables.getFirst(extractor.extract(null), null);
+        LookupKV results = Iterables.getFirst(extractor.extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
-        Assert.assertEquals("dummy", key.getIndicator());
-        Assert.assertEquals("type", key.getType());
+        Assert.assertEquals("dummy", key.indicator);
+        Assert.assertEquals("type", key.type);
         Assert.assertEquals("dummy", value.getMetadata().get("indicator"));
     }
 
@@ -74,11 +74,11 @@ public class ExtractorTest {
                 "            ,\"extractor\" : \"org.apache.metron.dataloads.extractor.ExtractorTest$DummyExtractor\"\n" +
                 "         }";
         ExtractorHandler handler = ExtractorHandler.load(config);
-        EnrichmentResult results = Iterables.getFirst(handler.getExtractor().extract(null), null);
+        LookupKV results = Iterables.getFirst(handler.getExtractor().extract(null), null);
         EnrichmentKey key = (EnrichmentKey) results.getKey();
         EnrichmentValue value = (EnrichmentValue) results.getValue();
-        Assert.assertEquals("dummy", key.getIndicator());
-        Assert.assertEquals("type", key.getType());
+        Assert.assertEquals("dummy", key.indicator);
+        Assert.assertEquals("type", key.type);
         Assert.assertEquals("dummy", value.getMetadata().get("indicator"));
     }
 }

@@ -37,7 +37,10 @@ import org.apache.metron.common.configuration.ConfigurationsUtils;
 import org.apache.metron.dataloads.extractor.csv.CSVExtractor;
 import org.apache.metron.dataloads.hbase.mr.HBaseUtil;
 import org.apache.metron.enrichment.converter.EnrichmentConverter;
+import org.apache.metron.enrichment.converter.EnrichmentKey;
+import org.apache.metron.enrichment.converter.EnrichmentValue;
 import org.apache.metron.enrichment.lookup.EnrichmentResult;
+import org.apache.metron.enrichment.lookup.LookupKV;
 import org.apache.metron.test.utils.UnitTestHelper;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -298,6 +301,7 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     customLineByLineExtractorConfigFile.delete();
   }
 
+
   @Test
   public void testArgs() throws Exception {
     String[] argv = {"-c cf", "-t enrichment"
@@ -305,7 +309,9 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
             , "-l log4j", "-i input.csv"
             , "-p 2", "-b 128", "-q"
     };
+
     String[] otherArgs = new GenericOptionsParser(config, argv).getRemainingArgs();
+
     CommandLine cli = LoadOptions.parse(new PosixParser(), otherArgs);
     Assert.assertEquals(extractorJson, LoadOptions.EXTRACTOR_CONFIG.get(cli).trim());
     Assert.assertEquals(cf, LoadOptions.HBASE_CF.get(cli).trim());
@@ -327,14 +333,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
-    Assert.assertTrue(results.get(0).getKey().getIndicator().startsWith("google"));
-    Assert.assertEquals(results.get(0).getKey().getType(), "enrichment");
+    Assert.assertTrue(results.get(0).getKey().indicator.startsWith("google"));
+    Assert.assertEquals(results.get(0).getKey().type, "enrichment");
     Assert.assertEquals(results.get(0).getValue().getMetadata().size(), 2);
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("meta").toString().startsWith("foo"));
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("host").toString().startsWith("google"));
@@ -350,14 +356,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
-    Assert.assertTrue(results.get(0).getKey().getIndicator().startsWith("google"));
-    Assert.assertEquals(results.get(0).getKey().getType(), "enrichment");
+    Assert.assertTrue(results.get(0).getKey().indicator.startsWith("google"));
+    Assert.assertEquals(results.get(0).getKey().type, "enrichment");
     Assert.assertEquals(results.get(0).getValue().getMetadata().size(), 2);
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("meta").toString().startsWith("foo"));
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("host").toString().startsWith("google"));
@@ -374,14 +380,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
-    Assert.assertTrue(results.get(0).getKey().getIndicator().startsWith("google"));
-    Assert.assertEquals(results.get(0).getKey().getType(), "enrichment");
+    Assert.assertTrue(results.get(0).getKey().indicator.startsWith("google"));
+    Assert.assertEquals(results.get(0).getKey().type, "enrichment");
     Assert.assertEquals(results.get(0).getValue().getMetadata().size(), 2);
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("meta").toString().startsWith("foo"));
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("host").toString().startsWith("google"));
@@ -398,14 +404,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for(Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(2, results.size());
-    Assert.assertTrue(results.get(0).getKey().getIndicator().startsWith("google"));
-    Assert.assertEquals(results.get(0).getKey().getType(), "enrichment");
+    Assert.assertTrue(results.get(0).getKey().indicator.startsWith("google"));
+    Assert.assertEquals(results.get(0).getKey().type, "enrichment");
     Assert.assertEquals(results.get(0).getValue().getMetadata().size(), 2);
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("meta").toString().startsWith("foo"));
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("host").toString().startsWith( "google"));
@@ -425,14 +431,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
-    Assert.assertTrue(results.get(0).getKey().getIndicator().startsWith("google"));
-    Assert.assertEquals(results.get(0).getKey().getType(), "enrichment");
+    Assert.assertTrue(results.get(0).getKey().indicator.startsWith("google"));
+    Assert.assertEquals(results.get(0).getKey().type, "enrichment");
     Assert.assertEquals(results.get(0).getValue().getMetadata().size(), 2);
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("meta").toString().startsWith("foo"));
     Assert.assertTrue(results.get(0).getValue().getMetadata().get("host").toString().startsWith("google"));
@@ -448,14 +454,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
     Assert.assertThat(results.get(0).getKey().getIndicator(), startsWith("GOOGLE"));
-    Assert.assertThat(results.get(0).getKey().getType(), equalTo("enrichment"));
+    Assert.assertThat(results.get(0).getKey().type, equalTo("enrichment"));
     Assert.assertThat(results.get(0).getValue().getMetadata().size(), equalTo(3));
     Assert.assertThat(results.get(0).getValue().getMetadata().get("meta").toString(), startsWith("foo"));
     Assert.assertThat(results.get(0).getValue().getMetadata().get("empty").toString(), startsWith("valfromglobalconfig"));
@@ -472,14 +478,14 @@ public class SimpleEnrichmentFlatFileLoaderIntegrationTest {
     SimpleEnrichmentFlatFileLoader.main(config, argv);
     EnrichmentConverter converter = new EnrichmentConverter();
     ResultScanner scanner = testTable.getScanner(Bytes.toBytes(cf));
-    List<EnrichmentResult> results = new ArrayList<>();
+    List<LookupKV<EnrichmentKey, EnrichmentValue>> results = new ArrayList<>();
     for (Result r : scanner) {
       results.add(converter.fromResult(r, cf));
       testTable.delete(new Delete(r.getRow()));
     }
     Assert.assertEquals(NUM_LINES, results.size());
     Assert.assertThat(results.get(0).getKey().getIndicator(), startsWith("GOOGLE"));
-    Assert.assertThat(results.get(0).getKey().getType(), equalTo("enrichment"));
+    Assert.assertThat(results.get(0).getKey().type, equalTo("enrichment"));
     Assert.assertThat(results.get(0).getValue().getMetadata().size(), equalTo(2));
     Assert.assertThat(results.get(0).getValue().getMetadata().get("meta").toString(), startsWith("foo"));
     Assert.assertThat(results.get(0).getValue().getMetadata().get("host").toString(), startsWith("GOOGLE"));
