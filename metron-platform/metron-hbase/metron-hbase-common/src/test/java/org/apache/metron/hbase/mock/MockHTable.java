@@ -163,6 +163,11 @@ public class MockHTable implements Table {
         return table;
     }
 
+    @Override
+    public TableDescriptor getDescriptor() throws IOException {
+        return getTableDescriptor();
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -249,9 +254,9 @@ public class MockHTable implements Table {
         return ret;
     }
 
-//    @Override
-    public Boolean[] exists(List<Get> list) throws IOException {
-        Boolean[] ret = new Boolean[list.size()];
+    @Override
+    public boolean[] exists(List<Get> list) throws IOException {
+        boolean[] ret = new boolean[list.size()];
         int i = 0;
         for(Get g : list) {
             ret[i++] = exists(g);
@@ -271,7 +276,7 @@ public class MockHTable implements Table {
     /**
      * {@inheritDoc}
      */
-    @Override
+//    @Override
     public Object[] batch(List<? extends Row> actions) throws IOException, InterruptedException {
         Object[] results = new Object[actions.size()]; // same size.
         for (int i = 0; i < actions.size(); i++) {
@@ -311,15 +316,14 @@ public class MockHTable implements Table {
     }
 
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public <R> Object[] batchCallback(
-            List<? extends Row> actions, Batch.Callback<R> callback) throws IOException,
-            InterruptedException {
-        throw new RuntimeException(this.getClass() + " does NOT implement this method.");
-    }
+//    /**
+//     * {@inheritDoc}
+//     */
+//    public <R> Object[] batchCallback(
+//            List<? extends Row> actions, Batch.Callback<R> callback) throws IOException,
+//            InterruptedException {
+//        throw new RuntimeException(this.getClass() + " does NOT implement this method.");
+//    }
 
     /**
      * {@inheritDoc}
@@ -822,7 +826,7 @@ public class MockHTable implements Table {
     /**
      * {@inheritDoc}
      */
-    @Override
+//    @Override
     public long getWriteBufferSize() {
         return 0;
     }
@@ -830,7 +834,7 @@ public class MockHTable implements Table {
     /**
      * {@inheritDoc}
      */
-    @Override
+//    @Override
     public void setWriteBufferSize(long writeBufferSize) throws IOException {
     }
 
@@ -907,42 +911,42 @@ public class MockHTable implements Table {
         return Mockito.mock(HTable.class, delegatesTo(this));
     }
 
-//    @Override
+    @Override
     public void setOperationTimeout(int i) {
         throw new UnsupportedOperationException("setOperationTimeout");
     }
 
-//    @Override
+    @Override
     public int getOperationTimeout() {
         throw new UnsupportedOperationException("getOperationTimeout");
     }
 
-//    @Override
+    @Override
     public void setRpcTimeout(int i) {
         throw new UnsupportedOperationException("setRpcTimeout");
     }
 
-//    @Override
+    @Override
     public int getReadRpcTimeout() {
         throw new UnsupportedOperationException("getReadRpcTimeout");
     }
 
-//    @Override
+    @Override
     public void setReadRpcTimeout(int i) {
         throw new UnsupportedOperationException("setReadRpcTimeout");
     }
 
-//    @Override
+    @Override
     public int getWriteRpcTimeout() {
         throw new UnsupportedOperationException("getWriteRpcTimeout");
     }
 
-//    @Override
+    @Override
     public void setWriteRpcTimeout(int i) {
         throw new UnsupportedOperationException("setWriteRpcTimeout");
     }
 
-//    @Override
+    @Override
     public int getRpcTimeout() {
         throw new UnsupportedOperationException("getRpcTimeout");
     }
