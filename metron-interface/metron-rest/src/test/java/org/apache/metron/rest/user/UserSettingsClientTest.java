@@ -20,7 +20,16 @@ package org.apache.metron.rest.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.hadoop.hbase.client.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import org.apache.hadoop.hbase.client.Get;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.client.ResultScanner;
+import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.Before;
 import org.junit.Rule;
@@ -49,14 +58,14 @@ public class UserSettingsClientTest {
   private static ThreadLocal<ObjectMapper> _mapper = ThreadLocal.withInitial(() ->
           new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL));
 
-  private HTableInterface userSettingsTable;
+  private Table userSettingsTable;
   private Supplier<Map<String, Object>> globalConfigSupplier;
   private UserSettingsClient userSettingsClient;
   private static byte[] cf = Bytes.toBytes("cf");
 
   @Before
   public void setUp() throws Exception {
-    userSettingsTable = mock(HTableInterface.class);
+    userSettingsTable = mock(Table.class);
     globalConfigSupplier = () -> new HashMap<String, Object>() {{
       put(USER_SETTINGS_HBASE_CF, "cf");
     }};
