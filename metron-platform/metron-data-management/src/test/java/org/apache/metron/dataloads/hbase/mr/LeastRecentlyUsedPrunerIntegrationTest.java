@@ -23,7 +23,8 @@ import org.apache.commons.cli.PosixParser;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.client.HTable;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.GenericOptionsParser;
@@ -49,8 +50,8 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
     private static HBaseTestingUtility testUtil;
 
     /** The test table. */
-    private static HTable testTable;
-    private static HTable atTable;
+    private static Table testTable;
+    private static Table atTable;
     private static final String tableName = "malicious_domains";
     private static final String cf = "cf";
     private static final String atTableName = "access_trackers";
@@ -65,8 +66,8 @@ public class LeastRecentlyUsedPrunerIntegrationTest {
         Map.Entry<HBaseTestingUtility, Configuration> kv = HBaseUtil.INSTANCE.create(true);
         config = kv.getValue();
         testUtil = kv.getKey();
-        testTable = testUtil.createTable(Bytes.toBytes(tableName), Bytes.toBytes(cf));
-        atTable = testUtil.createTable(Bytes.toBytes(atTableName), Bytes.toBytes(atCF));
+        testTable = testUtil.createTable(TableName.valueOf(tableName), cf);
+        atTable = testUtil.createTable(TableName.valueOf(atTableName), atCF);
     }
 
     @AfterClass

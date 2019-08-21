@@ -82,8 +82,8 @@ public class CIFHbaseAdapter implements EnrichmentAdapter<CacheKey>,Serializable
 		try {
 			rs = table.get(get);
 
-			for (KeyValue kv : rs.raw())
-				output.put(new String(kv.getQualifier(), StandardCharsets.UTF_8), "Y");
+//			for (KeyValue kv : rs.raw())
+//				output.put(new String(kv.getQualifier(), StandardCharsets.UTF_8), "Y");
 
 		} catch (IOException e) {
 			// TODO Auto-generated catch block

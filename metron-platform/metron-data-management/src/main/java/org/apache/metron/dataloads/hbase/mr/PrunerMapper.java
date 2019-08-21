@@ -23,6 +23,8 @@ import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.metron.enrichment.lookup.LookupKey;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackerUtil;
+import org.apache.metron.hbase.HTableProvider;
+import org.apache.metron.hbase.TableProvider;
 
 import java.io.IOException;
 
@@ -38,7 +40,8 @@ public class PrunerMapper extends TableMapper<ImmutableBytesWritable, Delete> {
         String atTable = context.getConfiguration().get(ACCESS_TRACKER_TABLE_CONF);
         String atCF = context.getConfiguration().get(ACCESS_TRACKER_CF_CONF);
         String atName = context.getConfiguration().get(ACCESS_TRACKER_NAME_CONF);
-        HTable table = new HTable(context.getConfiguration(), atTable);
+        TableProvider provider = new HTableProvider();
+        Table table = provider.getTable(context.getConfiguration(), atTable);
         long timestamp = context.getConfiguration().getLong(TIMESTAMP_CONF, -1);
         if(timestamp < 0) {
             throw new IllegalStateException("Must specify a timestamp that is positive.");
