@@ -141,6 +141,17 @@
     </properties>
 
     <profiles>
+        <!--<profile>-->
+            <!--<id>HDP-3.1</id>-->
+            <!--<activation>-->
+                <!--<activeByDefault>true</activeByDefault>-->
+            <!--</activation>-->
+            <!--<properties>-->
+                <!--<hdp_version>3.1.0.0</hdp_version>-->
+                <!--<global_hbase_version>2.0.2</global_hbase_version>-->
+                <!--<global_hbase_guava_version>17.0</global_hbase_guava_version>-->
+            <!--</properties>-->
+        <!--</profile>-->
         <profile>
             <id>HDP-2.5.0.0</id>
             <properties>
