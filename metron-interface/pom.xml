@@ -42,6 +42,8 @@
         </license>
     </licenses>
     <modules>
+        <module>metron-config</module>
+        <module>metron-alerts</module>
         <module>metron-rest</module>
         <module>metron-rest-client</module>
     </modules>
