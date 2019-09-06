@@ -41,12 +41,7 @@ public class PrunerMapper extends TableMapper<ImmutableBytesWritable, Delete> {
         String atTable = context.getConfiguration().get(ACCESS_TRACKER_TABLE_CONF);
         String atCF = context.getConfiguration().get(ACCESS_TRACKER_CF_CONF);
         String atName = context.getConfiguration().get(ACCESS_TRACKER_NAME_CONF);
-<<<<<<< HEAD
         Table table = new HTableProvider().getTable(context.getConfiguration(), atTable);
-=======
-        TableProvider provider = new HTableProvider();
-        Table table = provider.getTable(context.getConfiguration(), atTable);
->>>>>>> a2ff7fb2e... WIP
         long timestamp = context.getConfiguration().getLong(TIMESTAMP_CONF, -1);
         if(timestamp < 0) {
             throw new IllegalStateException("Must specify a timestamp that is positive.");
