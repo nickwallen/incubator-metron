@@ -23,8 +23,6 @@ import org.apache.hadoop.hbase.mapreduce.TableMapper;
 import org.apache.metron.enrichment.lookup.LookupKey;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTracker;
 import org.apache.metron.enrichment.lookup.accesstracker.AccessTrackerUtil;
-import org.apache.metron.hbase.HTableProvider;
-import org.apache.metron.hbase.TableProvider;
 
 import java.io.IOException;
 import org.apache.metron.hbase.HTableProvider;
