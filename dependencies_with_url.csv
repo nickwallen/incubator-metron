@@ -575,3 +575,4 @@ org.glassfish.web:javax.servlet.jsp:jar:2.3.2:compile
 org.glassfish:javax.el:jar:3.0.1-b11:compile
 org.jruby.jcodings:jcodings:jar:1.0.18:compile
 org.jruby.joni:joni:jar:2.1.11:compile
+io.dropwizard.metrics:metrics-core:jar:3.2.6:compile
