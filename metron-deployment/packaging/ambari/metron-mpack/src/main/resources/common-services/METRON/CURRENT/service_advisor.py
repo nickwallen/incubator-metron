@@ -198,5 +198,5 @@ class METRON${metron.short.version}ServiceAdvisor(service_advisor.ServiceAdvisor
 
     def getFilteredHostsBasedOnDependencies(self, services, component, hostsList, hostsComponentsMap):
         # need to override this method from StackAdvisor to work around https://issues.apache.org/jira/browse/AMBARI-25375
-        filteredHostsList = super(..., self).getFilteredHostsBasedOnDependencies(service, component, hostsList, hostsComponentsMap)
+        filteredHostsList = service_advisor.StackAdvisor.getFilteredHostsBasedOnDependencies(service, component, hostsList, hostsComponentsMap)
         return filteredHostsList if len(filteredHostsList) != 0 else hostsList
