@@ -40,8 +40,6 @@
 		</license>
 	</licenses>
 	<modules>
-		<module>metron-maas-service</module>
-		<module>metron-maas-common</module>
 		<module>metron-statistics</module>
 		<module>metron-profiler-storm</module>
 		<module>metron-profiler-client</module>
