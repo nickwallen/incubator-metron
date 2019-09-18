@@ -122,7 +122,7 @@
         <global_mockito_version>1.10.19</global_mockito_version>
         <global_powermock_version>1.7.0</global_powermock_version>
         <global_shade_version>3.2.0</global_shade_version>
-        <global_jackson_version>2.7.4</global_jackson_version>
+        <global_jackson_version>2.10.0.pr3</global_jackson_version>
         <global_errorprone_core_version>2.0.14</global_errorprone_core_version>
         <global_jar_version>3.0.2</global_jar_version>
         <global_surefire_version>2.18</global_surefire_version>
@@ -137,7 +137,7 @@
         <global_httpclient_version>4.3.2</global_httpclient_version>
         <global_aesh_version>0.66.19</global_aesh_version>
         <global_jacoco_version>0.8.3</global_jacoco_version>
-        <argLine></argLine>
+        <argLine/>
     </properties>
 
     <profiles>
@@ -282,7 +282,7 @@
                 <artifactId>cobertura-maven-plugin</artifactId>
                 <version>2.7</version>
                 <configuration>
-                    <check />
+                    <check/>
                     <formats>
                         <format>html</format>
                     </formats>
