@@ -150,8 +150,8 @@
                 <global_solr_version>7.4.0</global_solr_version>
                 <global_hbase_version>2.0.2</global_hbase_version>
                 <global_hbase_guava_version>17.0</global_hbase_guava_version>
-                <base_hadoop_version>3.1.1</base_hadoop_version>
-                <!-- see http://curator.apache.org/zk-compatibility.html -->
+                <!-- For Zookeeper/Curator version compatibility see
+                      http://curator.apache.org/zk-compatibility.html -->
                 <global_zookeeper_version>3.4.6</global_zookeeper_version>
                 <global_curator_version>4.2.0</global_curator_version>
                 <global_curator_test_version>2.12.0</global_curator_test_version>
@@ -171,7 +171,8 @@
                 <global_solr_version>6.6.2</global_solr_version>
                 <global_hbase_version>2.0.2</global_hbase_version>
                 <global_hbase_guava_version>17.0</global_hbase_guava_version>
-                <!-- see http://curator.apache.org/zk-compatibility.html -->
+                <!-- For Zookeeper/Curator version compatibility see
+                      http://curator.apache.org/zk-compatibility.html -->
                 <global_zookeeper_version>3.4.6</global_zookeeper_version>
                 <global_curator_version>4.2.0</global_curator_version>
                 <global_curator_test_version>2.12.0</global_curator_test_version>
