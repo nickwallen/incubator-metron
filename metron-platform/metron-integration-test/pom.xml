@@ -28,6 +28,17 @@
   </properties>
   <dependencies>
     <dependency>
+      <!-- why does this need to be at the top?  order should not matter here -->
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-yarn-api</artifactId>
+      <version>${global_hadoop_version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.metron</groupId>
+      <artifactId>metron-hbase-client</artifactId>
+      <version>${project.parent.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.apache.zookeeper</groupId>
       <artifactId>zookeeper</artifactId>
       <version>${global_zookeeper_version}</version>
@@ -168,25 +179,6 @@
             <!-- to avoid pulling in curator 2.12.0 with hadoop 3.1.x -->
             <groupId>org.apache.curator</groupId>
             <artifactId>curator-recipes</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
-      <version>${global_hbase_version}</version>
-      <exclusions>
-        <exclusion>
-          <artifactId>log4j</artifactId>
-          <groupId>log4j</groupId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-auth</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
         </exclusion>
       </exclusions>
     </dependency>

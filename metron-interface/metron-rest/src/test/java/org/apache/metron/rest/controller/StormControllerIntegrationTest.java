@@ -17,7 +17,6 @@
  */
 package org.apache.metron.rest.controller;
 
-import org.apache.hadoop.hbase.shaded.com.google.common.collect.ImmutableList;
 import org.apache.metron.common.configuration.SensorParserConfig;
 import org.apache.metron.integration.utils.TestUtils;
 import org.apache.metron.rest.MetronRestConstants;
@@ -39,6 +38,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -290,7 +290,7 @@ public class StormControllerIntegrationTest {
             .andExpect(jsonPath("$.status").value("SUCCESS"))
             .andExpect(jsonPath("$.message").value(TopologyStatusCode.STOPPED.name()));
 
-    for(String type : ImmutableList.of("randomaccess", "batch")) {
+    for(String type : Arrays.asList("randomaccess", "batch")) {
       this.mockMvc.perform(get(stormUrl + "/indexing/" + type).with(httpBasic(user,password)))
               .andExpect(status().isNotFound());
       this.mockMvc.perform(get(stormUrl + "/indexing/" + type + "/activate").with(httpBasic(user, password)))

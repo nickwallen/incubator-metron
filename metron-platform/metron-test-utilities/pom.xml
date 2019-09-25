@@ -29,6 +29,11 @@
   <dependencies>
     <dependency>
       <groupId>org.apache.metron</groupId>
+      <artifactId>metron-hbase-client</artifactId>
+      <version>${project.parent.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.metron</groupId>
       <artifactId>metron-zookeeper</artifactId>
       <version>${project.parent.version}</version>
     </dependency>
@@ -106,29 +111,6 @@
         <exclusion>
           <artifactId>commons-httpclient</artifactId>
           <groupId>commons-httpclient</groupId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase-client</artifactId>
-      <version>${global_hbase_version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-auth</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-common</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.apache.hadoop</groupId>
-          <artifactId>hadoop-mapreduce-client-core</artifactId>
-        </exclusion>
-        <exclusion>
-          <artifactId>log4j</artifactId>
-          <groupId>log4j</groupId>
         </exclusion>
       </exclusions>
     </dependency>
