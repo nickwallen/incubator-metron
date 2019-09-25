@@ -76,8 +76,7 @@ import static org.apache.metron.profiler.storm.KafkaEmitter.PERIOD_ID_FIELD;
 import static org.apache.metron.profiler.storm.KafkaEmitter.PERIOD_START_FIELD;
 import static org.apache.metron.profiler.storm.KafkaEmitter.PROFILE_FIELD;
 import static org.apache.metron.profiler.storm.KafkaEmitter.TIMESTAMP_FIELD;
-import static org.hamcrest.CoreMatchers.hasItem;
-import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -99,9 +98,9 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
   private static final String inputTopic = Constants.INDEXING_TOPIC;
   private static final String outputTopic = "profiles";
   private static final int saltDivisor = 10;
-  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(20);
-  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(10);
-  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long periodDurationMillis = TimeUnit.SECONDS.toMillis(10);
+  private static final long windowLagMillis = TimeUnit.SECONDS.toMillis(0);
+  private static final long windowDurationMillis = TimeUnit.SECONDS.toMillis(5);
   private static final long profileTimeToLiveMillis = TimeUnit.SECONDS.toMillis(20);
   private static final long maxRoutesPerBolt = 100000;
 
@@ -264,22 +263,22 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     // advance time.  the next period contains all of the remaining messages, so there are no other messages to
     // advance time.  because of this the next period only flushes after the time-to-live expires
 
-    // there are 14 messages in the first period and 12 in the next where ip_src_addr = 192.168.66.1
+    // there are 26 messages where ip_src_addr = 192.168.66.1, which may be split across multiple periods
     assertEventually(() -> {
       List<Integer> results = execute("PROFILE_GET('count-by-ip', '192.168.66.1', window)", List.class);
-      assertThat(results, hasItems(14, 12));
+      assertThat(results.stream().reduce(0, (x,y) -> x+y), equalTo(26));
       }, timeout);
 
-    // there are 36 messages in the first period and 38 in the next where ip_src_addr = 192.168.138.158
+    // there are 74 messages where ip_src_addr = 192.168.138.158, which may be split across multiple periods
     assertEventually(() -> {
       List<Integer> results = execute("PROFILE_GET('count-by-ip', '192.168.138.158', window)", List.class);
-      assertThat(results, hasItems(36, 38));
+      assertThat(results.stream().reduce(0, (x,y) -> x+y), equalTo(74));
       }, timeout);
 
-    // in all there are 50 (36+14) messages in the first period and 50 (38+12) messages in the next
+    // there are 100 messages in all, which may be split across multiple periods
     assertEventually(() -> {
       List<Integer> results = execute("PROFILE_GET('total-count', 'total', window)", List.class);
-      assertThat(results, hasItems(50, 50));
+      assertThat(results.stream().reduce(0, (x,y) -> x+y), equalTo(100));
       }, timeout);
   }
 
@@ -367,10 +366,10 @@ public class ProfilerIntegrationTest extends BaseIntegrationTest {
     List<String> telemetry = FileUtils.readLines(new File("src/test/resources/telemetry.json"));
     kafkaComponent.writeMessages(inputTopic, telemetry);
 
-    // wait until the triage message is output to kafka
+    // wait until the triage message(s) is output to kafka
     assertEventually(() -> {
       outputMessages = kafkaComponent.readMessages(outputTopic);
-      assertEquals(1, outputMessages.size());
+      assertTrue(outputMessages.size() > 0);
     }, timeout);
 
     // validate the triage message
