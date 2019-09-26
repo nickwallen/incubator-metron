@@ -32,6 +32,14 @@
     </properties>
     <dependencies>
         <dependency>
+            <!-- Must be pulled in preferentially -->
+            <groupId>org.apache.metron</groupId>
+            <artifactId>metron-hbase-testing-util</artifactId>
+            <version>${project.parent.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.metron</groupId>
             <artifactId>metron-common</artifactId>
             <version>${project.parent.version}</version>
@@ -106,7 +114,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-common</artifactId>
-            <!--classifier>tests</classifier-->
             <version>${global_hadoop_version}</version>
             <scope>provided</scope>
             <exclusions>
@@ -134,7 +141,6 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-hdfs</artifactId>
-            <!--classifier>tests</classifier-->
             <version>${global_hadoop_version}</version>
             <scope>provided</scope>
             <exclusions>
@@ -142,18 +148,6 @@
                     <!-- to avoid pulling in guava 11 -->
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-server</artifactId>
-            <version>${global_hbase_version}</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.apache.hbase</groupId>
-                    <artifactId>hbase-client</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -181,38 +175,6 @@
                     <!-- to avoid pulling in curator 2.12.0 -->
                     <groupId>org.apache.curator</groupId>
                     <artifactId>curator-recipes</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hbase</groupId>
-            <artifactId>hbase-testing-util</artifactId>
-            <version>${global_hbase_version}</version>
-            <scope>test</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-hdfs</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hadoop</groupId>
-                    <artifactId>hadoop-minicluster</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>org.apache.hbase</groupId>
-                    <artifactId>hbase-client</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>

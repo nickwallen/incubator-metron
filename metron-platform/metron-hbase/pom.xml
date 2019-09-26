@@ -42,5 +42,6 @@
     </licenses>
     <modules>
         <module>metron-hbase-common</module>
+        <module>metron-hbase-testing-util</module>
     </modules>
 </project>
