@@ -23,13 +23,13 @@
     <!--
     The purpose of this project is to provide test functionality for HBase; the
     equivalent of HBase's `hbase-testing-util`. This was introduced to work 
-    around compatibility issues when using `hbase-testing-util` with HBase 2.0.2 
-    and Hadoop 3.1.1. 
+    around compatibility issues when using `hbase-server` and `hbase-testing-util` 
+    with HBase 2.0.2 and Hadoop 3.1.1. 
     
     See https://issues.apache.org/jira/browse/HBASE-22394
     -->
-    <artifactId>metron-hbase-testing-util</artifactId>
-    <name>metron-hbase-testing-util</name>
+    <artifactId>metron-hbase-server-testing</artifactId>
+    <name>metron-hbase-server-testing</name>
     <url>https://metron.apache.org/</url>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

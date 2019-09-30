@@ -34,7 +34,7 @@
         <dependency>
             <!-- Must be pulled in preferentially -->
             <groupId>org.apache.metron</groupId>
-            <artifactId>metron-hbase-testing-util</artifactId>
+            <artifactId>metron-hbase-server-testing</artifactId>
             <version>${project.parent.version}</version>
             <scope>test</scope>
         </dependency>
