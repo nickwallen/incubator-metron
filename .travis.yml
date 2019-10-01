@@ -19,13 +19,6 @@ sudo: required
 addons:
  chrome: stable
 
-# env:
-#   - SCRIPT="mvn surefire:test@unit-tests -T 2C"
-#   - SCRIPT="mvn surefire:test@integration-tests"
-#   - SCRIPT="mvn clean site --projects site-book"
-#   - SCRIPT="mvn test --projects metron-interface/metron-config,metron-interface/metron-alerts"
-#   - SCRIPT="./dev-utilities/build-utils/verify_licenses.sh"
-
 install: true
 language: java
 jdk:
@@ -37,12 +30,6 @@ before_install:
   - '[[ -d $M2_HOME ]] || unzip -qq apache-maven-3.3.9-bin.zip'
   - npm config set cache $HOME/.npm-cache --global
   - npm config set prefix $HOME/.npm-prefix --global
-
-# install:
-#   - time mvn install -T 2C -q -DskipTests=true -Dmaven.javadoc.skip=true -B -V -pl '!org.apache.metron:metron-config,!org.apache.metron:metron-alerts'
-
-# script:
-#   - time $SCRIPT
 
 matrix:
   fast_finish: true
@@ -56,20 +43,20 @@ matrix:
       script:
         - time mvn install -T 2C -q -DskipTests=true -Dmaven.javadoc.skip=true -B -V -pl '!org.apache.metron:metron-config,!org.apache.metron:metron-alerts'
         - time mvn surefire:test@integration-tests
-    
-    - name: Site Book
-      script:
-        - time mvn clean site --projects site-book
         
     - name: Alerts UI Tests
       script:
         - time mvn install -T 2C -q -DskipTests=true -Dmaven.javadoc.skip=true -B -V -pl 'org.apache.metron:metron-alerts'
-        - time mvn test --projects metron-interface/metron-alerts
+        - time mvn test -pl 'org.apache.metron:metron-alerts'
         
     - name: Management UI Tests
       script:
         - time mvn install -T 2C -q -DskipTests=true -Dmaven.javadoc.skip=true -B -V -pl 'org.apache.metron:metron-config'
-        - time mvn test --projects metron-interface/metron-config
+        - time mvn test -pl 'org.apache.metron:metron-config'
+  
+    - name: Site Book
+      script:
+        - time mvn clean site --projects site-book
   
     - name: Verify Licenses
       script:
