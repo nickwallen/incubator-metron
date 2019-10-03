@@ -14,7 +14,9 @@
     "cypress:run": "cypress run",
     "cypress:open": "cypress open",
     "cypress:ci": "ng build --prod && run-p --race start:ci cypress:run",
-    "start:ci": "node ./scripts/alerts-server.js -c alerts_ui_cypress.yml"
+    "start:ci": "node ./scripts/alerts-server.js -c alerts_ui_cypress.yml",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
   },
   "private": true,
   "dependencies": {
@@ -45,7 +47,8 @@
     "rxjs": "^6.5.2",
     "ts-node": "^7.0.0",
     "web-animations-js": "^2.2.2",
-    "zone.js": "^0.8.29"
+    "zone.js": "^0.8.29",
+    "snyk": "^1.230.5"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^0.13.0",
@@ -82,5 +85,6 @@
     "tslint": "~5.0.0",
     "typescript": "~3.2.4",
     "yamljs": "^0.3.0"
-  }
+  },
+  "snyk": true
 }
