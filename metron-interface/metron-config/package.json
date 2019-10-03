@@ -17,7 +17,9 @@
     "e2e-all": "./node_modules/.bin/protractor --suite=all",
     "copy-ace": "cp -f $npm_package_config_node_ace/ext-language_tools.js $npm_package_config_node_ace/mode-json.js $npm_package_config_node_ace/theme-monokai.js $npm_package_config_node_ace/worker-json.js src/assets/ace",
     "copy-ace-snippets": "cp -f $npm_package_config_node_ace/snippets/text.js $npm_package_config_node_ace/snippets/json.js  src/assets/ace/snippets",
-    "postinstall": "npm run copy-ace & npm run copy-ace-snippets"
+    "postinstall": "npm run copy-ace & npm run copy-ace-snippets",
+    "snyk-protect": "snyk protect",
+    "prepare": "npm run snyk-protect"
   },
   "private": true,
   "dependencies": {
@@ -52,7 +54,8 @@
     "rxjs": "6.5.2",
     "ts-helpers": "^1.1.1",
     "tslib": "^1.9.0",
-    "zone.js": "^0.8.29"
+    "zone.js": "^0.8.29",
+    "snyk": "^1.230.5"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "~0.13.0",
@@ -73,5 +76,6 @@
     "ts-node": "~5.0.1",
     "tslint": "^5.11.0",
     "typescript": "~3.2.4"
-  }
+  },
+  "snyk": true
 }
