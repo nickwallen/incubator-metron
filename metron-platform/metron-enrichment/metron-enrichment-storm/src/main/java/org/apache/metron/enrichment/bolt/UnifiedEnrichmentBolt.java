@@ -362,12 +362,15 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
     perfLog = new PerformanceLogger(() -> getConfigurations().getGlobalConfig(), Perf.class.getName());
 
     try {
+      // TODO this will not work if the cluster is not kerberized
       // TODO these should come from the user's configuration
       // should see INFO log "Login successful for user {user} using keytab file {path}" from org.apache.hadoop.security.UserGroupInformation
       LOG.error("About to login to HDFS...");
-      map.put(HdfsSecurityUtil.STORM_KEYTAB_FILE_KEY, "/etc/security/keytab/metron.headless.keytab");
-      map.put(HdfsSecurityUtil.STORM_USER_NAME_KEY, "metron@EXAMPLE.COM");
-      HdfsSecurityUtil.login(map, new Configuration());
+      Map stormConf = new HashMap(map);
+      stormConf.put(HdfsSecurityUtil.STORM_KEYTAB_FILE_KEY, "/etc/security/keytab/metron.headless.keytab");
+      stormConf.put(HdfsSecurityUtil.STORM_USER_NAME_KEY, "metron@EXAMPLE.COM");
+      Configuration hdfsConf = new Configuration();
+      HdfsSecurityUtil.login(stormConf, hdfsConf);
 
     } catch (Exception e) {
       throw new RuntimeException("Unable to authenticate with HDFS: " + e.getMessage(), e);
