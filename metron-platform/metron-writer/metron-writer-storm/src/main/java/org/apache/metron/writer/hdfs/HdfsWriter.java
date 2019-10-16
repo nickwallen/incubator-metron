@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.metron.common.configuration.IndexingConfigurations;
 import org.apache.metron.common.configuration.writer.WriterConfiguration;
 import org.apache.metron.common.utils.LazyLogger;
@@ -47,7 +46,6 @@ import org.apache.storm.hdfs.bolt.rotation.NoRotationPolicy;
 import org.apache.storm.hdfs.bolt.sync.CountSyncPolicy;
 import org.apache.storm.hdfs.bolt.sync.SyncPolicy;
 import org.apache.storm.hdfs.common.rotation.RotationAction;
-import org.apache.storm.hdfs.security.HdfsSecurityUtil;
 import org.apache.storm.task.TopologyContext;
 import org.json.simple.JSONObject;
 
@@ -103,18 +101,6 @@ public class HdfsWriter implements BulkMessageWriter<JSONObject>, Serializable {
       //if the user has not, then we want to have the sync policy depend on the batch size.
       LOG.debug("No user specified sync policy, using CountSyncPolicy based on batch size");
       syncPolicyCreator = (source, config) -> new CountSyncPolicy(config == null?1:config.getBatchSize(source));
-    }
-
-    try {
-      // TODO these should come from the user's configuration
-      // should see INFO log "Login successful for user {user} using keytab file {path}" from org.apache.hadoop.security.UserGroupInformation
-      LOG.error("About to login to HDFS...");
-      stormConfig.put(HdfsSecurityUtil.STORM_KEYTAB_FILE_KEY, "/etc/security/keytab/metron.headless.keytab");
-      stormConfig.put(HdfsSecurityUtil.STORM_USER_NAME_KEY, "metron@EXAMPLE.COM");
-      HdfsSecurityUtil.login(stormConfig, new Configuration());
-
-    } catch (Exception e) {
-      throw new RuntimeException("Unable to authenticate with HDFS: " + e.getMessage(), e);
     }
   }
 

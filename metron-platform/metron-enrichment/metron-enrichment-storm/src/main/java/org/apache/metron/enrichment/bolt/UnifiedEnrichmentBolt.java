@@ -19,7 +19,6 @@ package org.apache.metron.enrichment.bolt;
 
 import static org.apache.metron.common.Constants.STELLAR_CONTEXT_CONF;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.metron.common.Constants;
 import org.apache.metron.storm.common.bolt.ConfiguredEnrichmentBolt;
 import org.apache.metron.common.configuration.ConfigurationType;
@@ -42,7 +41,6 @@ import org.apache.metron.enrichment.parallel.WorkerPoolStrategies;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.apache.metron.storm.common.utils.StormErrorUtils;
-import org.apache.storm.hdfs.security.HdfsSecurityUtil;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
 import org.apache.storm.topology.OutputFieldsDeclarer;
@@ -360,24 +358,10 @@ public class UnifiedEnrichmentBolt extends ConfiguredEnrichmentBolt {
     messageGetter = this.getterStrategy.get(messageFieldName);
     enricher = new ParallelEnricher(enrichmentsByType, ConcurrencyContext.get(strategy), captureCacheStats);
     perfLog = new PerformanceLogger(() -> getConfigurations().getGlobalConfig(), Perf.class.getName());
-
-    try {
-      // TODO these should come from the user's configuration
-      // should see INFO log "Login successful for user {user} using keytab file {path}" from org.apache.hadoop.security.UserGroupInformation
-      LOG.error("About to login to HDFS...");
-      map.put(HdfsSecurityUtil.STORM_KEYTAB_FILE_KEY, "/etc/security/keytab/metron.headless.keytab");
-      map.put(HdfsSecurityUtil.STORM_USER_NAME_KEY, "metron@EXAMPLE.COM");
-      HdfsSecurityUtil.login(map, new Configuration());
-
-    } catch (Exception e) {
-      throw new RuntimeException("Unable to authenticate with HDFS: " + e.getMessage(), e);
-    }
-
     GeoLiteCityDatabase.INSTANCE.update((String)getConfigurations().getGlobalConfig().get(
         GeoLiteCityDatabase.GEO_HDFS_FILE));
     GeoLiteAsnDatabase.INSTANCE.update((String)getConfigurations().getGlobalConfig().get(
         GeoLiteAsnDatabase.ASN_HDFS_FILE));
-
     initializeStellar();
     enrichmentContext = new EnrichmentContext(StellarFunctions.FUNCTION_RESOLVER(), stellarContext);
   }
