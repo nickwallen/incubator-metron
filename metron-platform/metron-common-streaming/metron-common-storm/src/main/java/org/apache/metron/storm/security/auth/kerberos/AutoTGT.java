@@ -16,42 +16,46 @@
  * limitations under the License.
  */
 
-package org.apache.metron.enrichment.bolt;
+package org.apache.metron.storm.security.auth.kerberos;
 
-import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.storm.security.auth.AuthUtils;
 import org.apache.storm.security.auth.IAutoCredentials;
 import org.apache.storm.security.auth.ICredentialsRenewer;
-import org.apache.storm.security.auth.AuthUtils;
-
-import java.io.IOException;
-import java.util.Map;
-import java.util.Set;
-import java.lang.reflect.Method;
-import java.lang.reflect.Constructor;
-import java.security.Principal;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.Iterator;
-
-import javax.security.auth.kerberos.KerberosTicket;
-import javax.security.auth.kerberos.KerberosPrincipal;
-import javax.security.auth.login.Configuration;
-import javax.security.auth.login.LoginContext;
-import javax.security.auth.DestroyFailedException;
-import javax.security.auth.RefreshFailedException;
-import javax.security.auth.Subject;
-import javax.xml.bind.DatatypeConverter;
-
 import org.apache.storm.security.auth.kerberos.ClientCallbackHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.security.auth.DestroyFailedException;
+import javax.security.auth.RefreshFailedException;
+import javax.security.auth.Subject;
+import javax.security.auth.kerberos.KerberosPrincipal;
+import javax.security.auth.kerberos.KerberosTicket;
+import javax.security.auth.login.Configuration;
+import javax.security.auth.login.LoginContext;
+import javax.xml.bind.DatatypeConverter;
+import java.lang.reflect.Method;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+
 /**
  * Automatically take a user's TGT, and push it, and renew it in Nimbus.
+ *
+ * <p>To allow a topology running in a Storm Supervisor to authenticate with Hadoop using
+ * the TGT pushed by Nimbus, this class should be configured as part of a topology's
+ * `topology.auto-credentials` parameter.
+ *
+ * <p>When using Storm's {@link org.apache.storm.security.auth.kerberos.AutoTGT}, Hadoop
+ * authentication fails because it is unable to dyanamically load Hadoop's
+ * {@link org.apache.hadoop.security.UserGroupInformation} class at runtime. This issue is
+ * avoided by using this custom AutoTGT implementation that is packaged in a topology's uber jar.
+ *
+ * <p>This work is derived from the {@link org.apache.storm.security.auth.kerberos.AutoTGT} class
+ * in storm-core version 1.2.1.
  */
 public class AutoTGT implements IAutoCredentials, ICredentialsRenewer {
-    private static final Logger LOG = LoggerFactory.getLogger(org.apache.storm.security.auth.kerberos.AutoTGT.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AutoTGT.class);
     private static final float TICKET_RENEW_WINDOW = 0.80f;
     protected static final AtomicReference<KerberosTicket> kerbTicket = new AtomicReference<>();
     private Map conf;
@@ -177,15 +181,34 @@ public class AutoTGT implements IAutoCredentials, ICredentialsRenewer {
      * @param subject the subject that should have a TGT in it.
      */
     private void loginHadoopUser(Subject subject) {
-        if (UserGroupInformation.isSecurityEnabled()) {
-            LOG.debug("Security is enabled. Logging into Hadoop as subject '{}'", subject);
-            try {
-                UserGroupInformation.loginUserFromSubject(subject);
-            } catch (IOException e) {
-                LOG.error("Unable to login to Hadoop; error={}", e.getMessage(), e);
+        final String clazz = "org.apache.hadoop.security.UserGroupInformation";
+        Class<?> ugi;
+        try {
+            ugi = Class.forName(clazz);
+        } catch (ClassNotFoundException e) {
+            /*
+             * When using Storm's `org.apache.storm.security.auth.kerberos.AutoTGT` class, Hadoop
+             * authentication fails because it is unable to load Hadoop's UserGroupInformation class
+             * at runtime. This issue is avoided when using a custom AutoTGT implementation like
+             * this, packaged into a topology's uber jar.
+             */
+            LOG.error("Hadoop authentication failed. Hadoop was not found on the class path. " +
+                    "Unable to load '{}' because '{}'", clazz, e.getMessage(), e);
+            return;
+        }
+        try {
+            Method isSecEnabled = ugi.getMethod("isSecurityEnabled");
+            if (!((Boolean)isSecEnabled.invoke(null))) {
+                LOG.warn("Hadoop is on the classpath but not configured for " +
+                        "security, if you want security you need to be sure that " +
+                        "hadoop.security.authentication=kerberos in core-site.xml " +
+                        "in your jar");
+                return;
             }
-        } else {
-            LOG.debug("Security is not enabled. No need to login to Hadoop.");
+            Method login = ugi.getMethod("loginUserFromSubject", Subject.class);
+            login.invoke(null, subject);
+        } catch (Exception e) {
+            LOG.warn("Something went wrong while trying to initialize Hadoop through reflection. This version of hadoop may not be compatible.", e);
         }
     }
 
@@ -218,7 +241,7 @@ public class AutoTGT implements IAutoCredentials, ICredentialsRenewer {
     }
 
     public static void main(String[] args) throws Exception {
-        org.apache.storm.security.auth.kerberos.AutoTGT at = new org.apache.storm.security.auth.kerberos.AutoTGT();
+        AutoTGT at = new AutoTGT();
         Map conf = new java.util.HashMap();
         conf.put("java.security.auth.login.config", args[0]);
         at.prepare(conf);
