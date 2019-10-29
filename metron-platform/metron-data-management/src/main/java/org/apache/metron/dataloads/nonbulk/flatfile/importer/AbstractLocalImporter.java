@@ -102,7 +102,7 @@ public abstract class AbstractLocalImporter<OPTIONS_T extends Enum<OPTIONS_T> & 
                       try (Stream<String> stream = ReaderSpliterator.lineStream(loc.openReader(), batchSize)) {
                         ForkJoinPool forkJoinPool = new ForkJoinPool(numThreads);
                         forkJoinPool.submit(() ->
-                          stream.parallel().forEach(input ->  {
+                          stream.forEach(input ->  {
                                     try {
                                       extract(state.get(), input);
                                       if (!quiet) {
