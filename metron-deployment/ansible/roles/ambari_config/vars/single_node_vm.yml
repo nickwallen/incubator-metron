@@ -19,8 +19,8 @@
 
 hadoop_master: [NAMENODE, SECONDARY_NAMENODE, RESOURCEMANAGER, HISTORYSERVER]
 hadoop_slave: [APP_TIMELINE_SERVER, DATANODE, HDFS_CLIENT, NODEMANAGER, YARN_CLIENT, MAPREDUCE2_CLIENT]
-spark_master: [SPARK_JOBHISTORYSERVER]
-spark_slave: [SPARK_CLIENT]
+spark_master: [SPARK2_JOBHISTORYSERVER]
+spark_slave: [SPARK2_CLIENT]
 storm_master: [NIMBUS, STORM_UI_SERVER, DRPC_SERVER]
 storm_slave: [SUPERVISOR]
 kafka_broker: [KAFKA_BROKER]
@@ -42,7 +42,8 @@ metron_alerts_ui: [METRON_ALERTS_UI]
 metron_components: >
   {{ hadoop_master | union(zookeeper_master) | union(storm_master) | union(hbase_master) | union(hadoop_slave) | union(zookeeper_slave) |
   union(storm_slave) | union(kafka_broker) | union(hbase_slave) | union(kibana_master) | union(metron_indexing) | union(metron_profiler) | union(metron_pcap) |
-  union(metron_enrichment_master) | union(metron_parsers) | union(metron_rest) | union(metron_management_ui) | union(metron_alerts_ui) | union(es_master)  }}
+  union(metron_enrichment_master) | union(metron_parsers) | union(metron_rest) | union(metron_management_ui) | union(metron_alerts_ui) | union(es_master) |
+  union(spark_master) | union(spark_slave) }}
 
 cluster_name: "metron_cluster"
 blueprint_name: "metron_blueprint"
@@ -113,6 +114,22 @@ configurations:
       gateway_recover_after_data_nodes: 1
       network_host: "[ _local_, {{ elasticsearch_network_interface }} ]"
       masters_also_are_datanodes: "1"
+  - spark2-env:
+      spark_daemon_memory: "1024"
+  - hive-env:
+      hive.heapsize: "512"
+      hive_database": "New MySQL Database"
+      hive_log_dir": "/var/log/hive"
+      hive_user": "hive"
+      hive.metastore.heapsize: "977"
+      hive_timeline_logging_enabled: "false"
+      beeline_jdbc_url_default: "container"
+      hive.atlas.hook: "false"
+      hive.log.level: "INFO"
+      hive_ambari_database: "MySQL"
+      hive_database_name: "hive"
+      hive_database_type: "mysql"
+      enable_heap_dump: "false"
 
 required_configurations:
   - metron-env:

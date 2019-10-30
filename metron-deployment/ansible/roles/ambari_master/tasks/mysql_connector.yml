@@ -15,12 +15,8 @@
 #  limitations under the License.
 #
 ---
-#- include: mysql_connector.yml
-- include: ambari.yml
-- include: metron_mpack.yml
-- include: elasticsearch_mpack.yml
 
-- name: start ambari server
-  service:
-    name: ambari-server
-    state: restarted
+- name: Install MySQL Connector
+  yum: name=mysql-connector-java
+
+- shell: ln -s /usr/share/java/mysql-connector-java.jar /var/lib/ambari-server/resources/mysql-connector-java.jar
