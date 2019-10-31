@@ -93,33 +93,33 @@ public abstract class AbstractLocalImporter<OPTIONS_T extends Enum<OPTIONS_T> & 
                                , int numThreads
                                , boolean quiet
                                ) throws IOException {
-    inputs.stream().map(input -> resolveLocation(input, fs))
-                   .forEach( loc -> {
-                      final Progress progress = new Progress();
-                      if(!quiet) {
-                        System.out.println("\nProcessing " + loc.toString());
-                      }
-                      try (Stream<String> stream = ReaderSpliterator.lineStream(loc.openReader(), batchSize)) {
-                        ForkJoinPool forkJoinPool = new ForkJoinPool(numThreads);
-                        forkJoinPool.submit(() ->
-                          stream.forEach(input ->  {
-                                    try {
-                                      extract(state.get(), input);
-                                      if (!quiet) {
-                                        progress.update();
-                                      }
-                                    }
-                                    catch(IOException e) {
-                                      throw new IllegalStateException("Unable to continue: " + e.getMessage(), e);
-                                    }
-                                  }
-                                       )
-                               ).get();
-                             } catch (Exception e) {
-                               throw new IllegalStateException(e.getMessage(), e);
-                             }
-                                  }
-                   );
+    inputs.stream()
+            .map(input -> resolveLocation(input, fs))
+            .forEach(loc -> extractFromLocation(loc, state, batchSize, numThreads, quiet));
+  }
+
+  private void extractFromLocation(Location location, ThreadLocal<STATE_T> state, int batchSize, int numThreads, boolean quiet) {
+      final Progress progress = new Progress();
+      if(!quiet) {
+          System.out.println("\nProcessing " + location.toString());
+      }
+      try (Stream<String> stream = ReaderSpliterator.lineStream(location.openReader(), batchSize)) {
+          ForkJoinPool forkJoinPool = new ForkJoinPool(numThreads);
+          forkJoinPool.submit(() -> stream.parallel().forEach(line -> extractLine(line, state, progress, quiet))).get();
+      } catch (Exception e) {
+          throw new IllegalStateException(e.getMessage(), e);
+      }
+  }
+
+  private void extractLine(String line, ThreadLocal<STATE_T> state, Progress progress, boolean quiet) {
+      try {
+          extract(state.get(), line);
+          if (!quiet) {
+              progress.update();
+          }
+      } catch(IOException e) {
+          throw new IllegalStateException("Unable to continue: " + e.getMessage(), e);
+      }
   }
 
   public void extractWholeFiles(List<String> inputs, FileSystem fs, ThreadLocal<STATE_T> state, boolean quiet) throws IOException {
