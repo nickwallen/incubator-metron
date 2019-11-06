@@ -30,6 +30,9 @@ import org.apache.metron.dataloads.nonbulk.flatfile.writer.InvalidWriterOutput;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -103,9 +106,12 @@ public abstract class AbstractLocalImporter<OPTIONS_T extends Enum<OPTIONS_T> & 
       if(!quiet) {
           System.out.println("\nProcessing " + location.toString());
       }
-      try (Stream<String> stream = ReaderSpliterator.lineStream(location.openReader(), batchSize)) {
+//      try (Stream<String> stream = ReaderSpliterator.lineStream(location.openReader(), batchSize)) {
+      try (Stream<String> stream = Files.lines(Paths.get(location.toString()))) {
+          // parallelize the stream using a dedicated, non-shared thread pool
+          Runnable task = () -> stream.parallel().forEach(line -> extractLine(line, state, progress, quiet));
           ForkJoinPool forkJoinPool = new ForkJoinPool(numThreads);
-          forkJoinPool.submit(() -> stream.parallel().forEach(line -> extractLine(line, state, progress, quiet))).get();
+          forkJoinPool.submit(task).get();
       } catch (Exception e) {
           throw new IllegalStateException(e.getMessage(), e);
       }
