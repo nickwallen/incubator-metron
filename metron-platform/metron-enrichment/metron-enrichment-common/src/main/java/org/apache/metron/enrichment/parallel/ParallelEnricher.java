@@ -19,6 +19,7 @@ package org.apache.metron.enrichment.parallel;
 
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.base.Joiner;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
 import org.apache.metron.common.configuration.enrichment.handler.ConfigHandler;
@@ -29,6 +30,7 @@ import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
 import org.json.simple.JSONObject;
 
+import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,8 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
 
@@ -197,7 +198,13 @@ public class ParallelEnricher {
             }
           };
           //add the Future to the task list
-          taskList.add(CompletableFuture.supplyAsync( supplier, ConcurrencyContext.getExecutor()));
+          CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor())
+          CompletableFuture<JSONObject> futureWithTimeout = new CompletableFuture<>().acceptEitherAsync(
+                  // TODO want default value after a timeout
+                  timeoutAfter(1, TimeUnit.SECONDS),
+                  future.get());
+
+          taskList.add(futureWithTimeout);
         }
       }
     }
@@ -215,6 +222,37 @@ public class ParallelEnricher {
     }
     return ret;
   }
+
+  /**
+   *
+   * http://iteratrlearning.com/java9/2016/09/13/java9-timeouts-completablefutures.html
+   * https://www.nurkiewicz.com/2014/12/asynchronous-timeouts-with.html
+   *
+   * @param duration
+   * @param <T>
+   * @return
+   */
+  public static <T> CompletableFuture<T> failAfter(Duration duration) {
+    final CompletableFuture<T> promise = new CompletableFuture<>();
+    delayer.schedule(() -> {
+      final TimeoutException ex = new TimeoutException("Timeout after " + duration);
+      return promise.completeExceptionally(ex);
+    }, duration.toMillis(), TimeUnit.MILLISECONDS);
+    return promise;
+  }
+
+  // TODO want to return a default value of there is a timeout
+  private static CompletableFuture<JSONObject> timeoutAfter(long timeout, TimeUnit unit) {
+    CompletableFuture<JSONObject> result = new CompletableFuture<>();
+    delayer.schedule(() -> result.completeExceptionally(new TimeoutException()), timeout, unit);
+    return result;
+  }
+
+  private static final ScheduledExecutorService delayer = Executors.newScheduledThreadPool(1,
+                  new ThreadFactoryBuilder()
+                          .setDaemon(true)
+                          .setNameFormat("failAfter-%d")
+                          .build());
 
   private static JSONObject join(JSONObject left, JSONObject right) {
     JSONObject message = new JSONObject();
@@ -250,7 +288,9 @@ public class ParallelEnricher {
   ) {
     CompletableFuture[] cfs = futures.toArray(new CompletableFuture[futures.size()]);
     CompletableFuture<Void> future = CompletableFuture.allOf(cfs);
-    return future.thenApply(aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
+    return future.
+            applyToEither(timeoutAfter(1, TimeUnit.SECONDS),
+                    aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
   }
 
   /**
