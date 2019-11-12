@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -198,13 +199,13 @@ public class ParallelEnricher {
             }
           };
           //add the Future to the task list
-          CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor())
-          CompletableFuture<JSONObject> futureWithTimeout = new CompletableFuture<>().acceptEitherAsync(
-                  // TODO want default value after a timeout
-                  timeoutAfter(1, TimeUnit.SECONDS),
-                  future.get());
-
-          taskList.add(futureWithTimeout);
+          CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
+          taskList.add(future);
+//          CompletableFuture<JSONObject> futureWithTimeout = new CompletableFuture<>().acceptEitherAsync(
+//                  // TODO want default value after a timeout
+//                  timeoutAfter(1, TimeUnit.SECONDS),
+//                  future.get());
+//          taskList.add(futureWithTimeout);
         }
       }
     }
@@ -241,10 +242,17 @@ public class ParallelEnricher {
     return promise;
   }
 
-  // TODO want to return a default value of there is a timeout
-  private static CompletableFuture<JSONObject> timeoutAfter(long timeout, TimeUnit unit) {
-    CompletableFuture<JSONObject> result = new CompletableFuture<>();
-    delayer.schedule(() -> result.completeExceptionally(new TimeoutException()), timeout, unit);
+  /**
+   * Returns a default value after a fixed period of time.
+   *
+   * @param timeout The timeout after which a default value is returned.
+   * @param units The units of the timeout value.
+   * @param defaultValue The default value returned if the timeout is exceeded.
+   * @return
+   */
+  private static CompletableFuture<Void> timeoutAfter(long timeout, TimeUnit units, JSONObject defaultValue) {
+    CompletableFuture<Void> result = new CompletableFuture<>();
+    delayer.schedule(() -> result.completeExceptionally(new TimeoutException()), timeout, units);
     return result;
   }
 
@@ -288,9 +296,18 @@ public class ParallelEnricher {
   ) {
     CompletableFuture[] cfs = futures.toArray(new CompletableFuture[futures.size()]);
     CompletableFuture<Void> future = CompletableFuture.allOf(cfs);
-    return future.
-            applyToEither(timeoutAfter(1, TimeUnit.SECONDS),
-                    aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
+    Function<Void, JSONObject> fn = aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp);
+
+    // TODO timeout should come from configuration
+    long timeout = 0;
+    TimeUnit timeoutUnits = TimeUnit.NANOSECONDS;
+    if(timeout > 0) {
+      JSONObject defaultValue = new JSONObject();
+      return future.applyToEither(timeoutAfter(timeout, timeoutUnits, defaultValue), fn);
+
+    } else {
+      return future.thenApply(fn);
+    }
   }
 
   /**
