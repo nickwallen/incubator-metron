@@ -48,6 +48,7 @@ public class ParallelEnricherTest {
                       "map" : "{ 'blah' : 1}"
                       ,"one" : "MAP_GET('blah', map)"
                       ,"foo": "1 + 1"
+                      ,"sleep":"SLEEP(10000)"
                       }
           ,"ALL_CAPS" : "TO_UPPER(source.type)"
         }

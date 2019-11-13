@@ -221,38 +221,20 @@ public class ParallelEnricher {
   }
 
   /**
-   *
-   * http://iteratrlearning.com/java9/2016/09/13/java9-timeouts-completablefutures.html
-   * https://www.nurkiewicz.com/2014/12/asynchronous-timeouts-with.html
-   *
-   * @param duration
-   * @param <T>
-   * @return
-   */
-  public static <T> CompletableFuture<T> failAfter(Duration duration) {
-    final CompletableFuture<T> promise = new CompletableFuture<>();
-    delayer.schedule(() -> {
-      final TimeoutException ex = new TimeoutException("Timeout after " + duration);
-      return promise.completeExceptionally(ex);
-    }, duration.toMillis(), TimeUnit.MILLISECONDS);
-    return promise;
-  }
-
-  /**
    * Creates a {@link CompletableFuture} that will timeout and return a default value
    * after a fixed period of time.
    *
+   * @see http://iteratrlearning.com/java9/2016/09/13/java9-timeouts-completablefutures.html
+   * @see https://www.nurkiewicz.com/2014/12/asynchronous-timeouts-with.html
+   *
    * @param timeout The timeout value.
-   * @param units The units of the timeout value.
+   * @param timeoutUnits The units of the timeout value.
    * @param defaultValue The default value returned when the timeout is exceeded.
    * @return A {@link CompletableFuture}.
    */
-  private static CompletableFuture<Void> timeoutAfter(long timeout, TimeUnit units, JSONObject defaultValue) {
-
-    // TODO need to return the defaultValue
-
-    CompletableFuture<Void> result = new CompletableFuture<>();
-    delayer.schedule(() -> result.completeExceptionally(new TimeoutException()), timeout, units);
+  private static CompletableFuture<JSONObject> timeoutAfter(long timeout, TimeUnit timeoutUnits, JSONObject defaultValue) {
+    CompletableFuture<JSONObject> result = new CompletableFuture<>();
+    delayer.schedule(() -> result.complete(defaultValue), timeout, timeoutUnits);
     return result;
   }
 
@@ -295,21 +277,20 @@ public class ParallelEnricher {
           , BinaryOperator<JSONObject> reduceOp
   ) {
     CompletableFuture<JSONObject>[] cfs = futures.toArray(new CompletableFuture[futures.size()]);
-    CompletableFuture<Void> future = CompletableFuture.allOf(cfs);
-    Function<Void, JSONObject> fn = aVoid -> futures
-            .stream()
-            .map(CompletableFuture::join)
-            .reduce(identity, reduceOp);
+    CompletableFuture<Void> enrichments = CompletableFuture.allOf(cfs);
 
     // TODO timeout should come from configuration
-    long timeout = 3;
-    TimeUnit timeoutUnits = TimeUnit.SECONDS;
+    long timeout = 1;
+    TimeUnit timeoutUnits = TimeUnit.NANOSECONDS;
+    JSONObject defaultValue = new JSONObject();
     if(timeout > 0) {
-      JSONObject defaultValue = new JSONObject();
-      return future.applyToEither(timeoutAfter(timeout, timeoutUnits, defaultValue), fn);
+      // the enrichments must complete by the given timeout, otherwise a default value is returned
+      CompletableFuture<Object> withTimeout = CompletableFuture.anyOf(enrichments, timeoutAfter(timeout, timeoutUnits, defaultValue));
+      return withTimeout.thenApply(obj -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
 
     } else {
-      return future.thenApply(fn);
+      // no timeout
+      return enrichments.thenApply(aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
     }
   }
 
