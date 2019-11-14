@@ -38,29 +38,6 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ParallelEnricherTest {
-  /**
-   * {
-  "enrichment": {
-    "fieldMap": {
-      "stellar" : {
-        "config" : {
-          "numeric" : {
-                      "map" : "{ 'blah' : 1}"
-                      ,"one" : "MAP_GET('blah', map)"
-                      ,"foo": "1 + 1"
-                      ,"sleep":"SLEEP(10000)"
-                      }
-          ,"ALL_CAPS" : "TO_UPPER(source.type)"
-        }
-      }
-    }
-  ,"fieldToTypeMap": { }
-  },
-  "threatIntel": { }
-}
-   */
-  @Multiline
-  public static String goodConfig;
 
   private static ParallelEnricher enricher;
   private static Context stellarContext;
@@ -122,6 +99,30 @@ public class ParallelEnricherTest {
     enricher = new ParallelEnricher(enrichmentsByType, infrastructure, false);
   }
 
+  /**
+   *
+   * {
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "numeric": {
+   *             "map": "{ 'blah' : 1}",
+   *             "one": "MAP_GET('blah', map)",
+   *             "foo": "1 + 1"
+   *           },
+   *           "ALL_CAPS": "TO_UPPER(source.type)"
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {}
+   *   },
+   *   "threatIntel": {}
+   * }
+   */
+  @Multiline
+  public static String goodConfig;
+
   @Test
   public void testCacheHit() throws Exception {
     numAccesses.set(0);
@@ -160,16 +161,19 @@ public class ParallelEnricherTest {
     Assert.assertTrue(result.getResult().containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(result.getResult().containsKey("parallelenricher.enrich.end.ts"));
   }
-/**
+
+  /**
    * {
-  "enrichment": {
-    "fieldMap": {
-      "dummy" : ["notthere"]
-    }
-  ,"fieldToTypeMap": { }
-  },
-  "threatIntel": { }
-}
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "dummy": [
+   *         "notthere"
+   *       ]
+   *     },
+   *     "fieldToTypeMap": {}
+   *   },
+   *   "threatIntel": {}
+   * }
    */
   @Multiline
   public static String nullConfig;
@@ -194,26 +198,26 @@ public class ParallelEnricherTest {
 
   /**
    * {
-  "enrichment": {
-    "fieldMap": {
-      "stellar" : {
-        "config" : {
-          "numeric" : [
-                      "map := { 'blah' : 1}"
-                      ,"one := MAP_GET('blah', map)"
-                      ,"foo := 1 + 1"
-                      ]
-          ,"ALL_CAPS" : "TO_UPPER(source.type)"
-          ,"errors" : [
-            "error := 1/0"
-          ]
-        }
-      }
-    }
-  ,"fieldToTypeMap": { }
-  },
-  "threatIntel": { }
-}
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "numeric": [
+   *             "map := { 'blah' : 1}",
+   *             "one := MAP_GET('blah', map)",
+   *             "foo := 1 + 1"
+   *           ],
+   *           "ALL_CAPS": "TO_UPPER(source.type)",
+   *           "errors": [
+   *             "error := 1/0"
+   *           ]
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {}
+   *   },
+   *   "threatIntel": {}
+   * }
    */
   @Multiline
   public static String badConfig;
@@ -244,14 +248,16 @@ public class ParallelEnricherTest {
 
   /**
    * {
-  "enrichment": {
-    "fieldMap": {
-      "hbaseThreatIntel" : [ "ip_src_addr"]
-      }
-    ,"fieldToTypeMap": { }
-  },
-  "threatIntel": { }
-}
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "hbaseThreatIntel": [
+   *         "ip_src_addr"
+   *       ]
+   *     },
+   *     "fieldToTypeMap": {}
+   *   },
+   *   "threatIntel": {}
+   * }
    */
   @Multiline
   public static String badConfigWrongEnrichmentType;
@@ -272,5 +278,58 @@ public class ParallelEnricherTest {
               , "Unable to find an adapter for hbaseThreatIntel, possible adapters are: " + Joiner.on(",").join(enrichmentsByType.keySet())
       );
     }
+  }
+
+  /**
+   * {
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "numeric": {
+   *             "sleep": "SLEEP(5000)"
+   *           },
+   *           "ALL_CAPS": "TO_UPPER(source.type)"
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {}
+   *   },
+   *   "threatIntel": {}
+   * }
+   */
+  @Multiline
+  public static String timeoutConfig;
+
+  @Test
+  public void testTimeoutExceeded() throws Exception {
+    // the enrichments will sleep for 5 seconds, which exceeds the enrichment timeout
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(timeoutConfig, SensorEnrichmentConfig.class);
+    config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
+
+    // attempt to enrich the message which will exceed the enrichment timeout
+    final String sourceType = "test";
+    JSONObject message = new JSONObject() {{
+      put(Constants.SENSOR_TYPE, "test");
+    }};
+    ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
+
+    // validate the message after enrichment
+    JSONObject enrichedMessage = result.getResult();
+    Assert.assertEquals(7, enrichedMessage.size());
+    Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
+    Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+
+    // TODO the timout should be registered as an enrichment error
+//    Assert.assertEquals(1, result.getEnrichmentErrors().size());
+  }
+
+  @Test
+  public void testTimeoutNotExceeded() throws Exception {
+    // TODO
   }
 }
