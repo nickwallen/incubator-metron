@@ -157,9 +157,10 @@ public class ParallelEnricher {
     List<Map.Entry<Object, Throwable>> errors = Collections.synchronizedList(new ArrayList<>());
     for(Map.Entry<String, List<JSONObject>> task : tasks.entrySet()) {
       //task is the list of enrichment tasks for the task.getKey() adapter
-      EnrichmentAdapter<CacheKey> adapter = enrichmentsByType.get(task.getKey());
+      String enrichmentAdapter = task.getKey();
+      EnrichmentAdapter<CacheKey> adapter = enrichmentsByType.get(enrichmentAdapter);
       if(adapter == null) {
-        throw new IllegalStateException("Unable to find an adapter for " + task.getKey()
+        throw new IllegalStateException("Unable to find an adapter for " + enrichmentAdapter
                 + ", possible adapters are: " + Joiner.on(",").join(enrichmentsByType.keySet()));
       }
       message.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".begin.ts", "" + System.currentTimeMillis());
@@ -194,24 +195,24 @@ public class ParallelEnricher {
               adjustedKeys.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".end.ts", "" + System.currentTimeMillis());
               return adjustedKeys;
             } catch (Throwable e) {
-              JSONObject errorMessage = new JSONObject();
-              errorMessage.putAll(m);
-              errorMessage.put(Constants.SENSOR_TYPE, sensorType );
-              errors.add(new AbstractMap.SimpleEntry<>(errorMessage, new IllegalStateException(strategy + " error with " + task.getKey() + " failed: " + e.getMessage(), e)));
+              errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
               return new JSONObject();
             }
           };
 
           //add the Future to the task list
-          // TODO Approach 3: Timeout on each individual enrichment expression?
+          // TODO Approach 3: Timeout on each expression block
           long timeout = 3;
           TimeUnit timeoutUnits = TimeUnit.SECONDS;
           JSONObject defaultValue = new JSONObject();
           defaultValue.put(cacheKey.getField(), "default-value");
 
           CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
-//          taskList.add(future);
-          CompletableFuture<JSONObject> futureWithDefault = withDefault(future, defaultValue, timeout, timeoutUnits);
+          CompletableFuture<JSONObject> futureWithDefault = withDefault(future, defaultValue, timeout, timeoutUnits)
+                  .exceptionally(e -> {
+                    errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
+                    return new JSONObject();
+                  });
           taskList.add(futureWithDefault);
         }
       }
@@ -246,19 +247,27 @@ public class ParallelEnricher {
     return ret;
   }
 
+  private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, String enrichmentAdapter, JSONObject m, Throwable e) {
+    JSONObject errorMessage = new JSONObject();
+    errorMessage.putAll(m);
+    errorMessage.put(Constants.SENSOR_TYPE, sensorType );
+    Exception exception = new IllegalStateException(strategy + " error with " + enrichmentAdapter + " failed: " + e.getMessage(), e);
+    return new AbstractMap.SimpleEntry<>(errorMessage, exception);
+  }
 
   @SuppressWarnings("unchecked")
   private static <T> CompletableFuture<T> withDefault(CompletableFuture<T> cf, T defaultValue, long timeout, TimeUnit timeoutUnits) {
     return (CompletableFuture<T>) CompletableFuture.anyOf(
             cf.exceptionally(ignoredException -> defaultValue),
-            delayedValue(defaultValue, timeout, timeoutUnits));
+            timeoutAfter(timeout, timeoutUnits));
+//            delayedValue(defaultValue, timeout, timeoutUnits));
   }
 
   private static final ScheduledExecutorService EXECUTOR = Executors.newSingleThreadScheduledExecutor();
 
-  public static <T> CompletableFuture<T> delayedValue(final T value, long timeout, TimeUnit timeoutUnits) {
+  public static <T> CompletableFuture<T> delayedValue(T defaultValue, long timeout, TimeUnit timeoutUnits) {
     final CompletableFuture<T> result = new CompletableFuture<>();
-    EXECUTOR.schedule(() -> result.complete(value), timeout, timeoutUnits);
+    EXECUTOR.schedule(() -> result.complete(defaultValue), timeout, timeoutUnits);
     return result;
   }
 

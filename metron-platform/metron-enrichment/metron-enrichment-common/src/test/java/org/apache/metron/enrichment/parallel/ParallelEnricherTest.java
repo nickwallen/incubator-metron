@@ -291,7 +291,7 @@ public class ParallelEnricherTest {
    *             "lost-because-of-timeout": "2 + 2"
    *           },
    *           "block-2": {
-   *              "other-fast-enrichment": "TO_UPPER(source.type)"
+   *              "other-fast-enrichment": "4 + 4"
    *           }
    *         }
    *       }
@@ -319,8 +319,9 @@ public class ParallelEnricherTest {
 
     // validate the message after enrichment
     JSONObject enrichedMessage = result.getResult();
-//    Assert.assertEquals(7, enrichedMessage.size());
+    Assert.assertEquals(8, enrichedMessage.get("other-fast-enrichment"));
     Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
+    Assert.assertFalse(enrichedMessage.containsKey("lost-because-of-timeout"));
     Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
