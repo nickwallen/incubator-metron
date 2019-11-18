@@ -321,6 +321,7 @@ public class ParallelEnricherTest {
     // only 'block1' has a "slow" enrichment that will trigger a timeout. this causes all 'block1' enrichments to be
     // ignored because they cannot all be completed within the timeout
     Assert.assertFalse(enrichedMessage.containsKey("block1-fast-enrichment"));
+    Assert.assertFalse(enrichedMessage.containsKey("block1-slow-enrichment"));
 
     // the enrichments in 'block2' are not affected by the timeout because they are in a separate block
     Assert.assertEquals(8, enrichedMessage.get("block2-enrichment"));
