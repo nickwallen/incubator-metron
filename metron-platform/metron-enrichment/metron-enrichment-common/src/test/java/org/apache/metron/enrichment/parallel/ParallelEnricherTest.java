@@ -287,11 +287,11 @@ public class ParallelEnricherTest {
    *       "stellar": {
    *         "config": {
    *           "block-1": {
-   *             "slow-enrichhment": "SLEEP(5000)",
-   *             "lost-because-of-timeout": "2 + 2"
+   *             "block1-slow-enrichhment": "SLEEP(5000)",
+   *             "block1-fast-enrichment": "2 + 2"
    *           },
    *           "block-2": {
-   *              "other-fast-enrichment": "4 + 4"
+   *              "block2-enrichment": "4 + 4"
    *           }
    *         }
    *       }
@@ -313,28 +313,32 @@ public class ParallelEnricherTest {
     // attempt to enrich the message which will exceed the enrichment timeout
     final String sourceType = "test";
     JSONObject message = new JSONObject() {{
-      put(Constants.SENSOR_TYPE, "test");
+      put(Constants.SENSOR_TYPE, sourceType);
     }};
     ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
-
-    // validate the message after enrichment
     JSONObject enrichedMessage = result.getResult();
-    Assert.assertEquals(8, enrichedMessage.get("other-fast-enrichment"));
+
+    // only 'block1' has a "slow" enrichment that will trigger a timeout. this causes all 'block1' enrichments to be
+    // ignored because they cannot all be completed within the timeout
+    Assert.assertFalse(enrichedMessage.containsKey("block1-fast-enrichment"));
+
+    // the enrichments in 'block2' are not affected by the timeout because they are in a separate block
+    Assert.assertEquals(8, enrichedMessage.get("block2-enrichment"));
+
+    // an enrichment error should indicate that a timeout occurred
+    Assert.assertEquals(1, result.getEnrichmentErrors().size());
+
     Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
-    Assert.assertFalse(enrichedMessage.containsKey("lost-because-of-timeout"));
     Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
-//    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.error"));
-
-    // TODO the timout should be registered as an enrichment error
-    Assert.assertEquals(1, result.getEnrichmentErrors().size());
   }
 
   @Test
   public void testTimeoutNotExceeded() throws Exception {
-    // TODO
+    Assert.fail("implement me");
   }
 }
