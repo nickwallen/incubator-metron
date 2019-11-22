@@ -17,29 +17,20 @@
  */
 package org.apache.metron.management;
 
-import com.fasterxml.jackson.core.JsonParser;
-import com.google.common.collect.ImmutableMap;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
-import org.apache.metron.enrichment.adapters.geo.GeoAdapter;
 import org.apache.metron.enrichment.adapters.stellar.StellarAdapter;
 import org.apache.metron.enrichment.cache.CacheKey;
-import org.apache.metron.enrichment.configuration.Enrichment;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.parallel.ConcurrencyContext;
 import org.apache.metron.enrichment.parallel.EnrichmentStrategies;
-import org.apache.metron.enrichment.parallel.EnrichmentStrategy;
 import org.apache.metron.enrichment.parallel.ParallelEnricher;
 import org.apache.metron.profiler.client.stellar.Util;
 import org.apache.metron.stellar.dsl.BaseStellarFunction;
-import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.Stellar;
-import org.apache.metron.stellar.dsl.StellarFunction;
-import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,6 +67,10 @@ public class EnrichmentFunctions {
 
         public ParallelEnricher.EnrichmentResult enrich(JSONObject message) throws ExecutionException, InterruptedException {
             return enricher.apply(message, enrichmentStrategy, enrichmentConfig, null);
+        }
+
+        public SensorEnrichmentConfig getEnrichmentConfig() {
+            return enrichmentConfig;
         }
     }
 
