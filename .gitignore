@@ -32,3 +32,7 @@ repodata/
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Gitpod
+.factorypath
+.theia
