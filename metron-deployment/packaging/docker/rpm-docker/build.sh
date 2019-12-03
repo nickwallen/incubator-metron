@@ -38,14 +38,14 @@ fi
 
 rm -rf SRPMS/ RPMS/
 
-QA_SKIP_BUILD_ROOT=1 rpmbuild -v -ba --define "_topdir $(pwd)" --define "_version ${VERSION}" --define "_prerelease ${PRERELEASE}" SPECS/metron.spec
+QA_SKIP_BUILD_ROOT=1 time rpmbuild -v -ba --define "_topdir $(pwd)" --define "_version ${VERSION}" --define "_prerelease ${PRERELEASE}" SPECS/metron.spec
 if [ $? -ne 0 ]; then
   echo "RPM build errors encountered" >&2
   exit 1
 fi
 
 if [ -z "${SKIP_RPMLINT}" ] || [ $SKIP_RPMLINT -eq 0 ]; then
-  rpmlint -i SPECS/metron.spec RPMS/*/metron* SRPMS/metron]
+  time rpmlint -i SPECS/metron.spec RPMS/*/metron* SRPMS/metron]
 else
   echo -n "SKIP_RPMLINT is non null and not equal to 0 - bypassing rpmlint"
 fi
