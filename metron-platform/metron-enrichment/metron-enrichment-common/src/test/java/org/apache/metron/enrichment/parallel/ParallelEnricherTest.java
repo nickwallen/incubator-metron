@@ -405,7 +405,7 @@ public class ParallelEnricherTest {
    *       "stellar": {
    *         "config": {
    *           "block-1": {
-   *             "block1-enrichment": "SLEEP(100)"
+   *              "block1-enrichment": "SLEEP(100)"
    *           },
    *           "block-2": {
    *              "block2-enrichment": "SLEEP(3000)"
@@ -460,7 +460,7 @@ public class ParallelEnricherTest {
    *       "stellar": {
    *         "config": {
    *           "block-1": {
-   *             "block1-enrichment": "SLEEP(100)"
+   *              "block1-enrichment": "SLEEP(100)"
    *           },
    *           "block-2": {
    *              "block2-enrichment": "SLEEP(100)"

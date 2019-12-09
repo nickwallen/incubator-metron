@@ -34,7 +34,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.invoke.MethodHandles;
-import java.time.Duration;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,9 +44,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -168,6 +171,7 @@ public class ParallelEnricher {
                 + ", possible adapters are: " + Joiner.on(",").join(enrichmentsByType.keySet()));
       }
       message.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".begin.ts", "" + System.currentTimeMillis());
+      final Optional<Long> blockTimeout = getEnrichmentBlockTimeout(config);
       for(JSONObject m : task.getValue()) {
         /* now for each unit of work (each of these only has one element in them)
          * the key is the field name and the value is value associated with that field.
@@ -205,13 +209,9 @@ public class ParallelEnricher {
           };
 
           CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
-          Optional<Long> timeout = getEnrichmentBlockTimeout(config);
-          if(timeout.isPresent() && timeout.get() > 0L) {
-            JSONObject defaultValue = new JSONObject();
-            defaultValue.put(cacheKey.getField(), "default-value");
-
-            // wrap the original future to ensure the enrichment 'block' takes no longer than the timeout
-            future = withDefault(future, defaultValue, timeout.get(), TimeUnit.MILLISECONDS)
+          if(blockTimeout.isPresent() && blockTimeout.get() > 0L) {
+            // ensure the enrichment 'block' takes no longer than the enrichment block timeout
+            future = withTimeout(future, blockTimeout.get())
                     .exceptionally(e -> {
                       errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
                       return new JSONObject();
@@ -228,21 +228,22 @@ public class ParallelEnricher {
       return new EnrichmentResult(message, errors);
     }
 
+    CompletableFuture<JSONObject> enrichments = all(taskList, message, (left, right) -> join(left, right));
     JSONObject enrichedMessage = new JSONObject();
-    Optional<Long> timeout = getEnrichmentMessageTimeout(config);
+    Optional<Long> messageTimeout = getEnrichmentMessageTimeout(config);
     try {
-      CompletableFuture<JSONObject> enrichments = all(taskList, message, (left, right) -> join(left, right));
-      if(timeout.isPresent() && timeout.get() > 0) {
-        // enforce the overall message timeout
-        enrichedMessage = enrichments.get(timeout.get(), TimeUnit.MILLISECONDS);
+      if(messageTimeout.isPresent() && messageTimeout.get() > 0) {
+        // enforce the enrichment message timeout
+        enrichedMessage = enrichments.get(messageTimeout.get(), TimeUnit.MILLISECONDS);
       } else {
+        // no enrichment message timeout
         enrichedMessage = enrichments.get();
       }
 
     } catch(TimeoutException e) {
-      LOG.debug("Enrichment message timeout exceeded; {} = {} milliseconds", ENRICHMENT_MESSAGE_TIMEOUT, timeout);
+      LOG.debug("Enrichment message timeout exceeded; {} = {} milliseconds", ENRICHMENT_MESSAGE_TIMEOUT, messageTimeout);
       enrichedMessage = message;
-      errors.add(createError(strategy, sensorType, enrichedMessage, e));
+      errors.add(createError(sensorType, enrichedMessage, e));
 
     } finally {
       enrichedMessage.put(getClass().getSimpleName().toLowerCase() + ".enrich.end.ts", "" + System.currentTimeMillis());
@@ -284,54 +285,49 @@ public class ParallelEnricher {
     return new AbstractMap.SimpleEntry<>(errorMessage, exception);
   }
 
-  private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, JSONObject m, Throwable e) {
+  private static Map.Entry<Object, Throwable> createError(String sensorType, JSONObject m, Throwable e) {
     JSONObject errorMessage = new JSONObject();
     errorMessage.putAll(m);
     errorMessage.put(Constants.SENSOR_TYPE, sensorType );
-    Exception exception = new IllegalStateException(strategy + " failed: " + e.getMessage(), e);
-    return new AbstractMap.SimpleEntry<>(errorMessage, exception);
-  }
-
-  @SuppressWarnings("unchecked")
-  private static <T> CompletableFuture<T> withDefault(CompletableFuture<T> cf, T defaultValue, long timeout, TimeUnit timeoutUnits) {
-    return (CompletableFuture<T>) CompletableFuture.anyOf(
-            cf.exceptionally(ignoredException -> defaultValue),
-            timeoutAfter(timeout, timeoutUnits));
-//            delayedValue(defaultValue, timeout, timeoutUnits));
-  }
-
-  private static final ScheduledExecutorService EXECUTOR = Executors.newSingleThreadScheduledExecutor();
-
-  public static <T> CompletableFuture<T> delayedValue(T defaultValue, long timeout, TimeUnit timeoutUnits) {
-    final CompletableFuture<T> result = new CompletableFuture<>();
-    EXECUTOR.schedule(() -> result.complete(defaultValue), timeout, timeoutUnits);
-    return result;
+    return new AbstractMap.SimpleEntry<>(errorMessage, e);
   }
 
   /**
-   * Creates a {@link CompletableFuture} that will timeout and return a default value
-   * after a fixed period of time.
+   * Creates a future that will throw an exception if computation of the original future
+   * takes longer than the timeout.
    *
    * http://iteratrlearning.com/java9/2016/09/13/java9-timeouts-completablefutures.html
    * https://www.nurkiewicz.com/2014/12/asynchronous-timeouts-with.html
    *
+   * @param future The original future.
+   * @param timeoutMillis The maximum time to wait for the original future to compute.
+   * @return A {@link CompletableFuture} that will execute no longer than the timeout.
+   */
+  @SuppressWarnings("unchecked")
+  private static <T> CompletableFuture<T> withTimeout(CompletableFuture<T> future, long timeoutMillis) {
+    return (CompletableFuture<T>) CompletableFuture.anyOf(future, timeoutAfter(timeoutMillis, TimeUnit.MILLISECONDS));
+  }
+
+  /**
+   * Creates a {@link CompletableFuture} that will throw an exception after a fixed
+   * period of time.
    * @param timeout The timeout value.
    * @param timeoutUnits The units of the timeout value.
    * @return A {@link CompletableFuture}.
    */
   private static <T> CompletableFuture<T> timeoutAfter(long timeout, TimeUnit timeoutUnits) {
     CompletableFuture<T> result = new CompletableFuture<>();
-    delayer.schedule(
+    timeoutScheduler.schedule(
             () -> result.completeExceptionally(new EnrichmentTimeoutException(timeout, timeoutUnits)),
             timeout,
             timeoutUnits);
     return result;
   }
 
-  private static final ScheduledExecutorService delayer = Executors.newScheduledThreadPool(1,
+  private static final ScheduledExecutorService timeoutScheduler = Executors.newScheduledThreadPool(1,
           new ThreadFactoryBuilder()
-                  .setDaemon(true)
                   .setNameFormat("enrichment-timeout-%d")
+                  .setDaemon(true)
                   .build());
 
   private static JSONObject join(JSONObject left, JSONObject right) {
@@ -351,7 +347,6 @@ public class ParallelEnricher {
     return message;
   }
 
-
   /**
    * Wait until all the futures complete and join the resulting JSONObjects using the supplied binary operator
    * and identity object.
@@ -366,32 +361,9 @@ public class ParallelEnricher {
           , JSONObject identity
           , BinaryOperator<JSONObject> reduceOp
   ) {
-    CompletableFuture<JSONObject>[] cfs = futures.toArray(new CompletableFuture[futures.size()]);
+    CompletableFuture[] cfs = futures.toArray(new CompletableFuture[futures.size()]);
     CompletableFuture<Void> future = CompletableFuture.allOf(cfs);
-    Function<Void, JSONObject> fn = aVoid -> futures
-            .stream()
-            .map(CompletableFuture::join)
-            .reduce(identity, reduceOp);
-
-    return future.thenApply(fn);
-
-//    // TODO timeout should come from configuration
-//    long timeout = 0;
-//    TimeUnit timeoutUnits = TimeUnit.SECONDS;
-//    if(timeout > 0) {
-//      // TODO Timeout Approach 1: Timeout can be enforced here, but timeout not treated like other enrichment errors
-//      return future
-//              .applyToEither(timeoutAfter(timeout, timeoutUnits), fn)
-//              .exceptionally(e -> handleTimeout(e, identity));
-//    } else {
-//      return future.thenApply(fn);
-//    }
-
-  }
-
-  private static JSONObject handleTimeout(Throwable e, JSONObject message) {
-    message.put(ParallelEnricher.class.getSimpleName().toLowerCase() + ".enrich.error", e.getMessage());
-    return message;
+    return future.thenApply(aVoid -> futures.stream().map(CompletableFuture::join).reduce(identity, reduceOp));
   }
 
   /**

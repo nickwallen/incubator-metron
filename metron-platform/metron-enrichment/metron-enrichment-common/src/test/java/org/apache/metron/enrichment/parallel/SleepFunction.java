@@ -26,9 +26,9 @@ import java.util.List;
 @Stellar(
         namespace = "",
         name = "SLEEP",
-        description = "Suspends execution for an interval of time. Only useful for testing.",
+        description = "Suspends execution for an interval of time. Only used for testing.",
         params = {
-                "milliseconds - The number of milliseconds to sleep for."
+                "millis - The number of milliseconds to sleep for."
         }
 )
 public class SleepFunction extends BaseStellarFunction {
@@ -38,7 +38,15 @@ public class SleepFunction extends BaseStellarFunction {
         if(args.size() != 1) {
             throw new IllegalArgumentException("Expected only one argument");
         }
-        long millis = ConversionUtils.convert(args.get(0), Long.class);
+
+        long millis = 0L;
+        Object arg0 = args.get(0);
+        if(arg0 instanceof Number) {
+            millis = ((Number) arg0).longValue();
+        } else {
+            throw new IllegalArgumentException(("Expected 1 numeric argument."));
+        }
+
         try {
             Thread.sleep(millis);
         } catch(InterruptedException e) {
