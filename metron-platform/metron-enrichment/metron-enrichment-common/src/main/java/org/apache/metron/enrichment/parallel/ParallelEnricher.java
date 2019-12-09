@@ -214,6 +214,7 @@ public class ParallelEnricher {
 
             // if the block exceeds the timeout, create an enrichment error
             future = future.exceptionally(e -> {
+              LOG.debug("Enrichments in '{}' failed to complete within {} millisecond(s); guid={}", field, blockTimeout.get(), message.get(Constants.GUID));
               errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
             });
@@ -233,7 +234,7 @@ public class ParallelEnricher {
     JSONObject enrichedMessage = new JSONObject();
     Optional<Long> messageTimeout = getEnrichmentMessageTimeout(config);
     try {
-      if(messageTimeout.isPresent() && messageTimeout.get() > 0) {
+      if(messageTimeout.isPresent()) {
         // enforce the enrichment message timeout
         enrichedMessage = enrichments.get(messageTimeout.get(), TimeUnit.MILLISECONDS);
       } else {
@@ -242,7 +243,8 @@ public class ParallelEnricher {
       }
 
     } catch(TimeoutException e) {
-      LOG.debug("Enrichment message timeout exceeded; {} = {} milliseconds", ENRICHMENT_MESSAGE_TIMEOUT, messageTimeout);
+      LOG.debug("Enrichment failed to complete within timeout; guid={}, {}={} millis",
+              message.get(Constants.GUID), ENRICHMENT_MESSAGE_TIMEOUT, messageTimeout.get());
       enrichedMessage = message;
       errors.add(createError(sensorType, enrichedMessage, e));
 
@@ -268,14 +270,16 @@ public class ParallelEnricher {
   }
 
   private Optional<Long> getConfigurationValue(SensorEnrichmentConfig enrichmentConfig, String key) {
+    Optional<Long> result = Optional.empty();
     Map<String, Object> config = enrichmentConfig.getEnrichment().getConfig();
     if(config.containsKey(key)) {
       long timeout = ConversionUtils.convert(config.get(key), Long.class);
-      return Optional.of(timeout);
-
-    } else {
-      return Optional.empty();
+      if(timeout > 0) {
+        result = Optional.of(timeout);
+      }
     }
+
+    return result;
   }
 
   private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, String enrichmentAdapter, JSONObject m, Throwable e) {

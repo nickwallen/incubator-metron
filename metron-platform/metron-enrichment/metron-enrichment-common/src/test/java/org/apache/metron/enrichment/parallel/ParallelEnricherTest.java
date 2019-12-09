@@ -26,6 +26,7 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.adrianwalker.multilinestring.Multiline;
 import org.apache.metron.common.Constants;
@@ -314,6 +315,7 @@ public class ParallelEnricherTest {
     final String sourceType = "test";
     JSONObject message = new JSONObject() {{
       put(Constants.SENSOR_TYPE, sourceType);
+      put(Constants.GUID, UUID.randomUUID());
     }};
     ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
     JSONObject enrichedMessage = result.getResult();
@@ -376,6 +378,7 @@ public class ParallelEnricherTest {
     final String sourceType = "test";
     JSONObject message = new JSONObject() {{
       put(Constants.SENSOR_TYPE, sourceType);
+      put(Constants.GUID, UUID.randomUUID());
     }};
     ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
     JSONObject enrichedMessage = result.getResult();
@@ -434,6 +437,7 @@ public class ParallelEnricherTest {
     final String sourceType = "test";
     JSONObject message = new JSONObject() {{
       put(Constants.SENSOR_TYPE, sourceType);
+      put(Constants.GUID, UUID.randomUUID());
     }};
     ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
     JSONObject enrichedMessage = result.getResult();
@@ -490,6 +494,7 @@ public class ParallelEnricherTest {
     final String sourceType = "test";
     JSONObject message = new JSONObject() {{
       put(Constants.SENSOR_TYPE, sourceType);
+      put(Constants.GUID, UUID.randomUUID());
     }};
     ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
     JSONObject enrichedMessage = result.getResult();
