@@ -365,3 +365,4 @@ An example configuration for the YAF sensor is as follows:
 ```
 
 ThreatIntel alert levels are emitted as a new field "threat.triage.level." So for the example above, an incoming message that trips the `ip_src_addr` rule will have a new field threat.triage.level=10.
+
