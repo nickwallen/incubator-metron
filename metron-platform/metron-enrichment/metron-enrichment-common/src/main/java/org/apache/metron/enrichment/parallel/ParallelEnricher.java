@@ -210,12 +210,14 @@ public class ParallelEnricher {
 
           CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
           if(blockTimeout.isPresent() && blockTimeout.get() > 0L) {
-            // ensure the enrichment 'block' takes no longer than the enrichment block timeout
-            future = withTimeout(future, blockTimeout.get())
-                    .exceptionally(e -> {
-                      errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
-                      return new JSONObject();
-                    });
+            // ensure the enrichment 'block' takes no longer than the timeout
+            future = withTimeout(future, blockTimeout.get());
+
+            // if the block exceeds the timeout, create an enrichment error
+            future = future.exceptionally(e -> {
+              errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
+              return new JSONObject();
+            });
           }
 
           //add the Future to the task list
