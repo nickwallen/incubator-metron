@@ -164,10 +164,9 @@ public class ParallelEnricher {
     List<Map.Entry<Object, Throwable>> errors = Collections.synchronizedList(new ArrayList<>());
     for(Map.Entry<String, List<JSONObject>> task : tasks.entrySet()) {
       //task is the list of enrichment tasks for the task.getKey() adapter
-      String enrichmentAdapter = task.getKey();
-      EnrichmentAdapter<CacheKey> adapter = enrichmentsByType.get(enrichmentAdapter);
+      EnrichmentAdapter<CacheKey> adapter = enrichmentsByType.get(task.getKey());
       if(adapter == null) {
-        throw new IllegalStateException("Unable to find an adapter for " + enrichmentAdapter
+        throw new IllegalStateException("Unable to find an adapter for " + task.getKey()
                 + ", possible adapters are: " + Joiner.on(",").join(enrichmentsByType.keySet()));
       }
       message.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".begin.ts", "" + System.currentTimeMillis());
@@ -203,7 +202,7 @@ public class ParallelEnricher {
               adjustedKeys.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".end.ts", "" + System.currentTimeMillis());
               return adjustedKeys;
             } catch (Throwable e) {
-              errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
+              errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
             }
           };
@@ -215,7 +214,7 @@ public class ParallelEnricher {
 
             // if the block exceeds the timeout, create an enrichment error
             future = future.exceptionally(e -> {
-              errors.add(createError(strategy, sensorType, enrichmentAdapter, m, e));
+              errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
             });
           }
