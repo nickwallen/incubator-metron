@@ -37,6 +37,7 @@ import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.stellar.dsl.Context;
 import org.apache.metron.stellar.dsl.StellarFunctions;
 import org.json.simple.JSONObject;
+import org.junit.Assert;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
@@ -283,7 +284,7 @@ public class ParallelEnricherTest {
    *       "stellar": {
    *         "config": {
    *           "block-1": {
-   *             "block1-slow-enrichhment": "SLEEP(5000)",
+   *             "block1-slow-enrichment": "SLEEP(5000)",
    *             "block1-fast-enrichment": "2 + 2"
    *           },
    *           "block-2": {
@@ -292,18 +293,21 @@ public class ParallelEnricherTest {
    *         }
    *       }
    *     },
-   *     "fieldToTypeMap": {}
+   *     "fieldToTypeMap": {},
+   *     "config": {
+   *         "block.timeout.millis": 500
+   *     }
    *   },
    *   "threatIntel": {}
    * }
    */
   @Multiline
-  public static String timeoutConfig;
+  public static String blockTimeoutExceeded;
 
   @Test
-  public void testTimeoutExceeded() throws Exception {
-    // the enrichments will sleep for 5 seconds, which exceeds the enrichment timeout
-    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(timeoutConfig, SensorEnrichmentConfig.class);
+  public void testBlockTimeoutExceeded() throws Exception {
+    // the 'block1-slow-enrichment' will sleep for 5 seconds, which exceeds the block timeout of 1 second
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(blockTimeoutExceeded, SensorEnrichmentConfig.class);
     config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
 
     // attempt to enrich the message which will exceed the enrichment timeout
@@ -325,6 +329,7 @@ public class ParallelEnricherTest {
     // an enrichment error should indicate that a timeout occurred
     Assert.assertEquals(1, result.getEnrichmentErrors().size());
 
+    // other message fields
     Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
     Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.end.ts"));
@@ -334,8 +339,173 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
   }
 
+  /**
+   * {
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "block-1": {
+   *             "block1-slow-enrichment": "SLEEP(500)",
+   *             "block1-fast-enrichment": "2 + 2"
+   *           },
+   *           "block-2": {
+   *              "block2-enrichment": "4 + 4"
+   *           }
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {},
+   *     "config": {
+   *         "block.timeout.millis": 5000
+   *     }
+   *   },
+   *   "threatIntel": {}
+   * }
+   */
+  @Multiline
+  public static String blockTimeoutNotExceeded;
+
   @Test
-  public void testTimeoutNotExceeded() throws Exception {
-    Assert.fail("implement me");
+  public void testBlockTimeoutNotExceeded() throws Exception {
+    // the 'block1-slow-enrichment' will sleep for 5 seconds, which exceeds the block timeout of 1 second
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(blockTimeoutNotExceeded, SensorEnrichmentConfig.class);
+    config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
+
+    // attempt to enrich the message which will exceed the enrichment timeout
+    final String sourceType = "test";
+    JSONObject message = new JSONObject() {{
+      put(Constants.SENSOR_TYPE, sourceType);
+    }};
+    ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
+    JSONObject enrichedMessage = result.getResult();
+
+    // all enrichments should have been completed successfully within the timeout
+    Assert.assertEquals(500L, enrichedMessage.get("block1-slow-enrichment"));
+    Assert.assertEquals(4, enrichedMessage.get("block1-fast-enrichment"));
+    Assert.assertEquals(8, enrichedMessage.get("block2-enrichment"));
+
+    // no enrichment errors expected as the timeout should not have been reached
+    Assert.assertEquals(0, result.getEnrichmentErrors().size());
+
+    // other message fields
+    Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
+    Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("adapter.accessloggingstellaradapter.end.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+  }
+
+  /**
+   * {
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "block-1": {
+   *             "block1-enrichment": "SLEEP(100)"
+   *           },
+   *           "block-2": {
+   *              "block2-enrichment": "SLEEP(3000)"
+   *           }
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {},
+   *     "config": {
+   *         "message.timeout.millis": 500
+   *     }
+   *   },
+   *   "threatIntel": {}
+   * }
+   */
+  @Multiline
+  public static String messageTimeoutExceeded;
+
+  @Test
+  public void testMessageTimeoutExceeded() throws Exception {
+    // the 'block1-slow-enrichment' will sleep for 5 seconds, which exceeds the block timeout of 1 second
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(messageTimeoutExceeded, SensorEnrichmentConfig.class);
+    config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
+
+    // attempt to enrich the message which will exceed the enrichment timeout
+    final String sourceType = "test";
+    JSONObject message = new JSONObject() {{
+      put(Constants.SENSOR_TYPE, sourceType);
+    }};
+    ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
+    JSONObject enrichedMessage = result.getResult();
+
+    // all enrichments will be ignored as they cannot all be completed within the given message timeout
+    Assert.assertFalse(enrichedMessage.containsKey("block1-enrichment"));
+    Assert.assertFalse(enrichedMessage.containsKey("block2-enrichment"));
+
+    // an enrichment error should indicate that a timeout occurred
+    Assert.assertEquals(1, result.getEnrichmentErrors().size());
+
+    // other message fields
+    Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+  }
+
+  /**
+   * {
+   *   "enrichment": {
+   *     "fieldMap": {
+   *       "stellar": {
+   *         "config": {
+   *           "block-1": {
+   *             "block1-enrichment": "SLEEP(100)"
+   *           },
+   *           "block-2": {
+   *              "block2-enrichment": "SLEEP(100)"
+   *           }
+   *         }
+   *       }
+   *     },
+   *     "fieldToTypeMap": {},
+   *     "config": {
+   *         "message.timeout.millis": 5000
+   *     }
+   *   },
+   *   "threatIntel": {}
+   * }
+   */
+  @Multiline
+  public static String messageTimeoutNotExceeded;
+
+
+  @Test
+  public void testMessageTimeoutNotExceeded() throws Exception {
+    // the 'block1-slow-enrichment' will sleep for 5 seconds, which exceeds the block timeout of 1 second
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(messageTimeoutNotExceeded, SensorEnrichmentConfig.class);
+    config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
+
+    // attempt to enrich the message which will exceed the enrichment timeout
+    final String sourceType = "test";
+    JSONObject message = new JSONObject() {{
+      put(Constants.SENSOR_TYPE, sourceType);
+    }};
+    ParallelEnricher.EnrichmentResult result = enricher.apply(message, EnrichmentStrategies.ENRICHMENT, config, null);
+    JSONObject enrichedMessage = result.getResult();
+
+    // all enrichments should have been completed successfully within the timeout
+    Assert.assertEquals(100L, enrichedMessage.get("block1-enrichment"));
+    Assert.assertEquals(100L, enrichedMessage.get("block2-enrichment"));
+
+    // no enrichment errors expected
+    Assert.assertEquals(0, result.getEnrichmentErrors().size());
+
+    // other message fields
+    Assert.assertEquals(sourceType, enrichedMessage.get("source.type"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
+    Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
   }
 }
