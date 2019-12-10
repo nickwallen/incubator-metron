@@ -9,6 +9,6 @@ import java.util.concurrent.TimeoutException;
 public class EnrichmentTimeoutException extends TimeoutException {
 
     public EnrichmentTimeoutException(long timeout, TimeUnit timeoutUnits) {
-        super(String.format("%s %s enrichment timeout exceeded", timeout, timeoutUnits.toString().toLowerCase()));
+        super(String.format("%s %s(s) enrichment timeout exceeded", timeout, timeoutUnits.toString().toLowerCase()));
     }
 }

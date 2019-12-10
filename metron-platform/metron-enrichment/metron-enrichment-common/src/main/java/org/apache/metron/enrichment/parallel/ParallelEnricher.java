@@ -214,7 +214,8 @@ public class ParallelEnricher {
 
             // if the block exceeds the timeout, create an enrichment error
             future = future.exceptionally(e -> {
-              LOG.debug("Enrichments in '{}' failed to complete within {} millisecond(s); guid={}", field, blockTimeout.get(), message.get(Constants.GUID));
+              LOG.debug("Enrichments in '{}' failed to complete within {} ms. No enrichments from '{}' added to message; guid={}",
+                      field, blockTimeout.get(), field, message.get(Constants.GUID));
               errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
             });
@@ -243,10 +244,10 @@ public class ParallelEnricher {
       }
 
     } catch(TimeoutException e) {
-      LOG.debug("All enrichments failed to complete within timeout; guid={}, {}={} millis",
-              message.get(Constants.GUID), ENRICHMENT_MESSAGE_TIMEOUT, messageTimeout.get());
+      LOG.debug("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
+              messageTimeout.get(), message.get(Constants.GUID));
       enrichedMessage = message;
-      errors.add(createError(sensorType, enrichedMessage, e));
+      errors.add(createError(strategy, sensorType, enrichedMessage, e));
 
     } finally {
       enrichedMessage.put(getClass().getSimpleName().toLowerCase() + ".enrich.end.ts", "" + System.currentTimeMillis());
@@ -283,18 +284,22 @@ public class ParallelEnricher {
   }
 
   private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, String enrichmentAdapter, JSONObject m, Throwable e) {
-    JSONObject errorMessage = new JSONObject();
-    errorMessage.putAll(m);
-    errorMessage.put(Constants.SENSOR_TYPE, sensorType );
+    JSONObject errorMessage = createErrorMessage(m, sensorType);
     Exception exception = new IllegalStateException(strategy + " error with " + enrichmentAdapter + " failed: " + e.getMessage(), e);
     return new AbstractMap.SimpleEntry<>(errorMessage, exception);
   }
 
-  private static Map.Entry<Object, Throwable> createError(String sensorType, JSONObject m, Throwable e) {
+  private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, JSONObject m, Throwable cause) {
+    JSONObject errorMessage = createErrorMessage(m, sensorType);
+    Exception exception = new IllegalStateException(strategy + " failed: " + cause.getMessage(), cause);
+    return new AbstractMap.SimpleEntry<>(errorMessage, exception);
+  }
+
+  private static JSONObject createErrorMessage(JSONObject original, String sensorType) {
     JSONObject errorMessage = new JSONObject();
-    errorMessage.putAll(m);
-    errorMessage.put(Constants.SENSOR_TYPE, sensorType );
-    return new AbstractMap.SimpleEntry<>(errorMessage, e);
+    errorMessage.putAll(original);
+    errorMessage.put(Constants.SENSOR_TYPE, sensorType);
+    return errorMessage;
   }
 
   /**
