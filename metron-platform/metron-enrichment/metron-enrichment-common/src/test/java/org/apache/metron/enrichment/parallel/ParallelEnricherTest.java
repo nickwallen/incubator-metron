@@ -331,6 +331,7 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+    Assert.assertEquals("Unexpected fields: " + enrichedMessage.keySet(), 9, enrichedMessage.size());
   }
 
   /**
@@ -340,7 +341,7 @@ public class ParallelEnricherTest {
    *       "stellar": {
    *         "config": {
    *           "block-1": {
-   *             "block1-slow-enrichment": "SLEEP(5000)",
+   *             "block1-slow-enrichment": "SLEEP(5000)"
    *           },
    *           "block-2": {
    *              "block2-slow-enrichment": "SLEEP(5000)"
@@ -360,9 +361,9 @@ public class ParallelEnricherTest {
   public static String multipleBlockTimeoutExceeded;
 
   @Test
-  public void testMultipleBlockTimeoutExceeded() throws Exception {
+  public void testMultipleBlockTimeoutsExceeded() throws Exception {
     // enrichments in both blocks will sleep for 5 seconds, which exceeds the block timeout of 500 ms
-    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(blockTimeoutExceeded, SensorEnrichmentConfig.class);
+    SensorEnrichmentConfig config = JSONUtils.INSTANCE.load(multipleBlockTimeoutExceeded, SensorEnrichmentConfig.class);
     config.getConfiguration().putIfAbsent("stellarContext", stellarContext);
 
     // attempt to enrich the message which will exceed the enrichment timeout
@@ -383,6 +384,7 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+    Assert.assertEquals("Unexpected fields: " + enrichedMessage.keySet(), 7, enrichedMessage.size());
   }
 
   /**
@@ -436,6 +438,7 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+    Assert.assertEquals("Unexpected fields: " + enrichedMessage.keySet(), 11, enrichedMessage.size());
   }
 
   /**
@@ -455,7 +458,7 @@ public class ParallelEnricherTest {
    *     },
    *     "fieldToTypeMap": {},
    *     "config": {
-   *         "message.timeout.millis": 500
+   *         "message.timeout.millis": 100
    *     }
    *   },
    *   "threatIntel": {}
@@ -488,6 +491,7 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+    Assert.assertEquals("Unexpected fields: " + enrichedMessage.keySet(), 7, enrichedMessage.size());
   }
 
   /**
@@ -540,6 +544,7 @@ public class ParallelEnricherTest {
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.splitter.end.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.begin.ts"));
     Assert.assertTrue(enrichedMessage.containsKey("parallelenricher.enrich.end.ts"));
+    Assert.assertEquals("Unexpected fields: " + enrichedMessage.keySet(), 10, enrichedMessage.size());
   }
 
   private JSONObject createMessage() {
