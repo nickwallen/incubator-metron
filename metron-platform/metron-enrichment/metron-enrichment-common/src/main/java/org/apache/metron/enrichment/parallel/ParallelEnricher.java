@@ -47,11 +47,18 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
+
+import static org.apache.metron.enrichment.parallel.CompletableFuture9.orTimeout;
 
 /**
  * This is an independent component which will accept a message and a set of enrichment adapters as well as a config which defines
@@ -210,11 +217,11 @@ public class ParallelEnricher {
           CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
           if(blockTimeout.isPresent() && blockTimeout.get() > 0L) {
             // ensure the enrichment 'block' takes no longer than the timeout
-            future = withTimeout(future, blockTimeout.get());
+            future = orTimeout(future, blockTimeout.get(), TimeUnit.MILLISECONDS);
 
             // if the block exceeds the timeout, create an enrichment error
             future = future.exceptionally(e -> {
-              LOG.debug("Enrichments in '{}' failed to complete within {} ms. No enrichments from '{}' added to message; guid={}",
+              LOG.warn("Enrichments in '{}' failed to complete within {} ms. No enrichments from '{}' added to message; guid={}",
                       field, blockTimeout.get(), field, message.get(Constants.GUID));
               errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
@@ -244,7 +251,7 @@ public class ParallelEnricher {
       }
 
     } catch(TimeoutException e) {
-      LOG.debug("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
+      LOG.warn("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
               messageTimeout.get(), message.get(Constants.GUID));
       enrichedMessage = message;
       errors.add(createError(strategy, sensorType, enrichedMessage, e));
@@ -301,44 +308,6 @@ public class ParallelEnricher {
     errorMessage.put(Constants.SENSOR_TYPE, sensorType);
     return errorMessage;
   }
-
-  /**
-   * Creates a future that will throw an exception if computation of the original future
-   * takes longer than the timeout.
-   *
-   * http://iteratrlearning.com/java9/2016/09/13/java9-timeouts-completablefutures.html
-   * https://www.nurkiewicz.com/2014/12/asynchronous-timeouts-with.html
-   *
-   * @param future The original future.
-   * @param timeoutMillis The maximum time to wait for the original future to compute.
-   * @return A {@link CompletableFuture} that will execute no longer than the timeout.
-   */
-  @SuppressWarnings("unchecked")
-  private static <T> CompletableFuture<T> withTimeout(CompletableFuture<T> future, long timeoutMillis) {
-    return (CompletableFuture<T>) CompletableFuture.anyOf(future, timeoutAfter(timeoutMillis, TimeUnit.MILLISECONDS));
-  }
-
-  /**
-   * Creates a {@link CompletableFuture} that will throw an exception after a fixed
-   * period of time.
-   * @param timeout The timeout value.
-   * @param timeoutUnits The units of the timeout value.
-   * @return A {@link CompletableFuture}.
-   */
-  private static <T> CompletableFuture<T> timeoutAfter(long timeout, TimeUnit timeoutUnits) {
-    CompletableFuture<T> result = new CompletableFuture<>();
-    timeoutScheduler.schedule(
-            () -> result.completeExceptionally(new EnrichmentTimeoutException(timeout, timeoutUnits)),
-            timeout,
-            timeoutUnits);
-    return result;
-  }
-
-  private static final ScheduledExecutorService timeoutScheduler = Executors.newScheduledThreadPool(1,
-          new ThreadFactoryBuilder()
-                  .setNameFormat("enrichment-timeout-%d")
-                  .setDaemon(true)
-                  .build());
 
   private static JSONObject join(JSONObject left, JSONObject right) {
     JSONObject message = new JSONObject();
