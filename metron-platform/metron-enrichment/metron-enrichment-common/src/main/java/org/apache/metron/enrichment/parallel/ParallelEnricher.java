@@ -241,26 +241,23 @@ public class ParallelEnricher {
     CompletableFuture<JSONObject> enrichments = all(taskList, message, (left, right) -> join(left, right));
     JSONObject enrichedMessage = new JSONObject();
     Optional<Long> messageTimeout = getEnrichmentMessageTimeout(config);
-    try {
-      if(messageTimeout.isPresent()) {
-        // enforce the enrichment message timeout
+    if(messageTimeout.isPresent()) {
+      // enforce the enrichment message timeout
+      try {
         enrichedMessage = enrichments.get(messageTimeout.get(), TimeUnit.MILLISECONDS);
-      } else {
-        // no enrichment message timeout
-        enrichedMessage = enrichments.get();
+      } catch(TimeoutException e) {
+        LOG.warn("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
+                messageTimeout.get(), message.get(Constants.GUID));
+        enrichedMessage = message;
+        errors.add(createError(strategy, sensorType, enrichedMessage, e));
       }
-
-    } catch(TimeoutException e) {
-      LOG.warn("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
-              messageTimeout.get(), message.get(Constants.GUID));
-      enrichedMessage = message;
-      errors.add(createError(strategy, sensorType, enrichedMessage, e));
-
-    } finally {
-      enrichedMessage.put(getClass().getSimpleName().toLowerCase() + ".enrich.end.ts", "" + System.currentTimeMillis());
+    } else {
+      // no enrichment message timeout
+      enrichedMessage = enrichments.get();
     }
 
     EnrichmentResult ret = new EnrichmentResult(enrichedMessage, errors);
+    ret.getResult().put(getClass().getSimpleName().toLowerCase() + ".enrich.end.ts", "" + System.currentTimeMillis());
     if(perfLog != null) {
       String key = message.get(Constants.GUID) + "";
       perfLog.log("enrich", "key={}, elapsed time to enrich", key);
