@@ -243,7 +243,7 @@ public class ParallelEnricher {
       }
 
     } catch(TimeoutException e) {
-      LOG.debug("Enrichment failed to complete within timeout; guid={}, {}={} millis",
+      LOG.debug("All enrichments failed to complete within timeout; guid={}, {}={} millis",
               message.get(Constants.GUID), ENRICHMENT_MESSAGE_TIMEOUT, messageTimeout.get());
       enrichedMessage = message;
       errors.add(createError(sensorType, enrichedMessage, e));
