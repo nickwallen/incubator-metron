@@ -19,6 +19,7 @@ package org.apache.metron.enrichment.parallel;
 
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.base.Joiner;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.metron.common.Constants;
 import org.apache.metron.common.configuration.enrichment.SensorEnrichmentConfig;
 import org.apache.metron.common.configuration.enrichment.handler.ConfigHandler;
@@ -27,8 +28,12 @@ import org.apache.metron.common.utils.MessageUtils;
 import org.apache.metron.enrichment.cache.CacheKey;
 import org.apache.metron.enrichment.interfaces.EnrichmentAdapter;
 import org.apache.metron.enrichment.utils.EnrichmentUtils;
+import org.apache.metron.stellar.common.utils.ConversionUtils;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.invoke.MethodHandles;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,11 +42,23 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
 import java.util.function.Supplier;
+
+import static org.apache.metron.enrichment.parallel.CompletableFuture9.orTimeout;
 
 /**
  * This is an independent component which will accept a message and a set of enrichment adapters as well as a config which defines
@@ -49,7 +66,9 @@ import java.util.function.Supplier;
  * unified together and a list of errors which happened.
  */
 public class ParallelEnricher {
-
+  private static final Logger LOG = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final String ENRICHMENT_MESSAGE_TIMEOUT = "message.timeout.millis";
+  private static final String ENRICHMENT_BLOCK_TIMEOUT = "block.timeout.millis";
   private Map<String, EnrichmentAdapter<CacheKey>> enrichmentsByType = new HashMap<>();
   private EnumMap<EnrichmentStrategies, CacheStats> cacheStats = new EnumMap<>(EnrichmentStrategies.class);
 
@@ -158,6 +177,7 @@ public class ParallelEnricher {
                 + ", possible adapters are: " + Joiner.on(",").join(enrichmentsByType.keySet()));
       }
       message.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".begin.ts", "" + System.currentTimeMillis());
+      final Optional<Long> blockTimeout = getEnrichmentBlockTimeout(config);
       for(JSONObject m : task.getValue()) {
         /* now for each unit of work (each of these only has one element in them)
          * the key is the field name and the value is value associated with that field.
@@ -189,15 +209,27 @@ public class ParallelEnricher {
               adjustedKeys.put("adapter." + adapter.getClass().getSimpleName().toLowerCase() + ".end.ts", "" + System.currentTimeMillis());
               return adjustedKeys;
             } catch (Throwable e) {
-              JSONObject errorMessage = new JSONObject();
-              errorMessage.putAll(m);
-              errorMessage.put(Constants.SENSOR_TYPE, sensorType );
-              errors.add(new AbstractMap.SimpleEntry<>(errorMessage, new IllegalStateException(strategy + " error with " + task.getKey() + " failed: " + e.getMessage(), e)));
+              errors.add(createError(strategy, sensorType, task.getKey(), m, e));
               return new JSONObject();
             }
           };
+
+          CompletableFuture<JSONObject> future = CompletableFuture.supplyAsync(supplier, ConcurrencyContext.getExecutor());
+          if(blockTimeout.isPresent() && blockTimeout.get() > 0L) {
+            // ensure the enrichment 'block' takes no longer than the timeout
+            future = orTimeout(future, blockTimeout.get(), TimeUnit.MILLISECONDS);
+
+            // if the block exceeds the timeout, create an enrichment error
+            future = future.exceptionally(e -> {
+              LOG.warn("Enrichments in '{}' failed to complete within {} ms. No enrichments from '{}' added to message; guid={}",
+                      field, blockTimeout.get(), field, message.get(Constants.GUID));
+              errors.add(createError(strategy, sensorType, task.getKey(), m, e));
+              return new JSONObject();
+            });
+          }
+
           //add the Future to the task list
-          taskList.add(CompletableFuture.supplyAsync( supplier, ConcurrencyContext.getExecutor()));
+          taskList.add(future);
         }
       }
     }
@@ -206,7 +238,25 @@ public class ParallelEnricher {
       return new EnrichmentResult(message, errors);
     }
 
-    EnrichmentResult ret = new EnrichmentResult(all(taskList, message, (left, right) -> join(left, right)).get(), errors);
+    CompletableFuture<JSONObject> enrichments = all(taskList, message, (left, right) -> join(left, right));
+    JSONObject enrichedMessage = new JSONObject();
+    Optional<Long> messageTimeout = getEnrichmentMessageTimeout(config);
+    if(messageTimeout.isPresent()) {
+      // enforce the enrichment message timeout
+      try {
+        enrichedMessage = enrichments.get(messageTimeout.get(), TimeUnit.MILLISECONDS);
+      } catch(TimeoutException e) {
+        LOG.warn("Enrichment failed to complete within {} ms. No enrichments added to message; guid={}",
+                messageTimeout.get(), message.get(Constants.GUID));
+        enrichedMessage = message;
+        errors.add(createError(strategy, sensorType, enrichedMessage, e));
+      }
+    } else {
+      // no enrichment message timeout
+      enrichedMessage = enrichments.get();
+    }
+
+    EnrichmentResult ret = new EnrichmentResult(enrichedMessage, errors);
     ret.getResult().put(getClass().getSimpleName().toLowerCase() + ".enrich.end.ts", "" + System.currentTimeMillis());
     if(perfLog != null) {
       String key = message.get(Constants.GUID) + "";
@@ -214,6 +264,46 @@ public class ParallelEnricher {
       perfLog.log("execute", "key={}, elapsed time to run execute", key);
     }
     return ret;
+  }
+
+  private Optional<Long> getEnrichmentMessageTimeout(SensorEnrichmentConfig enrichmentConfig) {
+    return getConfigurationValue(enrichmentConfig, ENRICHMENT_MESSAGE_TIMEOUT);
+  }
+
+  private Optional<Long> getEnrichmentBlockTimeout(SensorEnrichmentConfig enrichmentConfig) {
+    return getConfigurationValue(enrichmentConfig, ENRICHMENT_BLOCK_TIMEOUT);
+  }
+
+  private Optional<Long> getConfigurationValue(SensorEnrichmentConfig enrichmentConfig, String key) {
+    Optional<Long> result = Optional.empty();
+    Map<String, Object> config = enrichmentConfig.getEnrichment().getConfig();
+    if(config.containsKey(key)) {
+      long timeout = ConversionUtils.convert(config.get(key), Long.class);
+      if(timeout > 0) {
+        result = Optional.of(timeout);
+      }
+    }
+
+    return result;
+  }
+
+  private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, String enrichmentAdapter, JSONObject m, Throwable e) {
+    JSONObject errorMessage = createErrorMessage(m, sensorType);
+    Exception exception = new IllegalStateException(strategy + " error with " + enrichmentAdapter + " failed: " + e.getMessage(), e);
+    return new AbstractMap.SimpleEntry<>(errorMessage, exception);
+  }
+
+  private static Map.Entry<Object, Throwable> createError(EnrichmentStrategies strategy, String sensorType, JSONObject m, Throwable cause) {
+    JSONObject errorMessage = createErrorMessage(m, sensorType);
+    Exception exception = new IllegalStateException(strategy + " failed: " + cause.getMessage(), cause);
+    return new AbstractMap.SimpleEntry<>(errorMessage, exception);
+  }
+
+  private static JSONObject createErrorMessage(JSONObject original, String sensorType) {
+    JSONObject errorMessage = new JSONObject();
+    errorMessage.putAll(original);
+    errorMessage.put(Constants.SENSOR_TYPE, sensorType);
+    return errorMessage;
   }
 
   private static JSONObject join(JSONObject left, JSONObject right) {
@@ -232,7 +322,6 @@ public class ParallelEnricher {
     }
     return message;
   }
-
 
   /**
    * Wait until all the futures complete and join the resulting JSONObjects using the supplied binary operator
