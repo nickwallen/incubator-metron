@@ -1,0 +1,7 @@
+#NOTE: This is an Aether internal implementation file, its format can be changed without prior notice.
+#Wed Mar 11 15:04:20 EDT 2020
+stellar-common-0.7.1-tests.jar>=
+stellar-common-0.7.1.jar>=
+stellar-common-0.7.1-stand-alone.tar.gz>=
+stellar-common-0.7.1.pom>=
+stellar-common-0.7.1-uber.jar>=
