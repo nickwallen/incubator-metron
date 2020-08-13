@@ -26,7 +26,7 @@
     <description>Interfaces for Metron</description>
     <url>https://metron.apache.org/</url>
     <properties>
-        <jackson.version>2.9.5</jackson.version>
+        <jackson.version>2.10.0.pr1</jackson.version>
     </properties>
     <scm>
         <connection>scm:git:https://gitbox.apache.org/repos/asf/metron.git</connection>
